@@ -1,0 +1,157 @@
+/* Porkex — Global styles (Vercel-inspired dark UI) */
+
+:root {
+  color-scheme: dark;
+
+  /* Geist-style sans stack; falls back to the OS UI font */
+  --porkex-font: 'Geist', ui-sans-serif, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Feed the Vuetify typography scale */
+  --v-font-body: var(--porkex-font);
+  --v-font-heading: var(--porkex-font);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000000;
+  font-family: var(--porkex-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(0, 112, 243, 0.35);
+  color: #fff;
+}
+
+/* ── Typography scale (32/40 · 24/32 · 20/32 · 16/24 · 14/20) ───────── */
+.text-h1 { font-size: 48px; line-height: 56px; letter-spacing: -0.02em; }
+.text-h2 { font-size: 40px; line-height: 48px; letter-spacing: -0.02em; }
+.text-h3 { font-size: 32px; line-height: 40px; letter-spacing: -0.02em; }
+.text-h4 { font-size: 24px; line-height: 32px; letter-spacing: -0.02em; }
+.text-h5 { font-size: 20px; line-height: 32px; letter-spacing: -0.01em; }
+.text-h6 { font-size: 16px; line-height: 24px; letter-spacing: -0.01em; }
+
+/* ── Pill toggle groups (period / type filters) ──────────────────────── */
+/* rounded="pill" on v-btn-toggle falls through to the container, not the
+   buttons — force true pill radius on the buttons themselves. */
+.v-btn-toggle > .v-btn {
+  border-radius: 999px;
+}
+/* Inactive outlined buttons inherit bright text as border-color (currentColor);
+   force a hairline border + muted label, active keeps the toggle color. */
+.v-btn-toggle {
+  gap: 8px;
+}
+.v-btn-toggle .v-btn--variant-outlined {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.v-btn-toggle .v-btn--variant-outlined:not(.v-btn--active) {
+  color: #a1a1a1;
+}
+.v-btn-toggle .v-btn--variant-outlined.v-btn--active {
+  border-color: currentColor;
+}
+
+/* ── Thin scrollbars ─────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 999px;
+  border: 2px solid #000;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4d4d4d;
+}
+
+/* ── Brand logo (black in the source): displayed in white on the dark theme */
+.brand-logo {
+  filter: invert(1);
+  flex-shrink: 0;
+}
+
+/* ── Brand centered in the app bar, independent of the nav icon ─────────── */
+.app-bar-brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── Page transition: fade + slide up ──────────────────────────────────── */
+/* 120ms. The duration used to be 200ms, which sat in front of every navigation:
+   the incoming view only started fetching once the outgoing one had faded. */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ── Simple fade for login ─────────────────────────────────────────────── */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* ── Respect reduced-motion preferences ───────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .fade-slide-enter-active,
+  .fade-slide-leave-active,
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: none;
+  }
+  .fade-slide-enter-from,
+  .fade-slide-leave-to,
+  .fade-enter-from,
+  .fade-leave-to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Shared page container width for every view ──────────────────────── */
+.max-w-1200 {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Dialogs: keep long forms scrollable on short viewports ──────────── */
+.v-dialog .v-card-text {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+/* ── Flat cards (Vercel: hairline borders, no shadows) ───────────────── */
+.v-card.elevation-1 {
+  box-shadow: none;
+}

@@ -68,9 +68,25 @@ describe('the MDI icon set', () => {
 describe('the alias table', () => {
   it('covers the aliases Vuetify looks up through $name', () => {
     for (const name of [
-      'close', 'delete', 'clear', 'success', 'info', 'warning', 'error',
-      'prev', 'next', 'expand', 'menu', 'dropdown', 'checkboxOn', 'checkboxOff',
-      'sortAsc', 'sortDesc', 'edit', 'loading', 'search'
+      'close',
+      'delete',
+      'clear',
+      'success',
+      'info',
+      'warning',
+      'error',
+      'prev',
+      'next',
+      'expand',
+      'menu',
+      'dropdown',
+      'checkboxOn',
+      'checkboxOff',
+      'sortAsc',
+      'sortDesc',
+      'edit',
+      'loading',
+      'search'
     ]) {
       expect(aliases[name], `falta el alias ${name}`).toBeTruthy()
     }

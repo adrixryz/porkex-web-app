@@ -21,12 +21,23 @@
     <template v-else>
       <!-- HEADER -->
       <v-row class="mb-4">
-        <v-col cols="12" class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4">
+        <v-col
+          cols="12"
+          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
+        >
           <div>
             <h1 class="text-h4 font-weight-bold text-on-surface">Budgets</h1>
-            <p class="text-body-2 text-on-surface-variant mt-1">Set a limit per category and watch how much is left.</p>
+            <p class="text-body-2 text-on-surface-variant mt-1">
+              Set a limit per category and watch how much is left.
+            </p>
           </div>
-          <v-btn color="primary" elevation="0" rounded="pill" :prepend-icon="mdiPlus" @click="openDialog()">
+          <v-btn
+            color="primary"
+            elevation="0"
+            rounded="pill"
+            :prepend-icon="mdiPlus"
+            @click="openDialog()"
+          >
             New Budget
           </v-btn>
         </v-col>
@@ -35,7 +46,15 @@
       <!-- PERIOD TOGGLE -->
       <v-row class="mb-4">
         <v-col cols="12" class="d-flex align-center">
-          <v-btn-toggle v-model="period" mandatory color="primary" density="compact" rounded="pill" variant="outlined" aria-label="Budget period">
+          <v-btn-toggle
+            v-model="period"
+            mandatory
+            color="primary"
+            density="compact"
+            rounded="pill"
+            variant="outlined"
+            aria-label="Budget period"
+          >
             <v-btn value="MONTH">This month</v-btn>
             <v-btn value="WEEK">This week</v-btn>
           </v-btn-toggle>
@@ -46,22 +65,37 @@
       <v-row v-if="totals" class="mb-4">
         <v-col cols="12" sm="6" md="4">
           <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">Total limit</div>
-            <div class="text-h5 font-weight-bold text-on-surface">{{ cs }}{{ formatMoney(totals.amount) }}</div>
-            <div class="text-caption text-on-surface-variant">across {{ totals.count }} {{ totals.count === 1 ? 'category' : 'categories' }}</div>
+            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
+              Total limit
+            </div>
+            <div class="text-h5 font-weight-bold text-on-surface">
+              {{ cs }}{{ formatMoney(totals.amount) }}
+            </div>
+            <div class="text-caption text-on-surface-variant">
+              across {{ totals.count }} {{ totals.count === 1 ? 'category' : 'categories' }}
+            </div>
           </v-card>
         </v-col>
         <v-col cols="12" sm="6" md="4">
           <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
             <div class="text-caption text-on-surface-variant font-weight-medium mb-1">Spent</div>
-            <div class="text-h5 font-weight-bold text-on-surface">{{ cs }}{{ formatMoney(totals.spent) }}</div>
-            <div class="text-caption text-on-surface-variant">{{ overallPercent }}% of the limit used</div>
+            <div class="text-h5 font-weight-bold text-on-surface">
+              {{ cs }}{{ formatMoney(totals.spent) }}
+            </div>
+            <div class="text-caption text-on-surface-variant">
+              {{ overallPercent }}% of the limit used
+            </div>
           </v-card>
         </v-col>
         <v-col cols="12" sm="12" md="4">
           <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">Remaining</div>
-            <div class="text-h5 font-weight-bold" :class="remainingTotal < 0 ? 'text-error' : 'text-success'">
+            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
+              Remaining
+            </div>
+            <div
+              class="text-h5 font-weight-bold"
+              :class="remainingTotal < 0 ? 'text-error' : 'text-success'"
+            >
               {{ cs }}{{ formatMoney(remainingTotal) }}
             </div>
             <div class="text-caption text-on-surface-variant">
@@ -79,9 +113,19 @@
         <v-col cols="12">
           <div class="text-center pa-12 text-on-surface-variant">
             <v-icon :icon="mdiPiggyBankOutline" size="72" class="mb-4 opacity-40"></v-icon>
-            <p class="text-h6 font-weight-medium mb-1">No budgets for {{ period === 'MONTH' ? 'this month' : 'this week' }}</p>
-            <p class="text-body-2 mb-6">Set a limit on a category to know when you are getting close to the limit.</p>
-            <v-btn color="primary" elevation="0" rounded="pill" :prepend-icon="mdiPlus" @click="openDialog()">
+            <p class="text-h6 font-weight-medium mb-1">
+              No budgets for {{ period === 'MONTH' ? 'this month' : 'this week' }}
+            </p>
+            <p class="text-body-2 mb-6">
+              Set a limit on a category to know when you are getting close to the limit.
+            </p>
+            <v-btn
+              color="primary"
+              elevation="0"
+              rounded="pill"
+              :prepend-icon="mdiPlus"
+              @click="openDialog()"
+            >
               Create your first budget
             </v-btn>
           </div>
@@ -97,20 +141,41 @@
                 <v-icon :icon="mdiTagOutline" color="white"></v-icon>
               </v-avatar>
               <div class="flex-grow-1">
-                <div class="font-weight-medium text-body-1 text-on-surface">{{ b.category.name }}</div>
+                <div class="font-weight-medium text-body-1 text-on-surface">
+                  {{ b.category.name }}
+                </div>
                 <div class="text-caption text-on-surface-variant">
                   {{ b.period === 'MONTH' ? 'Monthly' : 'Weekly' }} limit
                 </div>
               </div>
-              <v-btn :icon="mdiPencilOutline" variant="text" size="small" color="primary" :aria-label="`Edit budget for ${b.category.name}`" @click="openDialog(b)"></v-btn>
-              <v-btn :icon="mdiDeleteOutline" variant="text" size="small" color="error" :aria-label="`Delete budget for ${b.category.name}`" @click="confirmDelete(b)"></v-btn>
+              <v-btn
+                :icon="mdiPencilOutline"
+                variant="text"
+                size="small"
+                color="primary"
+                :aria-label="`Edit budget for ${b.category.name}`"
+                @click="openDialog(b)"
+              ></v-btn>
+              <v-btn
+                :icon="mdiDeleteOutline"
+                variant="text"
+                size="small"
+                color="error"
+                :aria-label="`Delete budget for ${b.category.name}`"
+                @click="confirmDelete(b)"
+              ></v-btn>
             </div>
 
             <div class="d-flex align-baseline justify-space-between mb-2">
-              <span class="text-h6 font-weight-bold" :class="b.overBudget ? 'text-error' : 'text-on-surface'">
+              <span
+                class="text-h6 font-weight-bold"
+                :class="b.overBudget ? 'text-error' : 'text-on-surface'"
+              >
                 {{ cs }}{{ formatMoney(b.spent) }}
               </span>
-              <span class="text-body-2 text-on-surface-variant">of {{ cs }}{{ formatMoney(b.amount) }}</span>
+              <span class="text-body-2 text-on-surface-variant"
+                >of {{ cs }}{{ formatMoney(b.amount) }}</span
+              >
             </div>
 
             <v-progress-linear
@@ -119,11 +184,17 @@
               bg-color="surface-bright"
               height="8"
               rounded
+              :aria-label="`${b.category.name}: ${b.usagePercent}% of the limit used`"
             ></v-progress-linear>
 
             <div class="d-flex align-center justify-space-between mt-2">
-              <span class="text-caption" :class="b.overBudget ? 'text-error font-weight-medium' : 'text-on-surface-variant'">
-                <template v-if="b.overBudget">Over by {{ cs }}{{ formatMoney(Math.abs(b.remaining)) }}</template>
+              <span
+                class="text-caption"
+                :class="b.overBudget ? 'text-error font-weight-medium' : 'text-on-surface-variant'"
+              >
+                <template v-if="b.overBudget"
+                  >Over by {{ cs }}{{ formatMoney(Math.abs(b.remaining)) }}</template
+                >
                 <template v-else>{{ cs }}{{ formatMoney(b.remaining) }} left</template>
               </span>
               <span class="text-caption text-on-surface-variant">{{ b.usagePercent }}%</span>
@@ -139,7 +210,14 @@
         <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
           <span class="font-weight-medium">{{ editingBudget ? 'Edit Budget' : 'New Budget' }}</span>
           <v-spacer></v-spacer>
-          <v-btn :icon="mdiClose" variant="text" size="small" aria-label="Close dialog" :disabled="submitting" @click="dialog = false"></v-btn>
+          <v-btn
+            :icon="mdiClose"
+            variant="text"
+            size="small"
+            aria-label="Close dialog"
+            :disabled="submitting"
+            @click="dialog = false"
+          ></v-btn>
         </v-card-title>
         <v-card-text class="pa-6">
           <v-form @submit.prevent="submit">
@@ -167,13 +245,37 @@
                 <AmountStepper label="budget limit" @step="stepAmount"></AmountStepper>
               </template>
             </v-text-field>
-            <v-select v-model="form.period" :items="periodOptions" item-title="title" item-value="value" label="Repeats" class="mb-2"></v-select>
+            <v-select
+              v-model="form.period"
+              :items="periodOptions"
+              item-title="title"
+              item-value="value"
+              label="Repeats"
+              class="mb-2"
+            ></v-select>
 
-            <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-4" closable @click:close="error = ''">
+            <v-alert
+              v-if="error"
+              type="error"
+              variant="tonal"
+              density="compact"
+              class="mt-4"
+              closable
+              @click:close="error = ''"
+            >
               {{ error }}
             </v-alert>
 
-            <v-btn type="submit" color="primary" size="large" rounded="pill" class="w-100 mt-4 font-weight-bold" elevation="0" :loading="submitting" :disabled="!isValid">
+            <v-btn
+              type="submit"
+              color="primary"
+              size="large"
+              rounded="pill"
+              class="w-100 mt-4 font-weight-bold"
+              elevation="0"
+              :loading="submitting"
+              :disabled="!isValid"
+            >
               {{ editingBudget ? 'Update' : 'Create' }}
             </v-btn>
           </v-form>
@@ -190,17 +292,28 @@
           </v-avatar>
           <p class="text-h6 font-weight-medium mb-2">Remove budget?</p>
           <p class="text-body-2 text-on-surface-variant mb-6">
-            The limit for {{ deletingBudget?.category.name }} will be deleted. Your transactions are not affected.
+            The limit for {{ deletingBudget?.category.name }} will be deleted. Your transactions are
+            not affected.
           </p>
           <div class="d-flex ga-3 justify-center">
-            <v-btn variant="outlined" rounded="pill" :disabled="deleting" @click="deleteDialog = false">Cancel</v-btn>
-            <v-btn color="error" elevation="0" rounded="pill" :loading="deleting" @click="doDelete">Delete</v-btn>
+            <v-btn
+              variant="outlined"
+              rounded="pill"
+              :disabled="deleting"
+              @click="deleteDialog = false"
+              >Cancel</v-btn
+            >
+            <v-btn color="error" elevation="0" rounded="pill" :loading="deleting" @click="doDelete"
+              >Delete</v-btn
+            >
           </div>
         </v-card-text>
       </v-card>
     </v-dialog>
 
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{ snackMessage }}</v-snackbar>
+    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
+      snackMessage
+    }}</v-snackbar>
   </v-container>
 </template>
 
@@ -211,8 +324,16 @@ import { useAsyncData } from '@/composables/useAsyncData'
 import { useSnackbar } from '@/composables/useSnackbar'
 import { api, fetchJson } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
+import { todayInput } from '@/utils/date'
 import type { Budget, BudgetPeriod, BudgetsResponse, Category } from '@/types'
-import { mdiClose, mdiDeleteOutline, mdiPencilOutline, mdiPiggyBankOutline, mdiPlus, mdiTagOutline } from '@mdi/js'
+import {
+  mdiClose,
+  mdiDeleteOutline,
+  mdiPencilOutline,
+  mdiPiggyBankOutline,
+  mdiPlus,
+  mdiTagOutline
+} from '@mdi/js'
 
 const cs = useCurrencySymbol()
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
@@ -221,15 +342,28 @@ const EMPTY_BUDGETS: BudgetsResponse = { budgets: [], totals: [] }
 
 const period = ref<BudgetPeriod>('MONTH')
 
-const { data, loading, error: loadError, run: fetchBudgets } = useAsyncData<BudgetsResponse>(
-  signal => fetchJson<BudgetsResponse>(`/budgets?period=${period.value}`, { signal }),
+// `today` anchors the weekly/monthly window to the user's own calendar day:
+// the backend computes the range in UTC but starts from this day, so the
+// budget no longer rolls over mid-evening on a device west of UTC.
+const {
+  data,
+  loading,
+  error: loadError,
+  run: fetchBudgets
+} = useAsyncData<BudgetsResponse>(
+  signal =>
+    fetchJson<BudgetsResponse>(`/budgets?period=${period.value}&today=${todayInput()}`, { signal }),
   EMPTY_BUDGETS,
+  // `today` is only in the request, not the cache key: yesterday's numbers are
+  // still worth showing offline, under the stale banner.
   { cacheKey: () => `/budgets?period=${period.value}` }
 )
 
 const budgets = computed(() => data.value.budgets)
 const totals = computed(() => data.value.totals.find(t => t.period === period.value) ?? null)
-const remainingTotal = computed(() => (totals.value ? round2(totals.value.amount - totals.value.spent) : 0))
+const remainingTotal = computed(() =>
+  totals.value ? round2(totals.value.amount - totals.value.spent) : 0
+)
 const overBudgetCount = computed(() => budgets.value.filter(b => b.overBudget).length)
 const overallPercent = computed(() => {
   const t = totals.value
@@ -287,12 +421,15 @@ const availableCategories = computed(() => {
 
 // Switching the period can leave the chosen category unusable. Not while editing:
 // the category is fixed then, since the API only accepts amount and period.
-watch(() => form.value.period, () => {
-  if (isEditing.value) return
-  if (!availableCategories.value.some(c => c.id === form.value.categoryId)) {
-    form.value.categoryId = null
+watch(
+  () => form.value.period,
+  () => {
+    if (isEditing.value) return
+    if (!availableCategories.value.some(c => c.id === form.value.categoryId)) {
+      form.value.categoryId = null
+    }
   }
-})
+)
 
 const isValid = computed(() => Number(form.value.amount) > 0 && form.value.categoryId !== null)
 
@@ -372,5 +509,7 @@ onMounted(loadBudgets)
 </script>
 
 <style scoped>
-.cursor-pointer { cursor: pointer; }
+.cursor-pointer {
+  cursor: pointer;
+}
 </style>

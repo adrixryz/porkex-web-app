@@ -8,37 +8,43 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
-      meta: { public: true }
+      meta: { public: true, title: 'Log in' }
     },
     {
       path: '/',
       name: 'dashboard',
-      component: () => import('@/views/DashboardView.vue')
+      component: () => import('@/views/DashboardView.vue'),
+      meta: { title: 'Dashboard' }
     },
     {
       path: '/transactions',
       name: 'transactions',
-      component: () => import('@/views/TransactionsView.vue')
+      component: () => import('@/views/TransactionsView.vue'),
+      meta: { title: 'Transactions' }
     },
     {
       path: '/categories',
       name: 'categories',
-      component: () => import('@/views/CategoriesView.vue')
+      component: () => import('@/views/CategoriesView.vue'),
+      meta: { title: 'Categories' }
     },
     {
       path: '/analytics',
       name: 'analytics',
-      component: () => import('@/views/AnalyticsView.vue')
+      component: () => import('@/views/AnalyticsView.vue'),
+      meta: { title: 'Analytics' }
     },
     {
       path: '/budgets',
       name: 'budgets',
-      component: () => import('@/views/BudgetsView.vue')
+      component: () => import('@/views/BudgetsView.vue'),
+      meta: { title: 'Budgets' }
     },
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('@/views/SettingsView.vue')
+      component: () => import('@/views/SettingsView.vue'),
+      meta: { title: 'Settings' }
     },
     // Catch-all: unknown routes fall back to the dashboard (or login when signed out)
     {
@@ -64,6 +70,12 @@ router.beforeEach((to, _from, next) => {
     return next('/login')
   }
   next()
+})
+
+// One place to name the tab, so every view does not have to.
+router.afterEach(to => {
+  const title = (to.meta as { title?: string }).title
+  document.title = title ? `${title} · Porkex` : 'Porkex'
 })
 
 export default router

@@ -92,13 +92,17 @@ const SvgPath = defineComponent({
   setup(props, { attrs }) {
     return () =>
       h(props.tag as string, attrs, [
-        h('svg', {
-          class: 'v-icon__svg',
-          xmlns: 'http://www.w3.org/2000/svg',
-          viewBox: '0 0 24 24',
-          role: 'img',
-          'aria-hidden': 'true'
-        }, [h('path', { d: typeof props.icon === 'string' ? props.icon : '' })])
+        h(
+          'svg',
+          {
+            class: 'v-icon__svg',
+            xmlns: 'http://www.w3.org/2000/svg',
+            viewBox: '0 0 24 24',
+            role: 'img',
+            'aria-hidden': 'true'
+          },
+          [h('path', { d: typeof props.icon === 'string' ? props.icon : '' })]
+        )
       ])
   }
 })

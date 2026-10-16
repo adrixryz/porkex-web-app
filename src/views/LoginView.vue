@@ -4,7 +4,13 @@
       <v-card color="surface" class="rounded-xl mx-auto" width="100%" max-width="420" elevation="4">
         <!-- HEADER -->
         <div class="text-center pt-8 pb-4">
-          <img src="/porkex-logo.svg" alt="Porkex logo" width="64" height="64" class="brand-logo mb-4" />
+          <img
+            src="/porkex-logo.svg"
+            alt="Porkex logo"
+            width="64"
+            height="64"
+            class="brand-logo mb-4"
+          />
           <h1 class="text-h4 font-weight-bold text-on-surface">Porkex</h1>
           <p class="text-body-2 text-on-surface-variant mt-1">Your personal finance tracker</p>
         </div>
@@ -16,7 +22,15 @@
         </v-tabs>
 
         <v-card-text class="pa-6 pt-4">
-          <v-alert v-if="error" type="error" variant="tonal" class="mb-4" density="compact" closable @click:close="error = ''">
+          <v-alert
+            v-if="error"
+            type="error"
+            variant="tonal"
+            class="mb-4"
+            density="compact"
+            closable
+            @click:close="error = ''"
+          >
             {{ error }}
           </v-alert>
 
@@ -26,6 +40,8 @@
               v-if="tab === 'register'"
               v-model="form.name"
               label="Full Name"
+              autocomplete="name"
+              maxlength="80"
               :prepend-inner-icon="mdiAccountOutline"
               class="mb-2"
             ></v-text-field>
@@ -34,6 +50,7 @@
               v-model="form.email"
               label="Email"
               type="email"
+              autocomplete="email"
               :prepend-inner-icon="mdiEmailOutline"
               autofocus
               class="mb-2"
@@ -43,6 +60,7 @@
               v-model="form.password"
               :label="tab === 'register' ? 'Password (min 6 chars)' : 'Password'"
               :type="showPass ? 'text' : 'password'"
+              :autocomplete="tab === 'register' ? 'new-password' : 'current-password'"
               :prepend-inner-icon="mdiLockOutline"
               :append-inner-icon="showPass ? mdiEyeOff : mdiEye"
               @click:append-inner="showPass = !showPass"
@@ -57,7 +75,9 @@
               class="w-100 mt-4 font-weight-bold"
               elevation="0"
               :loading="loading"
-              :disabled="!form.email.trim() || !form.password || (tab === 'register' && !form.name.trim())"
+              :disabled="
+                !form.email.trim() || !form.password || (tab === 'register' && !form.name.trim())
+              "
             >
               {{ tab === 'login' ? 'Log In' : 'Create Account' }}
             </v-btn>
@@ -101,9 +121,14 @@ const submit = async () => {
   error.value = ''
 
   const endpoint = tab.value === 'login' ? '/login' : '/register'
-  const body = tab.value === 'login'
-    ? { email: form.value.email.trim(), password: form.value.password }
-    : { name: form.value.name.trim(), email: form.value.email.trim(), password: form.value.password }
+  const body =
+    tab.value === 'login'
+      ? { email: form.value.email.trim(), password: form.value.password }
+      : {
+          name: form.value.name.trim(),
+          email: form.value.email.trim(),
+          password: form.value.password
+        }
 
   try {
     const res = await authApi(endpoint, body)

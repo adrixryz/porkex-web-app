@@ -20,18 +20,20 @@
 </template>
 
 <script setup lang="ts">
-
 import { mdiChevronDown, mdiChevronUp } from '@mdi/js'
 // Up/down stepper for numeric amount fields.
 // Replaces the native number spinner, which is drawn as an OS widget and
 // therefore ignores background, border and radius styling.
 // Pair it with Vuetify's hide-spin-buttons on the text field.
 
-withDefaults(defineProps<{
-  label?: string
-}>(), {
-  label: 'amount'
-})
+withDefaults(
+  defineProps<{
+    label?: string
+  }>(),
+  {
+    label: 'amount'
+  }
+)
 
 defineEmits<{
   (e: 'step', delta: number): void
@@ -57,7 +59,10 @@ defineEmits<{
   border-radius: 5px;
   color: inherit;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, border-radius 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    border-radius 0.15s ease;
 }
 
 .amount-stepper-btn:hover {

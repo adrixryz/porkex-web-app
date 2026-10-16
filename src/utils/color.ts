@@ -6,7 +6,11 @@
 export function textOn(hex: string | null | undefined): string {
   if (!hex || typeof hex !== 'string') return '#ffffff'
   let h = hex.replace('#', '').trim()
-  if (h.length === 3) h = h.split('').map(c => c + c).join('')
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map(c => c + c)
+      .join('')
   if (h.length !== 6 || /[^0-9a-f]/i.test(h)) return '#ffffff'
   const r = parseInt(h.slice(0, 2), 16) / 255
   const g = parseInt(h.slice(2, 4), 16) / 255

@@ -11,15 +11,30 @@
     <template v-else>
       <!-- APP BAR -->
       <v-app-bar color="background" elevation="0" border="b">
-        <v-app-bar-nav-icon aria-label="Toggle navigation" @click="handleNavIconClick"></v-app-bar-nav-icon>
+        <v-app-bar-nav-icon
+          aria-label="Toggle navigation"
+          @click="handleNavIconClick"
+        ></v-app-bar-nav-icon>
         <div class="app-bar-brand d-flex align-center justify-center">
-          <img src="/porkex-logo.svg" alt="Porkex logo" width="26" height="26" class="brand-logo mr-2" />
+          <img
+            src="/porkex-logo.svg"
+            alt="Porkex logo"
+            width="26"
+            height="26"
+            class="brand-logo mr-2"
+          />
           <span class="text-h6 font-weight-medium text-on-surface">Porkex</span>
         </div>
       </v-app-bar>
 
       <!-- NAVIGATION DRAWER -->
-      <v-navigation-drawer v-model="drawer" :rail="!mobile && rail" :permanent="!mobile" color="background" border="e">
+      <v-navigation-drawer
+        v-model="drawer"
+        :rail="!mobile && rail"
+        :permanent="!mobile"
+        color="background"
+        border="e"
+      >
         <div class="pa-2"></div>
 
         <v-list density="compact" nav class="px-2">
@@ -82,6 +97,20 @@
           {{ pendingHint(pendingCount) }}
         </v-alert>
 
+        <!-- Something queued was dropped for good (rejected or expired): say so
+             instead of losing the write without a word. -->
+        <v-alert
+          v-if="lastFlushError"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="ma-3"
+          closable
+          @click:close="lastFlushError = ''"
+        >
+          {{ lastFlushError }}
+        </v-alert>
+
         <router-view v-slot="{ Component }">
           <!-- No mode="out-in": it makes Vue wait for the leaving view to finish
                before mounting the incoming one, which added the full transition
@@ -103,9 +132,16 @@ import { useDisplay } from 'vuetify'
 import { getUser, syncPendingWrites, USER_CHANGE_EVENT } from '@/utils/api'
 import { useConnection } from '@/utils/connection'
 import { formatAge } from '@/utils/cache'
-import { pendingCount } from '@/utils/outbox'
+import { pendingCount, lastFlushError } from '@/utils/outbox'
 import type { User } from '@/types'
-import { mdiAccountCircleOutline, mdiChartBar, mdiPiggyBankOutline, mdiShapeOutline, mdiSwapHorizontal, mdiViewDashboardOutline } from '@mdi/js'
+import {
+  mdiAccountCircleOutline,
+  mdiChartBar,
+  mdiPiggyBankOutline,
+  mdiShapeOutline,
+  mdiSwapHorizontal,
+  mdiViewDashboardOutline
+} from '@mdi/js'
 
 const route = useRoute()
 const { mobile } = useDisplay()
@@ -163,7 +199,10 @@ onUnmounted(() => {
   window.removeEventListener('online', flushQueue)
 })
 
-watch(() => route.path, () => refreshUser())
+watch(
+  () => route.path,
+  () => refreshUser()
+)
 
 const userName = computed(() => currentUser.value?.name || 'User')
 
@@ -171,7 +210,7 @@ const navItems = [
   { title: 'Dashboard', icon: mdiViewDashboardOutline, route: '/' },
   { title: 'Transactions', icon: mdiSwapHorizontal, route: '/transactions' },
   { title: 'Categories', icon: mdiShapeOutline, route: '/categories' },
-{ title: 'Analytics', icon: mdiChartBar, route: '/analytics' },
-  { title: 'Budgets', icon: mdiPiggyBankOutline, route: '/budgets' },
+  { title: 'Analytics', icon: mdiChartBar, route: '/analytics' },
+  { title: 'Budgets', icon: mdiPiggyBankOutline, route: '/budgets' }
 ]
 </script>

@@ -16,21 +16,52 @@ export const staleSavedAt = ref<number | null>(null)
 export const isOffline = ref(typeof navigator !== 'undefined' && navigator.onLine === false)
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => { isOffline.value = false })
-  window.addEventListener('offline', () => { isOffline.value = true })
+  window.addEventListener('online', () => {
+    isOffline.value = false
+  })
+  window.addEventListener('offline', () => {
+    isOffline.value = true
+  })
 }
 
-export function markStale(savedAt: number) {
+// Ownership tokens.
+//
+// Several views can be stale at the same time (a slow dashboard plus a slow
+// list), but the banner is a single global ref. Each view that paints from the
+// cache registers a token and releases it when its own data turns fresh — or
+// when it unmounts. The banner only drops once the last owner lets go.
+//
+// Without the tokens, any single view's success (or simply navigating away
+// from a stale view) cleared the banner while another view was still showing
+// cached numbers.
+let nextToken = 0
+const staleOwners = new Set<number>()
+
+/** Registers a stale owner and raises the banner. Returns its token. */
+export function markStale(savedAt: number): number {
+  const token = ++nextToken
+  staleOwners.add(token)
   hasStaleData.value = true
   staleSavedAt.value = savedAt
+  return token
 }
 
-export function markFresh() {
-  hasStaleData.value = false
-  staleSavedAt.value = null
+/**
+ * Releases one owner (or every owner when called with no token, e.g. on
+ * logout). The banner stays up while any other owner remains.
+ */
+export function markFresh(token?: number) {
+  if (token === undefined) staleOwners.clear()
+  else staleOwners.delete(token)
+
+  if (staleOwners.size === 0) {
+    hasStaleData.value = false
+    staleSavedAt.value = null
+  }
 }
 
 export function resetConnection() {
+  staleOwners.clear()
   hasStaleData.value = false
   staleSavedAt.value = null
 }

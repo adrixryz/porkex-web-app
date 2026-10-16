@@ -10,7 +10,7 @@ export const CURRENCIES = [
   { symbol: '¥', code: 'JPY', name: 'Japanese Yen' },
   { symbol: 'R$', code: 'BRL', name: 'Brazilian Real' },
   { symbol: '$', code: 'MXN', name: 'Mexican Peso' },
-  { symbol: 'S/.', code: 'PEN', name: 'Peruvian Sol' },
+  { symbol: 'S/.', code: 'PEN', name: 'Peruvian Sol' }
 ]
 
 export function getCurrency(): { symbol: string; code: string } {
@@ -21,7 +21,9 @@ export function getCurrency(): { symbol: string; code: string } {
       if (parsed && typeof parsed.symbol === 'string' && typeof parsed.code === 'string') {
         return parsed
       }
-    } catch { /* fallback */ }
+    } catch {
+      /* fallback */
+    }
   }
   return { symbol: '$', code: 'USD' }
 }
@@ -62,7 +64,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener(CURRENCY_EVENT, () => {
     currentSymbol.value = currencySymbol()
   })
-  window.addEventListener('storage', (e) => {
+  window.addEventListener('storage', e => {
     if (e.key === CURRENCY_KEY) currentSymbol.value = currencySymbol()
   })
 }

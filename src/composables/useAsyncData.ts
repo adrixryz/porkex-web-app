@@ -71,6 +71,23 @@ export function useAsyncData<T>(
   // while this run is still in flight.
   let runId = 0
 
+  // The connection banner is global but owned per view: this is the token this
+  // view registered when it painted from the cache (see utils/connection.ts).
+  let staleToken: number | null = null
+
+  function raiseStale(savedAt: number) {
+    // Painting from the cache twice in a row (the immediate block and run()
+    // both do it) must not register two owners.
+    if (staleToken === null) staleToken = markStale(savedAt)
+  }
+
+  function releaseStale() {
+    if (staleToken !== null) {
+      markFresh(staleToken)
+      staleToken = null
+    }
+  }
+
   async function run(): Promise<T | null> {
     const current = ++runId
     const cacheKey = resolveKey()
@@ -85,7 +102,7 @@ export function useAsyncData<T>(
         data.value = cached.data
         isStale.value = true
         servedFromCache = true
-        markStale(cached.savedAt)
+        raiseStale(cached.savedAt)
       }
     }
     loading.value = !servedFromCache
@@ -102,7 +119,7 @@ export function useAsyncData<T>(
       hasLoaded.value = true
       isStale.value = false
       error.value = ''
-      markFresh()
+      releaseStale()
       return result
     } catch (e) {
       if (current !== runId || (e as Error)?.name === 'AbortError') return null
@@ -110,7 +127,12 @@ export function useAsyncData<T>(
       // A failure with a cached copy on screen is not an error worth reporting:
       // the banner already says the data is old.
       if (!isStale.value) {
-        error.value = e instanceof Error ? e.message : 'Something went wrong.'
+        error.value =
+          (e as Error)?.name === 'TimeoutError'
+            ? 'The server took too long to answer.'
+            : e instanceof Error
+              ? e.message
+              : 'Something went wrong.'
       }
       return null
     } finally {
@@ -120,8 +142,9 @@ export function useAsyncData<T>(
 
   onUnmounted(() => {
     controller?.abort()
-    // Leaving a stale view must not leave the global banner raised.
-    markFresh()
+    // Leaving a stale view releases only this view's banner owner; another
+    // view may still be showing cached data.
+    releaseStale()
   })
 
   if (options.immediate) {
@@ -130,7 +153,7 @@ export function useAsyncData<T>(
     if (cached) {
       data.value = cached.data
       isStale.value = true
-      markStale(cached.savedAt)
+      raiseStale(cached.savedAt)
     }
     void run()
   }

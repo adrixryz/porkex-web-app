@@ -13,6 +13,9 @@ dist
 dist-ssr
 *.local
 
+# Test output
+coverage
+
 # Environment
 # VITE_* values are baked into the bundle at build time, so they belong in the
 # host's dashboard, not in the repo.

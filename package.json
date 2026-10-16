@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "vue-tsc -b --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -25,6 +25,7 @@ The dev server runs on `http://localhost:5173` and proxies `/api` and `/auth` to
 | `npm run preview` | Serves the production build locally |
 | `npm test` | Unit tests (`vitest run`) |
 | `npm run test:watch` | Vitest in watch mode |
+| `npm run test:coverage` | Unit tests with a coverage report |
 | `npm run typecheck` | `vue-tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |
@@ -75,6 +76,13 @@ is lost, the replay carries the same id and the backend returns the existing row
 instead of writing a second one. Generating the id at flush time would let that
 duplicate through.
 
+A queued write older than seven days is dropped on the next flush, and every
+drop — rejected by the server or expired — raises a warning banner instead of
+disappearing without a word. Only one tab replays the queue at a time: a
+short-lived lock in `localStorage` keeps two tabs from racing each other. A
+request that hangs past 45 seconds is treated as "never reached the server":
+reads fall back to the cache and writes are queued.
+
 A pending write is counted in a banner, not shown in the list: the table keeps
 showing what the server last confirmed.
 
@@ -82,6 +90,13 @@ showing what the server last confirmed.
 
 - Amounts arrive from the API as decimal numbers. The backend stores them as
   whole cents so sums stay exact, so nothing on this side needs rounding.
+- Dates are calendar days: the API stores them as UTC midnight and the app reads
+  them back with UTC components (`utils/date.ts`), so a movement always shows on
+  the day it was entered, wherever the device is. `createdAt` is a real instant
+  and is displayed in local time. "Today" and the windows that depend on it
+  (`/analytics`, `/budgets`) are anchored to the device's own calendar day with
+  a `today` query parameter, so the day does not roll over mid-evening west of
+  UTC.
 - The currency setting only changes the symbol used for display; there is no
   conversion between currencies.
 - Weeks start on Monday (see `utils/date.ts`).

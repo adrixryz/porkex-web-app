@@ -9,7 +9,14 @@
       <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
         <span class="font-weight-medium">{{ title }}</span>
         <v-spacer></v-spacer>
-        <v-btn :icon="mdiClose" variant="text" size="small" aria-label="Close dialog" :disabled="submitting" @click="close"></v-btn>
+        <v-btn
+          :icon="mdiClose"
+          variant="text"
+          size="small"
+          aria-label="Close dialog"
+          :disabled="submitting"
+          @click="close"
+        ></v-btn>
       </v-card-title>
       <v-card-text class="pa-6">
         <v-form @submit.prevent="submit">
@@ -26,13 +33,23 @@
             class="mb-2"
           >
             <template #append-inner>
-              <AmountStepper :label="isIncome ? 'income amount' : 'expense amount'" @step="stepAmount"></AmountStepper>
+              <AmountStepper
+                :label="isIncome ? 'income amount' : 'expense amount'"
+                @step="stepAmount"
+              ></AmountStepper>
             </template>
           </v-text-field>
-          <v-text-field v-model="form.date" label="Date" type="date" :max="todayInput()" class="mb-2"></v-text-field>
+          <v-text-field
+            v-model="form.date"
+            label="Date"
+            type="date"
+            :max="todayInput()"
+            class="mb-2"
+          ></v-text-field>
           <v-text-field
             v-model="form.description"
             label="Description"
+            maxlength="200"
             :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Grocery shopping'"
             class="mb-2"
           ></v-text-field>
@@ -44,7 +61,15 @@
             label="Category"
           ></v-select>
 
-          <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-4" closable @click:close="error = ''">
+          <v-alert
+            v-if="error"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+            closable
+            @click:close="error = ''"
+          >
             {{ error }}
           </v-alert>
 
@@ -67,7 +92,9 @@
             class="d-flex align-center justify-space-between ga-3 mt-4 pt-3 border-t border-outline-variant"
           >
             <span class="text-caption text-on-surface-variant">Created At</span>
-            <span class="text-caption text-on-surface">{{ formatDateTime(transaction.createdAt) }}</span>
+            <span class="text-caption text-on-surface">{{
+              formatDateTime(transaction.createdAt)
+            }}</span>
           </div>
         </v-form>
       </v-card-text>
@@ -84,15 +111,19 @@ import { fromDateInput, toDateInput, todayInput, formatDateTime } from '@/utils/
 import type { Category, Transaction } from '@/types'
 import { mdiClose } from '@mdi/js'
 
-const props = withDefaults(defineProps<{
-  modelValue: boolean
-  type?: 'INCOME' | 'EXPENSE'
-  transaction?: Transaction | null
-  categories?: Category[]
-}>(), {
-  type: 'EXPENSE',
-  transaction: null
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    type?: 'INCOME' | 'EXPENSE'
+    transaction?: Transaction | null
+    categories?: Category[]
+  }>(),
+  {
+    type: 'EXPENSE',
+    transaction: null,
+    categories: () => []
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
@@ -101,7 +132,12 @@ const emit = defineEmits<{
 
 const cs = useCurrencySymbol()
 
-const form = ref({ amount: '', description: '', categoryId: null as number | null, date: todayInput() })
+const form = ref({
+  amount: '',
+  description: '',
+  categoryId: null as number | null,
+  date: todayInput()
+})
 const submitting = ref(false)
 const error = ref('')
 const ownCategories = ref<Category[]>([])
@@ -110,19 +146,24 @@ const isEditing = computed(() => !!props.transaction)
 const isIncome = computed(() => props.type === 'INCOME')
 
 const title = computed(() =>
-  isEditing.value ? 'Edit Transaction' : (props.type === 'INCOME' ? 'New Income' : 'New Expense')
+  isEditing.value ? 'Edit Transaction' : props.type === 'INCOME' ? 'New Income' : 'New Expense'
 )
 
 // The parent may pass its own categories (e.g. for the filter); if not, they are loaded here.
-const allCategories = computed(() => props.categories?.length ? props.categories : ownCategories.value)
+const allCategories = computed(() =>
+  props.categories?.length ? props.categories : ownCategories.value
+)
 const categoryOptions = computed(() => allCategories.value.filter(c => c.type === props.type))
 
 const isValid = computed(() => {
   const amount = Number(form.value.amount)
-  return Number.isFinite(amount) && amount > 0
-    && !!form.value.description.trim()
-    && !!form.value.date
-    && form.value.categoryId !== null
+  return (
+    Number.isFinite(amount) &&
+    amount > 0 &&
+    !!form.value.description.trim() &&
+    !!form.value.date &&
+    form.value.categoryId !== null
+  )
 })
 
 const fetchCategories = async () => {
@@ -149,7 +190,12 @@ const reset = () => {
 }
 
 // The parent sets `transaction` before opening, so the form is ready by the time it shows.
-watch(() => props.modelValue, open => { if (open) reset() })
+watch(
+  () => props.modelValue,
+  open => {
+    if (open) reset()
+  }
+)
 
 const close = () => emit('update:modelValue', false)
 

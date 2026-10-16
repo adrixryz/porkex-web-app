@@ -33,7 +33,7 @@ describe('textOn', () => {
 describe('themeColors', () => {
   it('reads the colors from the theme', () => {
     const theme = { primary: '#111111', surface: '#222222' }
-    const colors = themeColors((name) => theme[name as keyof typeof theme])
+    const colors = themeColors(name => theme[name as keyof typeof theme])
 
     expect(colors.primary).toBe('#111111')
     expect(colors.surface).toBe('#222222')

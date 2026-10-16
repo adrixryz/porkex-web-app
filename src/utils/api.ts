@@ -91,10 +91,29 @@ const WRITE_INVALIDATES = ['/dashboard', '/transactions', '/categories', '/budge
 /**
  * A fetch that never reached the server. This is the only failure worth
  * queueing: a 4xx means the payload is wrong and a 5xx means the server
- * answered, so both will behave exactly the same on a retry.
+ * answered, so both will behave exactly the same on a retry. A timeout counts
+ * as "never reached it": the request was abandoned while the server was cold.
  */
 function isNetworkFailure(err: unknown): boolean {
-  return err instanceof TypeError
+  if (err instanceof TypeError) return true
+  // AbortSignal.timeout() aborts the fetch with a TimeoutError DOMException.
+  return (err as { name?: string } | null)?.name === 'TimeoutError'
+}
+
+// A hosted API that is cold can hang for a long time. Past these limits the
+// request is abandoned: reads fall back to the cache (and the stale banner),
+// writes are queued and replayed, and login fails with a visible error instead
+// of a spinner that never stops.
+const READ_TIMEOUT_MS = 45_000
+const WRITE_TIMEOUT_MS = 45_000
+const AUTH_TIMEOUT_MS = 30_000
+
+/** The caller's signal plus a hard timeout. */
+function withTimeout(signal: AbortSignal | null | undefined, ms: number): AbortSignal | undefined {
+  if (typeof AbortSignal.timeout !== 'function') return signal ?? undefined
+  const timeout = AbortSignal.timeout(ms)
+  if (!signal) return timeout
+  return typeof AbortSignal.any === 'function' ? AbortSignal.any([signal, timeout]) : signal
 }
 
 /**
@@ -104,9 +123,13 @@ function isNetworkFailure(err: unknown): boolean {
  * and the response is lost, the replay has to carry the same id so the backend
  * recognises it and returns the stored row. Generating it at flush time would
  * let the duplicate through.
+ *
+ * Only POST /transactions needs it: an id on any other write would be dead
+ * weight in the queued payload.
  */
-function withClientId(path: string, body: BodyInit | null): BodyInit | null {
-  if (!path.startsWith('/transactions') || typeof body !== 'string') return body
+function withClientId(method: string, path: string, body: BodyInit | null): BodyInit | null {
+  if (method !== 'POST' || !path.startsWith('/transactions') || typeof body !== 'string')
+    return body
   try {
     const parsed = JSON.parse(body) as Record<string, unknown>
     if (parsed.clientId) return body
@@ -131,13 +154,14 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
   const token = getToken()
   const method = (options.method ?? 'GET').toUpperCase()
   const isRead = READ_METHODS.includes(method)
-  const body = withClientId(path, options.body ?? null)
+  const body = withClientId(method, path, options.body ?? null)
 
   let res: Response
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...options,
       body: body ?? undefined,
+      signal: withTimeout(options.signal, isRead ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -183,6 +207,9 @@ export function syncPendingWrites(): Promise<void> {
         'Content-Type': 'application/json',
         ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
       },
+      // A replay that hangs must not hold the queue hostage: the timeout makes
+      // flushOutbox treat it as "still unreachable" and keep the item.
+      signal: withTimeout(undefined, WRITE_TIMEOUT_MS),
       ...(m.body ? { body: m.body } : {})
     })
     // A replay that comes back 401 means the session is gone; the queue was
@@ -210,7 +237,8 @@ export async function authApi(path: string, body: unknown): Promise<Response> {
   const res = await fetch(`${AUTH_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: withTimeout(undefined, AUTH_TIMEOUT_MS)
   })
   return res
 }

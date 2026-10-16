@@ -9,7 +9,9 @@ import {
   type QueuedMutation
 } from './outbox'
 
-const item = (over: Partial<QueuedMutation> = {}): Omit<QueuedMutation, 'createdAt' | 'attempts'> => ({
+const item = (
+  over: Partial<QueuedMutation> = {}
+): Omit<QueuedMutation, 'createdAt' | 'attempts'> => ({
   id: 'a',
   method: 'POST',
   path: '/transactions',
@@ -100,7 +102,9 @@ describe('flushOutbox', () => {
   it('keeps everything and stops when the network is still down', async () => {
     enqueue(item({ id: '1' }))
     enqueue(item({ id: '2' }))
-    const send = vi.fn(async () => { throw new TypeError('Failed to fetch') })
+    const send = vi.fn(async () => {
+      throw new TypeError('Failed to fetch')
+    })
 
     await flushOutbox(send)
 
@@ -125,6 +129,47 @@ describe('flushOutbox', () => {
 
     await flushOutbox(async () => dead(400))
 
+    expect(pendingCount.value).toBe(0)
+    // Dropping used to be silent; now the banner says what was lost.
+    expect(lastFlushError.value).toContain('rejected')
+  })
+
+  it('drops writes that are too old to replay', async () => {
+    enqueue(item({ id: '1' }))
+    const stored = JSON.parse(localStorage.getItem('porkex_outbox')!)
+    stored[0].createdAt = Date.now() - 8 * 24 * 60 * 60 * 1000
+    localStorage.setItem('porkex_outbox', JSON.stringify(stored))
+
+    const send = vi.fn(async (_m: QueuedMutation) => ok())
+    await flushOutbox(send)
+
+    expect(send).not.toHaveBeenCalled()
+    expect(pendingCount.value).toBe(0)
+    expect(lastFlushError.value).toContain('expired')
+  })
+
+  it('leaves the queue alone while another tab holds the flush lock', async () => {
+    enqueue(item({ id: '1' }))
+    localStorage.setItem('porkex_outbox_lock', JSON.stringify({ id: 'other-tab', at: Date.now() }))
+
+    const send = vi.fn(async (_m: QueuedMutation) => ok())
+    await flushOutbox(send)
+
+    expect(send).not.toHaveBeenCalled()
+    expect(pendingCount.value).toBe(1)
+  })
+
+  it('ignores a lock left behind by a tab that crashed', async () => {
+    enqueue(item({ id: '1' }))
+    localStorage.setItem(
+      'porkex_outbox_lock',
+      JSON.stringify({ id: 'dead-tab', at: Date.now() - 60_000 })
+    )
+
+    const send = vi.fn(async (_m: QueuedMutation) => ok())
+    await flushOutbox(send)
+
+    expect(send).toHaveBeenCalledTimes(1)
     expect(pendingCount.value).toBe(0)
   })
 
@@ -184,7 +229,9 @@ describe('flushOutbox', () => {
 describe('clearOutbox', () => {
   it('drops everything and resets the error', async () => {
     enqueue(item({ id: '1' }))
-    await flushOutbox(async () => { throw new TypeError('Failed to fetch') })
+    await flushOutbox(async () => {
+      throw new TypeError('Failed to fetch')
+    })
     expect(lastFlushError.value).not.toBe('')
 
     clearOutbox()

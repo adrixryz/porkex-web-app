@@ -10,7 +10,10 @@ import { hasStaleData, resetConnection } from '@/utils/connection'
 function deferred<T>() {
   let resolve!: (v: T) => void
   let reject!: (e: unknown) => void
-  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
   return { promise, resolve, reject }
 }
 
@@ -174,5 +177,59 @@ describe('the loading race', () => {
     await nextTick()
     expect(api.loading.value).toBe(false)
     expect(api.data.value).toBe('fresh')
+  })
+})
+
+describe('the stale banner is owned per view', () => {
+  it('one view going fresh does not hide the banner while another is still stale', async () => {
+    writeCache('/k', { n: 1 })
+    const first = deferred<{ n: number }>()
+    const second = deferred<{ n: number }>()
+
+    const a = mountUser(() => first.promise, { n: 0 }, { cacheKey: '/k' })
+    const b = mountUser(() => second.promise, { n: 0 }, { cacheKey: '/k' })
+    expect(hasStaleData.value).toBe(true)
+
+    // The first view answers with fresh data, but the second still shows cache.
+    first.resolve({ n: 2 })
+    await nextTick()
+    await nextTick()
+    expect(a.api.isStale.value).toBe(false)
+    expect(b.api.isStale.value).toBe(true)
+    expect(hasStaleData.value).toBe(true)
+
+    // Only when the last owner is fresh does the banner drop.
+    second.resolve({ n: 3 })
+    await nextTick()
+    await nextTick()
+    expect(hasStaleData.value).toBe(false)
+  })
+
+  it('unmounting a stale view keeps the banner for the other stale view', async () => {
+    writeCache('/k', { n: 1 })
+    const never = deferred<{ n: number }>()
+
+    const a = mountUser(() => never.promise, { n: 0 }, { cacheKey: '/k' })
+    const b = mountUser(() => never.promise, { n: 0 }, { cacheKey: '/k' })
+    expect(hasStaleData.value).toBe(true)
+
+    b.wrapper.unmount()
+    expect(hasStaleData.value).toBe(true)
+
+    a.wrapper.unmount()
+    expect(hasStaleData.value).toBe(false)
+  })
+
+  it('reports a friendly message when the request times out', async () => {
+    const d = deferred<string>()
+    const { api } = mountUser(() => d.promise, 'initial')
+
+    d.reject(
+      Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
+    )
+    await nextTick()
+    await nextTick()
+
+    expect(api.error.value).toBe('The server took too long to answer.')
   })
 })

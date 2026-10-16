@@ -22,8 +22,8 @@ export default createVuetify({
     defaultSet: 'mdi',
     aliases,
     sets: {
-      mdi,
-    },
+      mdi
+    }
   } as VuetifyOptions['icons'],
   theme: {
     defaultTheme: 'dark',
@@ -50,30 +50,30 @@ export default createVuetify({
           'on-surface': '#ededed',
           'on-surface-variant': '#a1a1a1',
           outline: '#2e2e2e',
-          'outline-variant': '#1f1f1f',
-        },
-      },
-    },
+          'outline-variant': '#1f1f1f'
+        }
+      }
+    }
   },
   defaults: {
     VCard: {
       elevation: 0,
       rounded: 'lg',
-      border: true,
+      border: true
     },
     VBtn: {
       style: 'text-transform: none; letter-spacing: normal; font-weight: 500;',
-      rounded: 'lg',
+      rounded: 'lg'
     },
     VTextField: {
       variant: 'outlined',
       color: 'primary',
-      rounded: 'lg',
+      rounded: 'lg'
     },
     VSelect: {
       variant: 'outlined',
       color: 'primary',
-      rounded: 'lg',
-    },
-  },
+      rounded: 'lg'
+    }
+  }
 })

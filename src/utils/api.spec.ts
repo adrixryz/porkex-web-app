@@ -6,7 +6,10 @@ import { writeCache } from './cache'
 const TOKEN = 'test-token'
 
 // A fetch that fails the way a dead network does: fetch() itself rejects.
-const networkDown = () => vi.fn(async () => { throw new TypeError('Failed to fetch') })
+const networkDown = () =>
+  vi.fn(async () => {
+    throw new TypeError('Failed to fetch')
+  })
 
 beforeEach(() => {
   localStorage.clear()
@@ -66,7 +69,10 @@ describe('writes that never reach the server are queued', () => {
 
 describe('writes the server answered are not queued', () => {
   it('a 400 is not a network problem', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"error":"bad"}', { status: 400 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{"error":"bad"}', { status: 400 }))
+    )
 
     await api('/transactions', { method: 'POST', body: '{}' })
 
@@ -75,7 +81,10 @@ describe('writes the server answered are not queued', () => {
   })
 
   it('a 500 is not queued either: the server did answer', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 500 }))
+    )
 
     await api('/transactions', { method: 'POST', body: '{}' })
 
@@ -84,11 +93,14 @@ describe('writes the server answered are not queued', () => {
   })
 
   it('a 401 is not queued: replaying it with a new token would write to the wrong account', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 401 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 401 }))
+    )
 
-    await expect(
-      api('/transactions', { method: 'POST', body: '{}' })
-    ).rejects.toThrow('Session expired')
+    await expect(api('/transactions', { method: 'POST', body: '{}' })).rejects.toThrow(
+      'Session expired'
+    )
     expect(pendingCount.value).toBe(0)
     vi.unstubAllGlobals()
   })
@@ -100,12 +112,15 @@ describe('the idempotency key', () => {
     // row, the response is lost, and the replay arrives without the id.
     const sentBodies: string[] = []
     let calls = 0
-    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
-      calls += 1
-      if (init.body) sentBodies.push(init.body as string)
-      if (calls === 1) throw new TypeError('Failed to fetch')
-      return new Response('{}', { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        calls += 1
+        if (init.body) sentBodies.push(init.body as string)
+        if (calls === 1) throw new TypeError('Failed to fetch')
+        return new Response('{}', { status: 200 })
+      })
+    )
 
     await api('/transactions', {
       method: 'POST',
@@ -157,6 +172,19 @@ describe('the idempotency key', () => {
     vi.unstubAllGlobals()
   })
 
+  it('is not added to a transaction update: only creates can duplicate', async () => {
+    vi.stubGlobal('fetch', networkDown())
+
+    await api('/transactions/7', { method: 'PUT', body: '{"amount":5}' })
+
+    const send = vi.fn(async (_m: QueuedMutation) => new Response('{}', { status: 200 }))
+    await flushOutbox(send)
+
+    const body = (send.mock.calls[0][0] as QueuedMutation).body!
+    expect(JSON.parse(body)).toEqual({ amount: 5 })
+    vi.unstubAllGlobals()
+  })
+
   it('leaves an existing clientId alone', async () => {
     vi.stubGlobal('fetch', networkDown())
 
@@ -174,12 +202,41 @@ describe('the idempotency key', () => {
   })
 })
 
+describe('a request that hangs is treated like a dead network', () => {
+  const timedOut = () =>
+    vi.fn(async () => {
+      // AbortSignal.timeout() rejects the fetch with this DOMException.
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError')
+    })
+
+  it('queues a write that timed out', async () => {
+    vi.stubGlobal('fetch', timedOut())
+
+    const res = await api('/transactions', { method: 'POST', body: '{"amount":1}' })
+
+    expect(res.status).toBe(202)
+    expect(pendingCount.value).toBe(1)
+    vi.unstubAllGlobals()
+  })
+
+  it('rethrows a read that timed out, so the cached copy is shown', async () => {
+    vi.stubGlobal('fetch', timedOut())
+
+    await expect(api('/dashboard')).rejects.toThrow()
+    expect(pendingCount.value).toBe(0)
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('cache invalidation after a write', () => {
   it('a successful create drops the cached reads it would contradict', async () => {
     writeCache('/dashboard', { globalBalance: 0 })
     writeCache('/profile', { name: 'Ada' })
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 201 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 201 }))
+    )
     await api('/transactions', { method: 'POST', body: '{}' })
 
     const stored = JSON.parse(localStorage.getItem('porkex_cache')!)
@@ -192,7 +249,10 @@ describe('cache invalidation after a write', () => {
     writeCache('/transactions?page=1', { items: [] })
     writeCache('/budgets?period=MONTH', { budgets: [] })
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 201 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 201 }))
+    )
     await api('/budgets', { method: 'POST', body: '{}' })
 
     const stored = JSON.parse(localStorage.getItem('porkex_cache')!)
@@ -204,7 +264,10 @@ describe('cache invalidation after a write', () => {
   it('a failed write does not invalidate anything', async () => {
     writeCache('/dashboard', { globalBalance: 0 })
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 400 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 400 }))
+    )
     await api('/transactions', { method: 'POST', body: '{}' })
 
     const stored = JSON.parse(localStorage.getItem('porkex_cache')!)

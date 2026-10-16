@@ -32,7 +32,8 @@
                 <div class="text-h6 font-weight-medium">{{ profile.name }}</div>
                 <div class="text-body-2 text-on-surface-variant">{{ profile.email }}</div>
                 <div class="text-caption text-on-surface-variant mt-1">
-                  Member since {{ formatDate(profile.createdAt, { month: 'long', year: 'numeric' }) }}
+                  Member since
+                  {{ formatDate(profile.createdAt, { month: 'long', year: 'numeric' }) }}
                 </div>
               </div>
             </div>
@@ -41,9 +42,31 @@
 
             <div class="text-subtitle-1 font-weight-medium mb-4">Edit Profile</div>
             <v-form @submit.prevent="updateProfile">
-              <v-text-field v-model="editName" label="Display Name" :prepend-inner-icon="mdiAccountOutline" class="mb-2"></v-text-field>
-              <v-text-field :model-value="profile.email" label="Email" :prepend-inner-icon="mdiEmailOutline" disabled hint="Email cannot be changed" persistent-hint class="mb-2"></v-text-field>
-              <v-btn type="submit" color="primary" elevation="0" rounded="pill" :loading="saving" :disabled="!editName.trim() || editName.trim() === profile.name" class="mt-2">
+              <v-text-field
+                v-model="editName"
+                label="Display Name"
+                maxlength="80"
+                :prepend-inner-icon="mdiAccountOutline"
+                class="mb-2"
+              ></v-text-field>
+              <v-text-field
+                :model-value="profile.email"
+                label="Email"
+                :prepend-inner-icon="mdiEmailOutline"
+                disabled
+                hint="Email cannot be changed"
+                persistent-hint
+                class="mb-2"
+              ></v-text-field>
+              <v-btn
+                type="submit"
+                color="primary"
+                elevation="0"
+                rounded="pill"
+                :loading="saving"
+                :disabled="!editName.trim() || editName.trim() === profile.name"
+                class="mt-2"
+              >
                 Save Changes
               </v-btn>
             </v-form>
@@ -64,8 +87,9 @@
               class="mb-2"
             ></v-select>
             <div class="text-caption text-on-surface-variant">
-              The symbol is only used for display: amounts are stored and added up as they are, with no currency conversion.
-              This choice is saved to your account, so it follows you to any browser.
+              The symbol is only used for display: amounts are stored and added up as they are, with
+              no currency conversion. This choice is saved to your account, so it follows you to any
+              browser.
             </div>
           </v-card>
 
@@ -73,25 +97,52 @@
           <v-card color="surface" elevation="1" class="rounded-xl pa-6 mb-4">
             <div class="text-subtitle-1 font-weight-medium mb-4">About</div>
             <v-list bg-color="transparent">
-              <v-list-item :prepend-icon="mdiInformationOutline" title="App Version" :subtitle="appVersion"></v-list-item>
-              <v-list-item title="Porkex Finance Tracker" subtitle="Track your income and expenses with ease">
+              <v-list-item
+                :prepend-icon="mdiInformationOutline"
+                title="App Version"
+                :subtitle="appVersion"
+              ></v-list-item>
+              <v-list-item
+                title="Porkex Finance Tracker"
+                subtitle="Track your income and expenses with ease"
+              >
                 <template v-slot:prepend>
-                  <img src="/porkex-logo.svg" alt="Porkex logo" width="24" height="24" class="brand-logo mr-7" />
+                  <img
+                    src="/porkex-logo.svg"
+                    alt="Porkex logo"
+                    width="24"
+                    height="24"
+                    class="brand-logo mr-7"
+                  />
                 </template>
               </v-list-item>
             </v-list>
           </v-card>
 
-<!-- DANGER ZONE -->
-          <v-card color="surface" elevation="1" class="rounded-xl pa-6" border style="border-color: rgb(var(--v-theme-error));">
+          <!-- DANGER ZONE -->
+          <v-card
+            color="surface"
+            elevation="1"
+            class="rounded-xl pa-6"
+            border
+            style="border-color: rgb(var(--v-theme-error))"
+          >
             <div class="text-subtitle-1 font-weight-medium text-error mb-4">Danger Zone</div>
-            <v-btn color="error" variant="outlined" rounded="pill" :prepend-icon="mdiLogout" @click="logoutDialog = true">
+            <v-btn
+              color="error"
+              variant="outlined"
+              rounded="pill"
+              :prepend-icon="mdiLogout"
+              @click="logoutDialog = true"
+            >
               Log Out
             </v-btn>
           </v-card>
         </template>
 
-<v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{ snackMessage }}</v-snackbar>
+        <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
+          snackMessage
+        }}</v-snackbar>
       </v-col>
     </v-row>
 
@@ -125,29 +176,41 @@ import type { CurrencyOption, Profile } from '@/types'
 import { CURRENCIES, getCurrency, setCurrency, setCurrencyByCode } from '@/utils/currency'
 import { formatDate } from '@/utils/date'
 import pkg from '../../package.json'
-import { mdiAccountOutline, mdiCurrencyUsd, mdiEmailOutline, mdiInformationOutline, mdiLogout } from '@mdi/js'
+import {
+  mdiAccountOutline,
+  mdiCurrencyUsd,
+  mdiEmailOutline,
+  mdiInformationOutline,
+  mdiLogout
+} from '@mdi/js'
 
 const router = useRouter()
 
 const appVersion = pkg.version
 
 const currentCurrency = getCurrency()
-const selectedCurrency = ref<CurrencyOption>(CURRENCIES.find(c => c.code === currentCurrency.code) || CURRENCIES[0])
+const selectedCurrency = ref<CurrencyOption>(
+  CURRENCIES.find(c => c.code === currentCurrency.code) || CURRENCIES[0]
+)
 
 const editName = ref('')
 const saving = ref(false)
 const savingCurrency = ref(false)
 
-const userInitial = computed(() => profile.value.name ? profile.value.name.charAt(0).toUpperCase() : 'U')
-
+const userInitial = computed(() =>
+  profile.value.name ? profile.value.name.charAt(0).toUpperCase() : 'U'
+)
 
 const EMPTY_PROFILE: Profile = { id: 0, name: '', email: '', currency: 'USD', createdAt: '' }
 
-const { data: profile, loading, error: profileError, run: fetchProfile } = useAsyncData<Profile>(
-  signal => fetchJson<Profile>('/profile', { signal }),
-  EMPTY_PROFILE,
-  { cacheKey: '/profile' }
-)
+const {
+  data: profile,
+  loading,
+  error: profileError,
+  run: fetchProfile
+} = useAsyncData<Profile>(signal => fetchJson<Profile>('/profile', { signal }), EMPTY_PROFILE, {
+  cacheKey: '/profile'
+})
 
 // The account wins over whatever this browser had cached.
 function applyProfile(data: Profile) {
@@ -176,14 +239,25 @@ const updateProfile = async () => {
       body: JSON.stringify({ name: cleanName })
     })
     if (res.ok) {
-      const data = (await res.json()) as Profile
-      applyProfile({ ...profile.value, ...data })
-      // Update localStorage user data so sidebar reflects changes
-      const currentUser = getUser()
-      if (currentUser) {
-        setUser({ ...currentUser, name: data.name })
+      // A 202 with { queued: true } means the device is offline and the write
+      // was queued for replay. It has no Profile payload, so applying the
+      // response used to blank the name field; instead the change is applied
+      // locally and the user is told it will sync later.
+      const data = (await res.json().catch(() => null)) as (Profile & { queued?: boolean }) | null
+      if (data?.queued) {
+        applyProfile({ ...profile.value, name: cleanName })
+        const currentUser = getUser()
+        if (currentUser) setUser({ ...currentUser, name: cleanName })
+        showSnack('You are offline: the change will be saved when the connection is back.', 'info')
+      } else if (data) {
+        applyProfile({ ...profile.value, ...data })
+        // Update localStorage user data so sidebar reflects changes
+        const currentUser = getUser()
+        if (currentUser) {
+          setUser({ ...currentUser, name: data.name })
+        }
+        showSnack('Profile updated!', 'success')
       }
-      showSnack('Profile updated!', 'success')
     } else {
       const data = await res.json().catch(() => null)
       showSnack(data?.error || 'Failed to update profile.', 'error')
@@ -196,9 +270,7 @@ const updateProfile = async () => {
 }
 
 const onCurrencyChange = async (val: CurrencyOption | string | null) => {
-  const currency = typeof val === 'string'
-    ? CURRENCIES.find(c => c.code === val)
-    : val
+  const currency = typeof val === 'string' ? CURRENCIES.find(c => c.code === val) : val
   if (!currency || !currency.symbol || !currency.code) return
   // Refresh the model in case a code was received instead of the object.
   selectedCurrency.value = currency
@@ -214,7 +286,15 @@ const onCurrencyChange = async (val: CurrencyOption | string | null) => {
       const data = await res.json().catch(() => null)
       showSnack(data?.error || 'Could not save the currency.', 'error')
     } else {
-      showSnack(`Currency changed to ${currency.symbol} (${currency.code})`, 'success')
+      const data = (await res.json().catch(() => null)) as { queued?: boolean } | null
+      if (data?.queued) {
+        showSnack(
+          `Currency changed to ${currency.symbol} (${currency.code}); it will be saved when the connection is back.`,
+          'info'
+        )
+      } else {
+        showSnack(`Currency changed to ${currency.symbol} (${currency.code})`, 'success')
+      }
     }
   } catch (e) {
     console.error(e)

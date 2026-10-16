@@ -15,6 +15,8 @@ export interface Category {
   total: number
   /** Movements ever: this is what decides whether a delete needs a target. */
   allTimeCount: number
+  /** Budgets attached to it: deleting the category deletes them too. */
+  budgetCount: number
 }
 
 export interface Transaction {

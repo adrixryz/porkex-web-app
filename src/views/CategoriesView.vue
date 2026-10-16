@@ -3,7 +3,10 @@
     <!-- LOADING SKELETON -->
     <template v-if="loading">
       <v-row class="mb-4">
-        <v-col cols="12" class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4">
+        <v-col
+          cols="12"
+          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
+        >
           <v-skeleton-loader type="heading" width="180"></v-skeleton-loader>
           <v-skeleton-loader type="button" width="150"></v-skeleton-loader>
         </v-col>
@@ -23,75 +26,131 @@
       </v-row>
     </template>
     <template v-else>
-    <v-row class="mb-4">
-      <v-col cols="12" class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4">
-        <h1 class="text-h4 font-weight-bold text-on-surface">Categories</h1>
-        <v-btn color="primary" elevation="0" rounded="pill" :prepend-icon="mdiPlus" @click="openDialog()">New Category</v-btn>
-      </v-col>
-    </v-row>
+      <v-row class="mb-4">
+        <v-col
+          cols="12"
+          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
+        >
+          <h1 class="text-h4 font-weight-bold text-on-surface">Categories</h1>
+          <v-btn
+            color="primary"
+            elevation="0"
+            rounded="pill"
+            :prepend-icon="mdiPlus"
+            @click="openDialog()"
+            >New Category</v-btn
+          >
+        </v-col>
+      </v-row>
 
-    <v-row class="mb-4">
-      <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
-        <v-btn-toggle v-model="filterType" mandatory color="primary" density="comfortable" rounded="pill" variant="outlined" aria-label="Filter by type">
-          <v-btn value="EXPENSE">Expense</v-btn>
-          <v-btn value="INCOME">Income</v-btn>
-        </v-btn-toggle>
+      <v-row class="mb-4">
+        <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
+          <v-btn-toggle
+            v-model="filterType"
+            mandatory
+            color="primary"
+            density="comfortable"
+            rounded="pill"
+            variant="outlined"
+            aria-label="Filter by type"
+          >
+            <v-btn value="EXPENSE">Expense</v-btn>
+            <v-btn value="INCOME">Income</v-btn>
+          </v-btn-toggle>
 
-        <v-spacer class="d-none d-sm-block"></v-spacer>
+          <v-spacer class="d-none d-sm-block"></v-spacer>
 
-        <v-btn-toggle v-model="period" mandatory color="primary" density="compact" rounded="pill" variant="outlined" aria-label="Filter by period">
-          <v-btn value="week">This week</v-btn>
-          <v-btn value="month">This month</v-btn>
-          <v-btn value="all">All time</v-btn>
-        </v-btn-toggle>
-      </v-col>
-    </v-row>
+          <v-btn-toggle
+            v-model="period"
+            mandatory
+            color="primary"
+            density="compact"
+            rounded="pill"
+            variant="outlined"
+            aria-label="Filter by period"
+          >
+            <v-btn value="week">This week</v-btn>
+            <v-btn value="month">This month</v-btn>
+            <v-btn value="all">All time</v-btn>
+          </v-btn-toggle>
+        </v-col>
+      </v-row>
 
-    <v-row>
-      <v-col cols="12" sm="6" md="4" v-for="cat in filteredCategories" :key="cat.id">
-        <v-card color="surface" elevation="1" class="rounded-xl pa-4 cat-card fill-height">
-          <div class="d-flex align-center justify-space-between">
-            <div class="d-flex align-center">
-              <v-avatar :color="cat.color ?? undefined" size="40" class="mr-4">
-                <v-icon :icon="mdiTagOutline" color="white"></v-icon>
-              </v-avatar>
-              <div>
-                <div class="font-weight-medium text-body-1 text-on-surface">{{ cat.name }}</div>
-                <div class="d-flex align-center ga-2 mt-1">
-                  <v-chip size="x-small" :color="cat.type === 'INCOME' ? 'success' : 'error'" variant="tonal">
-                    {{ cat.type === 'INCOME' ? 'Income' : 'Expense' }}
-                  </v-chip>
-                  <span class="text-caption text-on-surface-variant">
-                    {{ cat.transactionCount }} movement{{ cat.transactionCount === 1 ? '' : 's' }}
-                  </span>
+      <v-row>
+        <v-col cols="12" sm="6" md="4" v-for="cat in filteredCategories" :key="cat.id">
+          <v-card color="surface" elevation="1" class="rounded-xl pa-4 cat-card fill-height">
+            <div class="d-flex align-center justify-space-between">
+              <div class="d-flex align-center">
+                <v-avatar :color="cat.color ?? undefined" size="40" class="mr-4">
+                  <v-icon :icon="mdiTagOutline" color="white"></v-icon>
+                </v-avatar>
+                <div>
+                  <div class="font-weight-medium text-body-1 text-on-surface">{{ cat.name }}</div>
+                  <div class="d-flex align-center ga-2 mt-1">
+                    <v-chip
+                      size="x-small"
+                      :color="cat.type === 'INCOME' ? 'success' : 'error'"
+                      variant="tonal"
+                    >
+                      {{ cat.type === 'INCOME' ? 'Income' : 'Expense' }}
+                    </v-chip>
+                    <span class="text-caption text-on-surface-variant">
+                      {{ cat.transactionCount }} movement{{ cat.transactionCount === 1 ? '' : 's' }}
+                    </span>
+                  </div>
                 </div>
               </div>
+              <div>
+                <v-btn
+                  :icon="mdiPencilOutline"
+                  variant="text"
+                  size="small"
+                  color="primary"
+                  :aria-label="`Edit ${cat.name}`"
+                  @click="editCat(cat)"
+                ></v-btn>
+                <v-btn
+                  :icon="mdiDeleteOutline"
+                  variant="text"
+                  size="small"
+                  color="error"
+                  :aria-label="`Delete ${cat.name}`"
+                  @click="confirmDelete(cat)"
+                ></v-btn>
+              </div>
             </div>
-            <div>
-              <v-btn :icon="mdiPencilOutline" variant="text" size="small" color="primary" :aria-label="`Edit ${cat.name}`" @click="editCat(cat)"></v-btn>
-              <v-btn :icon="mdiDeleteOutline" variant="text" size="small" color="error" :aria-label="`Delete ${cat.name}`" @click="confirmDelete(cat)"></v-btn>
+            <v-divider class="my-3"></v-divider>
+            <div class="d-flex align-baseline justify-space-between">
+              <span class="text-caption text-on-surface-variant">Total {{ periodLabel }}</span>
+              <span
+                class="text-subtitle-1 font-weight-bold"
+                :class="cat.type === 'INCOME' ? 'text-success' : 'text-error'"
+              >
+                {{ cs }}{{ formatMoney(cat.total) }}
+              </span>
             </div>
+          </v-card>
+        </v-col>
+        <v-col v-if="filteredCategories.length === 0" cols="12">
+          <div class="text-center pa-12 text-on-surface-variant">
+            <v-icon :icon="mdiShapePlusOutline" size="72" class="mb-4 opacity-40"></v-icon>
+            <p class="text-h6 font-weight-medium mb-1">No {{ filterLabel }} categories yet</p>
+            <p class="text-body-2 mb-6">
+              Create one to start organizing your
+              {{ filterLabel === 'income' ? 'earnings' : 'spending' }}.
+            </p>
+            <v-btn
+              color="primary"
+              elevation="0"
+              rounded="pill"
+              :prepend-icon="mdiPlus"
+              @click="openDialog()"
+            >
+              New {{ filterLabel }} category
+            </v-btn>
           </div>
-          <v-divider class="my-3"></v-divider>
-          <div class="d-flex align-baseline justify-space-between">
-            <span class="text-caption text-on-surface-variant">Total {{ periodLabel }}</span>
-            <span class="text-subtitle-1 font-weight-bold" :class="cat.type === 'INCOME' ? 'text-success' : 'text-error'">
-              {{ cs }}{{ formatMoney(cat.total) }}
-            </span>
-          </div>
-        </v-card>
-      </v-col>
-      <v-col v-if="filteredCategories.length === 0" cols="12">
-        <div class="text-center pa-12 text-on-surface-variant">
-          <v-icon :icon="mdiShapePlusOutline" size="72" class="mb-4 opacity-40"></v-icon>
-          <p class="text-h6 font-weight-medium mb-1">No {{ filterLabel }} categories yet</p>
-          <p class="text-body-2 mb-6">Create one to start organizing your {{ filterLabel === 'income' ? 'earnings' : 'spending' }}.</p>
-          <v-btn color="primary" elevation="0" rounded="pill" :prepend-icon="mdiPlus" @click="openDialog()">
-            New {{ filterLabel }} category
-          </v-btn>
-        </div>
-      </v-col>
-    </v-row>
+        </v-col>
+      </v-row>
     </template>
 
     <!-- CREATE/EDIT DIALOG -->
@@ -100,12 +159,28 @@
         <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
           <span class="font-weight-medium">{{ isEditing ? 'Edit Category' : 'New Category' }}</span>
           <v-spacer></v-spacer>
-          <v-btn :icon="mdiClose" variant="text" size="small" aria-label="Close dialog" @click="dialog = false"></v-btn>
+          <v-btn
+            :icon="mdiClose"
+            variant="text"
+            size="small"
+            aria-label="Close dialog"
+            @click="dialog = false"
+          ></v-btn>
         </v-card-title>
         <v-card-text class="pa-6">
           <v-form @submit.prevent="submitCat">
-            <v-text-field v-model="catForm.name" label="Name" class="mb-2"></v-text-field>
-            <v-select v-model="catForm.type" :items="['INCOME', 'EXPENSE']" label="Type" class="mb-2"></v-select>
+            <v-text-field
+              v-model="catForm.name"
+              label="Name"
+              maxlength="60"
+              class="mb-2"
+            ></v-text-field>
+            <v-select
+              v-model="catForm.type"
+              :items="['INCOME', 'EXPENSE']"
+              label="Type"
+              class="mb-2"
+            ></v-select>
             <div class="text-body-2 text-on-surface-variant mb-2">Color</div>
             <div class="d-flex flex-wrap ga-2 mb-4" role="radiogroup" aria-label="Category color">
               <v-avatar
@@ -118,15 +193,32 @@
                 tabindex="0"
                 :aria-checked="catForm.color === c"
                 :aria-label="`Color ${c}`"
-                :style="catForm.color === c ? 'outline: 3px solid #0070f3; outline-offset: 2px;' : ''"
+                :style="
+                  catForm.color === c ? 'outline: 3px solid #0070f3; outline-offset: 2px;' : ''
+                "
                 @click="catForm.color = c"
                 @keydown.enter.prevent="catForm.color = c"
                 @keydown.space.prevent="catForm.color = c"
               >
-                <v-icon v-if="catForm.color === c" :icon="mdiCheck" color="white" size="18"></v-icon>
+                <v-icon
+                  v-if="catForm.color === c"
+                  :icon="mdiCheck"
+                  color="white"
+                  size="18"
+                ></v-icon>
               </v-avatar>
             </div>
-            <v-btn type="submit" color="primary" size="large" rounded="pill" class="w-100 mt-2 font-weight-bold" elevation="0" :loading="submitting" :disabled="!catForm.name.trim() || !catForm.type">{{ isEditing ? 'Update' : 'Create' }}</v-btn>
+            <v-btn
+              type="submit"
+              color="primary"
+              size="large"
+              rounded="pill"
+              class="w-100 mt-2 font-weight-bold"
+              elevation="0"
+              :loading="submitting"
+              :disabled="!catForm.name.trim() || !catForm.type"
+              >{{ isEditing ? 'Update' : 'Create' }}</v-btn
+            >
           </v-form>
         </v-card-text>
       </v-card>
@@ -142,10 +234,21 @@
           <p class="text-h6 font-weight-medium mb-2">Delete "{{ deletingCat?.name }}"?</p>
           <p class="text-body-2 text-on-surface-variant mb-6">
             <template v-if="needsReassignment">
-              It has {{ deletingCat?.allTimeCount ?? 0 }} movement{{ deletingCat?.allTimeCount === 1 ? '' : 's' }} in total.
-              Choose which category takes them, or cancel to keep the category.
+              It has {{ deletingCat?.allTimeCount ?? 0 }} movement{{
+                deletingCat?.allTimeCount === 1 ? '' : 's'
+              }}
+              in total. Choose which category takes them, or cancel to keep the category.
             </template>
             <template v-else>This action cannot be undone.</template>
+            <template v-if="(deletingCat?.budgetCount ?? 0) > 0">
+              <br />
+              <span class="text-warning">
+                Its {{ deletingCat?.budgetCount }} budget{{
+                  (deletingCat?.budgetCount ?? 0) === 1 ? '' : 's'
+                }}
+                will be deleted with it.
+              </span>
+            </template>
           </p>
           <v-select
             v-if="needsReassignment"
@@ -159,8 +262,17 @@
             class="mb-6 text-left"
           ></v-select>
           <div class="d-flex ga-3 justify-center">
-            <v-btn variant="outlined" rounded="pill" :disabled="deleting" @click="closeDelete">Cancel</v-btn>
-            <v-btn color="error" elevation="0" rounded="pill" :loading="deleting" :disabled="!canDelete" @click="doDelete">
+            <v-btn variant="outlined" rounded="pill" :disabled="deleting" @click="closeDelete"
+              >Cancel</v-btn
+            >
+            <v-btn
+              color="error"
+              elevation="0"
+              rounded="pill"
+              :loading="deleting"
+              :disabled="!canDelete"
+              @click="doDelete"
+            >
               {{ needsReassignment ? 'Move & Delete' : 'Delete' }}
             </v-btn>
           </div>
@@ -168,7 +280,9 @@
       </v-card>
     </v-dialog>
 
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{ snackMessage }}</v-snackbar>
+    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
+      snackMessage
+    }}</v-snackbar>
   </v-container>
 </template>
 
@@ -180,8 +294,16 @@ import { api, fetchJson } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { Category } from '@/types'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
-import { endOfMonth, endOfWeek, startOfMonth, startOfWeek } from '@/utils/date'
-import { mdiCheck, mdiClose, mdiDeleteOutline, mdiPencilOutline, mdiPlus, mdiShapePlusOutline, mdiTagOutline } from '@mdi/js'
+import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, toDateOnly } from '@/utils/date'
+import {
+  mdiCheck,
+  mdiClose,
+  mdiDeleteOutline,
+  mdiPencilOutline,
+  mdiPlus,
+  mdiShapePlusOutline,
+  mdiTagOutline
+} from '@mdi/js'
 
 const cs = useCurrencySymbol()
 
@@ -203,26 +325,46 @@ const deletingCat = ref<Category | null>(null)
 const reassignTo = ref<number | null>(null)
 const deleting = ref(false)
 
+// The range travels as calendar days ('YYYY-MM-DD'); the backend maps each
+// one to the full UTC day, so the totals match what the user sees.
 const categoriesUrl = () => {
   const params = new URLSearchParams()
   if (period.value === 'week') {
-    params.set('from', startOfWeek().toISOString())
-    params.set('to', endOfWeek().toISOString())
+    params.set('from', toDateOnly(startOfWeek()))
+    params.set('to', toDateOnly(endOfWeek()))
   } else if (period.value === 'month') {
-    params.set('from', startOfMonth().toISOString())
-    params.set('to', endOfMonth().toISOString())
+    params.set('from', toDateOnly(startOfMonth()))
+    params.set('to', toDateOnly(endOfMonth()))
   }
   const qs = params.toString()
   return `/categories${qs ? `?${qs}` : ''}`
 }
 
-const { data: categories, loading, error: categoriesError, run: fetchCategories } = useAsyncData<Category[]>(
-  signal => fetchJson<Category[]>(categoriesUrl(), { signal }),
-  [],
-  { cacheKey: categoriesUrl }
-)
+const {
+  data: categories,
+  loading,
+  error: categoriesError,
+  run: fetchCategories
+} = useAsyncData<Category[]>(signal => fetchJson<Category[]>(categoriesUrl(), { signal }), [], {
+  cacheKey: categoriesUrl
+})
 
-const colorOptions = ['#EA4335', '#FBBC04', '#34A853', '#4285F4', '#A142F4', '#E8710A', '#5F6368', '#F28B82', '#81C995', '#A8C7FA', '#D7AEFB', '#FDCFE8', '#78909C', '#FF7043']
+const colorOptions = [
+  '#EA4335',
+  '#FBBC04',
+  '#34A853',
+  '#4285F4',
+  '#A142F4',
+  '#E8710A',
+  '#5F6368',
+  '#F28B82',
+  '#81C995',
+  '#A8C7FA',
+  '#D7AEFB',
+  '#FDCFE8',
+  '#78909C',
+  '#FF7043'
+]
 
 const filteredCategories = computed(() => categories.value.filter(c => c.type === filterType.value))
 
@@ -262,7 +404,10 @@ const submitCat = async () => {
   const url = isEditing.value ? `/categories/${editingId.value}` : '/categories'
   const method = isEditing.value ? 'PUT' : 'POST'
   try {
-    const res = await api(url, { method, body: JSON.stringify({ ...catForm.value, name: catForm.value.name.trim() }) })
+    const res = await api(url, {
+      method,
+      body: JSON.stringify({ ...catForm.value, name: catForm.value.name.trim() })
+    })
     if (res.ok) {
       dialog.value = false
       showSnack(isEditing.value ? 'Category updated!' : 'Category created!', 'success')
@@ -299,9 +444,12 @@ const doDelete = async () => {
     if (res.ok) {
       const data = await res.json().catch(() => null)
       const moved = data?.moved ?? 0
-      showSnack(moved > 0
-        ? `Category deleted, ${moved} movement${moved === 1 ? '' : 's'} moved.`
-        : 'Category deleted!', 'success')
+      showSnack(
+        moved > 0
+          ? `Category deleted, ${moved} movement${moved === 1 ? '' : 's'} moved.`
+          : 'Category deleted!',
+        'success'
+      )
       closeDelete()
       await loadCategories()
     } else {
@@ -328,7 +476,16 @@ onMounted(loadCategories)
 </script>
 
 <style scoped>
-.cursor-pointer { cursor: pointer; }
-.cat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
-.cat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important; }
+.cursor-pointer {
+  cursor: pointer;
+}
+.cat-card {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.cat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
 </style>

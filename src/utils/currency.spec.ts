@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { CURRENCIES, getCurrency, setCurrency, setCurrencyByCode, formatMoney, currencySymbol, getCurrencyCode } from './currency'
+import {
+  CURRENCIES,
+  getCurrency,
+  setCurrency,
+  setCurrencyByCode,
+  formatMoney,
+  currencySymbol,
+  getCurrencyCode
+} from './currency'
 
 beforeEach(() => {
   localStorage.clear()

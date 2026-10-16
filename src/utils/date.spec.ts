@@ -1,21 +1,46 @@
 import { describe, expect, it } from 'vitest'
-import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, toDateInput, fromDateInput, formatDate } from './date'
+import {
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  toDateOnly,
+  toDateInput,
+  todayInput,
+  fromDateInput,
+  parseDateOnly,
+  formatDate,
+  formatDateOnly
+} from './date'
 
 const localYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
+// Stored dates are UTC midnights. The suite runs in the machine's timezone
+// (America/Lima, UTC-5 in CI/dev), where reading a UTC midnight with local
+// getters would show the previous day — which is exactly the bug these helpers
+// exist to prevent.
+describe('toDateOnly', () => {
+  it('formats a Date as its LOCAL calendar day', () => {
+    expect(toDateOnly(new Date(2024, 0, 5))).toBe('2024-01-05')
+  })
+
+  it('uses local components, so a late-evening date stays on its day', () => {
+    expect(toDateOnly(new Date(2024, 4, 20, 23, 30))).toBe('2024-05-20')
+  })
+})
+
 describe('toDateInput', () => {
-  it('formats a Date as YYYY-MM-DD', () => {
-    expect(toDateInput(new Date(2024, 0, 5))).toBe('2024-01-05')
+  it('reads a stored date (UTC midnight) with UTC components', () => {
+    expect(toDateInput('2024-05-20T00:00:00.000Z')).toBe('2024-05-20')
+  })
+
+  it('formats a Date object the same way', () => {
+    expect(toDateInput(new Date('2024-05-20T00:00:00.000Z'))).toBe('2024-05-20')
   })
 
   it('pads single-digit months and days', () => {
-    expect(toDateInput(new Date(2024, 8, 9))).toBe('2024-09-09')
-  })
-
-  it('uses local midnight, not UTC, so the day never shifts', () => {
-    // 23:30 local would be the next day in UTC if the conversion were careless.
-    expect(toDateInput(new Date(2024, 4, 20, 23, 30))).toBe('2024-05-20')
+    expect(toDateInput('2024-09-09T00:00:00.000Z')).toBe('2024-09-09')
   })
 
   it('returns empty string for an unparseable value', () => {
@@ -23,25 +48,45 @@ describe('toDateInput', () => {
   })
 })
 
+describe('todayInput', () => {
+  it('is the LOCAL calendar day, which is what the date picker shows', () => {
+    expect(todayInput()).toBe(localYmd(new Date()))
+  })
+})
+
 describe('fromDateInput', () => {
-  it('reads back the same calendar day it was given', () => {
-    const iso = fromDateInput('2024-03-15')
-    expect(localYmd(new Date(iso))).toBe('2024-03-15')
+  it('passes a YYYY-MM-DD day through unchanged', () => {
+    // The API expects the calendar day itself; it maps it to UTC midnight.
+    expect(fromDateInput('2024-03-15')).toBe('2024-03-15')
   })
 
   it('returns empty string for empty input', () => {
     expect(fromDateInput('')).toBe('')
   })
 
-  it('returns empty string for a string without numbers', () => {
+  it('returns empty string for anything that is not a plain day', () => {
     expect(fromDateInput('not-a-date')).toBe('')
+    expect(fromDateInput('2024-3-5')).toBe('')
+    expect(fromDateInput('2024-03-15T10:00:00Z')).toBe('')
+  })
+})
+
+describe('parseDateOnly', () => {
+  it('parses a day into LOCAL midnight', () => {
+    const d = parseDateOnly('2024-03-15')
+    expect(d).not.toBeNull()
+    expect(localYmd(d!)).toBe('2024-03-15')
+    expect(d!.getHours()).toBe(0)
   })
 
-  it('builds local midnight, so the stored instant matches the chosen day', () => {
-    // The value goes to the API as ISO/UTC; reading it back must land on the
-    // same calendar day regardless of the machine timezone.
-    const iso = fromDateInput('2024-03-15')
-    expect(new Date(iso).getHours()).toBe(0)
+  it('rejects malformed input', () => {
+    expect(parseDateOnly('')).toBeNull()
+    expect(parseDateOnly('2024-3-5')).toBeNull()
+    expect(parseDateOnly('nope')).toBeNull()
+  })
+
+  it('rejects a day that rolls over (2024-02-31)', () => {
+    expect(parseDateOnly('2024-02-31')).toBeNull()
   })
 })
 
@@ -87,8 +132,7 @@ describe('startOfWeek / endOfWeek', () => {
 })
 
 describe('formatDate', () => {
-  // The API always returns full ISO timestamps (e.g. 2024-01-15T17:00:00.000Z),
-  // which are real instants, so rendering them in local time is correct.
+  // Real instants (createdAt) are rendered in local time.
   it('formats a timestamp from the API', () => {
     expect(formatDate(new Date(2024, 0, 15, 12).toISOString())).toBe('Jan 15, 2024')
   })
@@ -103,5 +147,23 @@ describe('formatDate', () => {
 
   it('returns empty string for an invalid date instead of "Invalid Date"', () => {
     expect(formatDate('nope')).toBe('')
+  })
+})
+
+describe('formatDateOnly', () => {
+  // Calendar dates (a transaction's `date`) are rendered in UTC: a UTC
+  // midnight rendered in local time would show the previous day west of UTC.
+  it('renders a stored date as its own calendar day', () => {
+    expect(formatDateOnly('2024-05-20T00:00:00.000Z')).toBe('May 20, 2024')
+  })
+
+  it('honours custom options', () => {
+    expect(formatDateOnly('2024-05-20T00:00:00.000Z', { month: 'short', day: 'numeric' })).toBe(
+      'May 20'
+    )
+  })
+
+  it('returns empty string for an invalid date', () => {
+    expect(formatDateOnly('nope')).toBe('')
   })
 })

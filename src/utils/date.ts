@@ -1,25 +1,55 @@
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n))
 
-// <input type="date"> works with 'YYYY-MM-DD' in local time.
-export function toDateInput(value: string | Date): string {
-  const d = typeof value === 'string' ? new Date(value) : value
-  if (isNaN(d.getTime())) return ''
+// Calendar dates travel as 'YYYY-MM-DD' strings end to end. The backend stores
+// them as UTC midnight of that day, which makes the rules simple:
+//
+//   - a stored date is read back with getUTC* — its calendar day never shifts,
+//     no matter where the device is;
+//   - "today" and range bounds are built from local components, because the
+//     user's own calendar is what they see in the picker; the API maps that
+//     same day to UTC midnight;
+//   - real instants (createdAt) keep being rendered in local time.
+
+/** 'YYYY-MM-DD' of a Date's LOCAL calendar day. */
+export function toDateOnly(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
+/**
+ * The value shown in <input type="date"> for a stored transaction date. Stored
+ * dates are UTC midnights, so the day is read with getUTC*.
+ */
+export function toDateInput(value: string | Date): string {
+  const d = typeof value === 'string' ? new Date(value) : value
+  if (isNaN(d.getTime())) return ''
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+}
+
 export function todayInput(): string {
-  return toDateInput(new Date())
+  return toDateOnly(new Date())
 }
 
-// Turns 'YYYY-MM-DD' into local midnight and sends it as ISO (UTC), so reading it
-// back shows the same day in any timezone.
+/**
+ * The value of <input type="date"> is already the calendar day the API
+ * expects, so it is sent as-is. Empty means "no date chosen".
+ */
 export function fromDateInput(value: string): string {
-  if (!value) return ''
-  const [y, m, d] = value.split('-').map(Number)
-  if (!y || !m || !d) return ''
-  return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString()
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''
 }
 
+/** Local midnight of a 'YYYY-MM-DD' day, for labels and range math. */
+export function parseDateOnly(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!m) return null
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const day = Number(m[3])
+  const d = new Date(y, mo - 1, day)
+  if (d.getFullYear() !== y || d.getMonth() !== mo - 1 || d.getDate() !== day) return null
+  return d
+}
+
+// For real instants (createdAt), in the user's local time.
 export function formatDate(
   value: string | Date,
   options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
@@ -27,6 +57,18 @@ export function formatDate(
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''
   return d.toLocaleDateString('en-US', options)
+}
+
+// For calendar dates (a transaction's `date`): rendered in UTC so the stored
+// day is the day shown, wherever the device is. Rendering a UTC midnight in
+// local time would show the previous day west of UTC.
+export function formatDateOnly(
+  value: string | Date,
+  options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
+): string {
+  const d = typeof value === 'string' ? new Date(value) : value
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-US', { ...options, timeZone: 'UTC' })
 }
 
 export function formatDateTime(value: string | Date): string {

@@ -4,7 +4,7 @@ Personal finance tracker UI: Vue 3 (`<script setup>` + TypeScript), Vuetify 4, v
 
 ## Requirements
 
-- Node 20+
+- Node 24+ (Vitest 5 and jsdom's undici need it)
 - The backend running on `http://localhost:3000` (see `../porkex-backend`, a sibling folder)
 
 ## Getting started

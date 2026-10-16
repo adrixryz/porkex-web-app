@@ -46,9 +46,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     include: ['src/**/*.spec.ts'],
-    // CI runners are small and shared: capping the forks keeps memory bounded.
+    // CI runners are small and shared: capping the workers keeps memory bounded.
     // Locally the default (one per core) stays, since it is faster.
-    ...(process.env.CI ? { poolOptions: { forks: { maxForks: 2 } } } : {}),
+    ...(process.env.CI ? { maxWorkers: 2 } : {}),
     server: {
       deps: {
         // Vuetify ships untranspiled ESM that Vitest cannot load directly.

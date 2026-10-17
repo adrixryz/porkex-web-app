@@ -249,6 +249,15 @@
                 will be deleted with it.
               </span>
             </template>
+            <template v-if="(deletingCat?.recurringCount ?? 0) > 0">
+              <br />
+              <span class="text-warning">
+                Its {{ deletingCat?.recurringCount }} recurring rule{{
+                  (deletingCat?.recurringCount ?? 0) === 1 ? '' : 's'
+                }}
+                will be deleted with it.
+              </span>
+            </template>
           </p>
           <v-select
             v-if="needsReassignment"

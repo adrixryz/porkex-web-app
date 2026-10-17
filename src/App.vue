@@ -138,6 +138,7 @@ import {
   mdiAccountCircleOutline,
   mdiChartBar,
   mdiPiggyBankOutline,
+  mdiRepeat,
   mdiShapeOutline,
   mdiSwapHorizontal,
   mdiViewDashboardOutline
@@ -209,6 +210,7 @@ const userName = computed(() => currentUser.value?.name || 'User')
 const navItems = [
   { title: 'Dashboard', icon: mdiViewDashboardOutline, route: '/' },
   { title: 'Transactions', icon: mdiSwapHorizontal, route: '/transactions' },
+  { title: 'Recurring', icon: mdiRepeat, route: '/recurring' },
   { title: 'Categories', icon: mdiShapeOutline, route: '/categories' },
   { title: 'Analytics', icon: mdiChartBar, route: '/analytics' },
   { title: 'Budgets', icon: mdiPiggyBankOutline, route: '/budgets' }

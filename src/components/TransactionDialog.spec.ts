@@ -14,7 +14,8 @@ const CATEGORIES: Category[] = [
     transactionCount: 0,
     total: 0,
     allTimeCount: 0,
-    budgetCount: 0
+    budgetCount: 0,
+    recurringCount: 0
   },
   {
     id: 2,
@@ -25,7 +26,8 @@ const CATEGORIES: Category[] = [
     transactionCount: 0,
     total: 0,
     allTimeCount: 0,
-    budgetCount: 0
+    budgetCount: 0,
+    recurringCount: 0
   }
 ]
 

@@ -35,12 +35,12 @@ The dev server runs on `http://localhost:5173` and proxies `/api` and `/auth` to
 
 ```
 src/
-  components/   TransactionDialog, AmountStepper (shared UI)
+  components/   TransactionDialog, RecurringDialog, AmountStepper (shared UI)
   composables/  useAsyncData (fetch state + cache), useSnackbar (shared toast state)
   plugins/      Vuetify instance (dark theme, component defaults), MDI SVG icon set
   router/       Routes and the auth guard
-  utils/        api (auth + fetch + write queue), cache, outbox, connection, currency, date, color
-  views/        Login, Dashboard, Transactions, Categories, Analytics, Budgets, Settings
+  utils/        api (auth + fetch + write queue), cache, outbox, connection, currency, date, recurring, color
+  views/        Login, Dashboard, Transactions, Recurring, Categories, Analytics, Budgets, Settings
   App.vue       Shell: app bar, navigation drawer, page transitions, status banners
   style.css     Global resets and shared utilities
 ```
@@ -71,11 +71,11 @@ not queued either: the server answered, so the payload is wrong rather than the
 network, and it would fail identically on a retry. A 5xx is retried up to five
 times and then dropped, so one bad write cannot block the queue.
 
-Replays are safe because a transaction create gets a `clientId` **before the
-first attempt** (`utils/api.ts`). If the server stores the row and the response
-is lost, the replay carries the same id and the backend returns the existing row
-instead of writing a second one. Generating the id at flush time would let that
-duplicate through.
+Replays are safe because a transaction or recurring-rule create gets a `clientId`
+**before the first attempt** (`utils/api.ts`). If the server stores the row and the
+response is lost, the replay carries the same id and the backend returns the
+existing row instead of writing a second one. Generating the id at flush time
+would let that duplicate through.
 
 A queued write older than seven days is dropped on the next flush, and every
 drop — rejected by the server or expired — raises a warning banner instead of
@@ -124,6 +124,9 @@ black background in `pwa-assets.config.ts`).
   UTC.
 - The currency setting only changes the symbol used for display; there is no
   conversion between currencies.
+- Recurring rules are the backend's job: it turns due occurrences into normal
+  transactions, so this side only manages the rules (`/recurring`) and marks the
+  movements they generated with a repeat icon in `TransactionsView`.
 - Weeks start on Monday (see `utils/date.ts`).
 - The access token is kept in `localStorage` and does not expire until you log out.
   Any `401` clears it and sends the user back to `/login`.

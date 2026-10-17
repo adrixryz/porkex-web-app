@@ -86,7 +86,14 @@ const READ_METHODS = ['GET', 'HEAD']
  * that mapping subtly wrong would show a stale number. One extra refetch the
  * next time a view is opened is the cheaper mistake.
  */
-const WRITE_INVALIDATES = ['/dashboard', '/transactions', '/categories', '/budgets', '/analytics']
+const WRITE_INVALIDATES = [
+  '/dashboard',
+  '/transactions',
+  '/categories',
+  '/budgets',
+  '/recurring',
+  '/analytics'
+]
 
 /**
  * A fetch that never reached the server. This is the only failure worth
@@ -117,19 +124,20 @@ function withTimeout(signal: AbortSignal | null | undefined, ms: number): AbortS
 }
 
 /**
- * Gives a transaction create a stable id before the first attempt.
+ * Gives a transaction or recurring-rule create a stable id before the first
+ * attempt.
  *
  * It has to happen here and not at flush time: if the server creates the row
  * and the response is lost, the replay has to carry the same id so the backend
  * recognises it and returns the stored row. Generating it at flush time would
  * let the duplicate through.
  *
- * Only POST /transactions needs it: an id on any other write would be dead
- * weight in the queued payload.
+ * Only creates need it: an id on any other write would be dead weight in the
+ * queued payload.
  */
 function withClientId(method: string, path: string, body: BodyInit | null): BodyInit | null {
-  if (method !== 'POST' || !path.startsWith('/transactions') || typeof body !== 'string')
-    return body
+  const isCreate = path.startsWith('/transactions') || path.startsWith('/recurring')
+  if (method !== 'POST' || !isCreate || typeof body !== 'string') return body
   try {
     const parsed = JSON.parse(body) as Record<string, unknown>
     if (parsed.clientId) return body

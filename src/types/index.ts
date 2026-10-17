@@ -17,6 +17,8 @@ export interface Category {
   allTimeCount: number
   /** Budgets attached to it: deleting the category deletes them too. */
   budgetCount: number
+  /** Recurring rules attached: they go with the category as well. */
+  recurringCount: number
 }
 
 export interface Transaction {
@@ -29,6 +31,8 @@ export interface Transaction {
   categoryId: number
   userId: number
   category: Category | null
+  /** Set when a recurring rule generated the movement. */
+  recurringId: number | null
 }
 
 export interface User {
@@ -150,4 +154,28 @@ export interface BudgetsResponse {
   budgets: Budget[]
   /** One entry per period: mixing WEEK and MONTH would count movements twice. */
   totals: BudgetTotals[]
+}
+
+export type RecurringFrequency = 'WEEK' | 'MONTH' | 'YEAR'
+
+export interface RecurringRule {
+  id: number
+  userId: number
+  categoryId: number
+  type: TxType
+  amount: number
+  description: string
+  frequency: RecurringFrequency
+  /** "Every N": 2 + WEEK is a fortnight. 1–12. */
+  interval: number
+  /** Anchor day of the schedule, as UTC midnight. */
+  startDate: string
+  /** Inclusive last day, or null when it runs forever. */
+  endDate: string | null
+  /** Next occurrence still to materialize. */
+  nextDate: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+  category: Pick<Category, 'id' | 'name' | 'color' | 'type'> | null
 }

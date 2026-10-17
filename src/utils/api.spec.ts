@@ -176,7 +176,20 @@ describe('the idempotency key', () => {
     vi.unstubAllGlobals()
   })
 
-  it('is not added to writes that are not transaction creates', async () => {
+  it('is added to a recurring-rule create too', async () => {
+    vi.stubGlobal('fetch', networkDown())
+
+    await api('/recurring', { method: 'POST', body: JSON.stringify({ frequency: 'MONTH' }) })
+
+    const send = vi.fn(async (_m: QueuedMutation) => new Response('{}', { status: 200 }))
+    await flushOutbox(send)
+
+    const body = (send.mock.calls[0][0] as QueuedMutation).body!
+    expect(JSON.parse(body).clientId).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
+
+  it('is not added to writes that are not transaction or rule creates', async () => {
     vi.stubGlobal('fetch', networkDown())
 
     await api('/categories', { method: 'POST', body: '{"name":"Food"}' })

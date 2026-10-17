@@ -28,7 +28,7 @@
           <div>
             <h1 class="text-h4 font-weight-bold text-on-surface">Recurring</h1>
             <p class="text-body-2 text-on-surface-variant mt-1">
-              Movements that repeat on a schedule — for income and expenses.
+              Movements that repeat on a schedule, for income and expenses.
             </p>
           </div>
           <v-btn

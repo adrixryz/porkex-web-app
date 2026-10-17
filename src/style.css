@@ -60,6 +60,41 @@ html, body {
   border-color: currentColor;
 }
 
+/* ── Disabled filled buttons ──────────────────────────────────────────── */
+/* Vuetify repaints a disabled filled button as a light grey pill; over the
+   black canvas that reads as brighter than its own colour. Keep each button's
+   colour instead, in a darker shade, with dimmed text. */
+.v-btn--disabled.v-btn--variant-elevated.bg-primary,
+.v-btn--disabled.v-btn--variant-flat.bg-primary,
+.v-btn--disabled.v-btn--variant-elevated.bg-error,
+.v-btn--disabled.v-btn--variant-flat.bg-error,
+.v-btn--disabled.v-btn--variant-elevated.bg-success,
+.v-btn--disabled.v-btn--variant-flat.bg-success {
+  color: rgba(255, 255, 255, 0.6);
+}
+.v-btn--disabled.v-btn--variant-elevated.bg-primary,
+.v-btn--disabled.v-btn--variant-flat.bg-primary {
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 40%, #000);
+}
+.v-btn--disabled.v-btn--variant-elevated.bg-error,
+.v-btn--disabled.v-btn--variant-flat.bg-error {
+  background: color-mix(in srgb, rgb(var(--v-theme-error)) 40%, #000);
+}
+.v-btn--disabled.v-btn--variant-elevated.bg-success,
+.v-btn--disabled.v-btn--variant-flat.bg-success {
+  background: color-mix(in srgb, rgb(var(--v-theme-success)) 40%, #000);
+}
+/* Vuetify's disabled overlay is a light grey wash; the darker shade already
+   carries the disabled state on its own. */
+.v-btn--disabled.v-btn--variant-elevated.bg-primary > .v-btn__overlay,
+.v-btn--disabled.v-btn--variant-flat.bg-primary > .v-btn__overlay,
+.v-btn--disabled.v-btn--variant-elevated.bg-error > .v-btn__overlay,
+.v-btn--disabled.v-btn--variant-flat.bg-error > .v-btn__overlay,
+.v-btn--disabled.v-btn--variant-elevated.bg-success > .v-btn__overlay,
+.v-btn--disabled.v-btn--variant-flat.bg-success > .v-btn__overlay {
+  opacity: 0;
+}
+
 /* ── Thin scrollbars ─────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
@@ -146,8 +181,13 @@ html, body {
 }
 
 /* ── Dialogs: keep long forms scrollable on short viewports ──────────── */
+/* The cap only exists as a safety net for dialogs taller than the window.
+   It used to reserve 220px, which made short dialogs (like the category
+   delete confirm) overflow by a few pixels and show a scrollbar. Vuetify
+   already centres the dialog with 24px top/bottom margins, so 64px leaves
+   the same breathing room plus a small slack. */
 .v-dialog .v-card-text {
-  max-height: calc(100vh - 220px);
+  max-height: calc(100vh - 64px);
   overflow-y: auto;
 }
 

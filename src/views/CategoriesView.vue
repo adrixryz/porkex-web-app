@@ -268,6 +268,7 @@
             item-value="value"
             label="Move transactions to"
             density="comfortable"
+            rounded="xl"
             hide-details
             class="mb-6 text-left"
           ></v-select>

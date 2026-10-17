@@ -83,10 +83,12 @@
             {{ error }}
           </v-alert>
 
+          <!-- Editing an existing movement is neutral (blue); creating one
+               keeps the income/expense colour. -->
           <v-btn
             type="submit"
             rounded="pill"
-            :color="isIncome ? 'success' : 'error'"
+            :color="isEditing ? 'primary' : isIncome ? 'success' : 'error'"
             size="large"
             class="w-100 mt-4 font-weight-bold"
             elevation="0"

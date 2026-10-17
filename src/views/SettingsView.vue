@@ -30,7 +30,6 @@
               </v-avatar>
               <div class="flex-grow-1">
                 <div class="text-h6 font-weight-medium">{{ profile.name }}</div>
-                <div class="text-body-2 text-on-surface-variant">{{ profile.email }}</div>
                 <div class="text-caption text-on-surface-variant mt-1">
                   Member since
                   {{ formatDate(profile.createdAt, { month: 'long', year: 'numeric' }) }}

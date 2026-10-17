@@ -134,10 +134,12 @@
             {{ error }}
           </v-alert>
 
+          <!-- Neutral blue like the other dialogs: the rule itself already
+               says whether it is income or expense. -->
           <v-btn
             type="submit"
             rounded="pill"
-            :color="isIncome ? 'success' : 'error'"
+            color="primary"
             size="large"
             class="w-100 mt-4 font-weight-bold"
             elevation="0"

@@ -33,7 +33,7 @@ export default createVuetify({
         colors: {
           background: '#000000',
           surface: '#0a0a0a',
-          'surface-bright': '#171717',
+          'surface-bright': '#3c3c3c',
           'surface-variant': '#111111',
           primary: '#0070f3',
           'on-primary': '#ffffff',
@@ -42,7 +42,9 @@ export default createVuetify({
           error: '#e5484d',
           'on-error': '#ffffff',
           success: '#00c853',
-          'on-success': '#003c18',
+          // White like on-error: filled success buttons otherwise render
+          // their label in a dark green that reads poorly on #00c853.
+          'on-success': '#ffffff',
           warning: '#f5a623',
           'on-warning': '#3d2a00',
           info: '#0070f3',

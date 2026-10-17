@@ -88,21 +88,21 @@
           </div>
           <div>
             <v-btn
-              color="success"
-              elevation="0"
-              :prepend-icon="mdiPlus"
-              rounded="pill"
-              @click="openDialog('INCOME')"
-              class="mr-3"
-              >Income</v-btn
-            >
-            <v-btn
               color="error"
               elevation="0"
               :prepend-icon="mdiMinus"
               rounded="pill"
               @click="openDialog('EXPENSE')"
+              class="mr-3"
               >Expense</v-btn
+            >
+            <v-btn
+              color="success"
+              elevation="0"
+              :prepend-icon="mdiPlus"
+              rounded="pill"
+              @click="openDialog('INCOME')"
+              >Income</v-btn
             >
           </div>
         </v-col>
@@ -181,20 +181,20 @@
                   </p>
                   <div class="d-flex flex-wrap justify-center ga-3">
                     <v-btn
-                      color="success"
-                      variant="outlined"
-                      :prepend-icon="mdiPlus"
-                      rounded="pill"
-                      @click="openDialog('INCOME')"
-                      >Add income</v-btn
-                    >
-                    <v-btn
                       color="error"
                       variant="outlined"
                       :prepend-icon="mdiMinus"
                       rounded="pill"
                       @click="openDialog('EXPENSE')"
                       >Add expense</v-btn
+                    >
+                    <v-btn
+                      color="success"
+                      variant="outlined"
+                      :prepend-icon="mdiPlus"
+                      rounded="pill"
+                      @click="openDialog('INCOME')"
+                      >Add income</v-btn
                     >
                   </div>
                 </div>
@@ -212,21 +212,22 @@
                     <v-list-item-title class="font-weight-medium text-body-1">{{
                       tx.description || 'No description'
                     }}</v-list-item-title>
-                    <v-list-item-subtitle class="mt-1">
-                      <div class="d-flex align-center flex-wrap ga-2">
-                        <v-chip
-                          size="x-small"
-                          :color="tx.category?.color ?? undefined"
-                          variant="flat"
-                          class="font-weight-medium"
-                          :style="`color: ${textOn(tx.category?.color)}`"
-                          >{{ tx.category?.name }}</v-chip
-                        >
-                        <span class="text-caption">{{
-                          formatDateOnly(tx.date, { month: 'short', day: 'numeric' })
-                        }}</span>
-                      </div>
-                    </v-list-item-subtitle>
+                    <!-- Plain div, not v-list-item-subtitle: the latter paints its
+                         children at opacity 0.7, which dulls the category chip.
+                         Same structure as the Transactions list, where it looks right. -->
+                    <div class="mt-1 d-flex align-center flex-wrap ga-2">
+                      <v-chip
+                        size="x-small"
+                        :color="tx.category?.color ?? undefined"
+                        variant="flat"
+                        class="font-weight-medium"
+                        :style="`color: ${textOn(tx.category?.color)}`"
+                        >{{ tx.category?.name }}</v-chip
+                      >
+                      <span class="opacity-70 text-caption">{{
+                        formatDateOnly(tx.date, { month: 'short', day: 'numeric' })
+                      }}</span>
+                    </div>
                     <template v-slot:append>
                       <span
                         class="font-weight-bold text-subtitle-1"

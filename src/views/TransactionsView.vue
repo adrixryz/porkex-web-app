@@ -43,21 +43,21 @@
           <h1 class="text-h4 font-weight-bold text-on-surface">Transactions</h1>
           <div>
             <v-btn
-              color="success"
-              elevation="0"
-              :prepend-icon="mdiPlus"
-              rounded="pill"
-              @click="openDialog('INCOME')"
-              class="mr-3"
-              >Income</v-btn
-            >
-            <v-btn
               color="error"
               elevation="0"
               :prepend-icon="mdiMinus"
               rounded="pill"
               @click="openDialog('EXPENSE')"
+              class="mr-3"
               >Expense</v-btn
+            >
+            <v-btn
+              color="success"
+              elevation="0"
+              :prepend-icon="mdiPlus"
+              rounded="pill"
+              @click="openDialog('INCOME')"
+              >Income</v-btn
             >
           </div>
         </v-col>
@@ -154,8 +154,8 @@
                 aria-label="Filter by type"
               >
                 <v-btn value="ALL">All</v-btn>
-                <v-btn value="INCOME">Income</v-btn>
                 <v-btn value="EXPENSE">Expense</v-btn>
+                <v-btn value="INCOME">Income</v-btn>
               </v-btn-toggle>
 
               <v-spacer class="d-none d-md-block"></v-spacer>
@@ -531,20 +531,20 @@
                 </v-btn>
                 <div v-else class="d-flex flex-wrap justify-center ga-3">
                   <v-btn
-                    color="success"
-                    variant="outlined"
-                    :prepend-icon="mdiPlus"
-                    rounded="pill"
-                    @click="openDialog('INCOME')"
-                    >Add income</v-btn
-                  >
-                  <v-btn
                     color="error"
                     variant="outlined"
                     :prepend-icon="mdiMinus"
                     rounded="pill"
                     @click="openDialog('EXPENSE')"
                     >Add expense</v-btn
+                  >
+                  <v-btn
+                    color="success"
+                    variant="outlined"
+                    :prepend-icon="mdiPlus"
+                    rounded="pill"
+                    @click="openDialog('INCOME')"
+                    >Add income</v-btn
                   >
                 </div>
               </div>

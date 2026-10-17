@@ -21,6 +21,10 @@
         ></v-btn>
       </v-card-title>
       <v-card-text class="pa-6">
+        <v-alert v-if="rule?.nextException" type="info" density="compact" class="mb-3"
+          >Changing the schedule or type can cancel the next-only edit. Other rule edits preserve
+          it.</v-alert
+        >
         <v-form @submit.prevent="submit">
           <v-btn-toggle
             v-model="form.type"

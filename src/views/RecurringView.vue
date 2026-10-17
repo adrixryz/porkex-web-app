@@ -106,6 +106,21 @@
               </span>
             </div>
 
+            <v-alert
+              v-if="r.nextException"
+              density="compact"
+              variant="tonal"
+              type="info"
+              class="mt-2"
+              >Next only: {{ cs }}{{ formatMoney(r.nextException.amount)
+              }}<span v-if="r.nextException.comment">
+                · {{ r.nextException.comment }}</span
+              ></v-alert
+            >
+            <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-1 mt-2">
+              <v-btn size="small" variant="text" @click="skipRule = r">Skip next</v-btn
+              ><v-btn size="small" variant="text" @click="editNext(r)">Edit next</v-btn>
+            </div>
             <div class="d-flex align-center justify-space-between mt-2">
               <span class="text-caption text-on-surface-variant">
                 <template v-if="r.endDate">Until {{ formatDateOnly(r.endDate) }}</template>
@@ -147,6 +162,27 @@
     <!-- CREATE/EDIT DIALOG -->
     <RecurringDialog v-model="dialog" :rule="editingRule" @saved="onSaved" />
 
+    <TransactionDialog
+      v-model="nextDialog"
+      :type="nextRule?.type"
+      :transaction="nextTransaction"
+      :occurrence="nextTarget"
+      @saved="onNextSaved"
+    />
+    <v-dialog
+      :model-value="!!skipRule"
+      max-width="400"
+      :persistent="skipping"
+      @update:model-value="skipRule = null"
+      ><v-card
+        title="Skip next occurrence?"
+        :text="`Skip ${skipRule ? formatDateOnly(skipRule.nextDate) : ''}? The rule will continue on its following date.`"
+        ><v-card-actions
+          ><v-btn :disabled="skipping" @click="skipRule = null">Cancel</v-btn
+          ><v-btn color="warning" :loading="skipping" @click="skipNext">Skip</v-btn></v-card-actions
+        ></v-card
+      ></v-dialog
+    >
     <!-- DELETE CONFIRM -->
     <v-dialog v-model="deleteDialog" max-width="420">
       <v-card class="rounded-xl" color="surface">
@@ -184,6 +220,7 @@
 <script setup lang="ts">
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted } from 'vue'
+import TransactionDialog from '@/components/TransactionDialog.vue'
 import RecurringDialog from '@/components/RecurringDialog.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useSnackbar } from '@/composables/useSnackbar'
@@ -191,7 +228,7 @@ import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { formatDateOnly, toDateInput } from '@/utils/date'
 import { scheduleLabel } from '@/utils/recurring'
-import type { RecurringRule } from '@/types'
+import type { RecurringRule, Transaction } from '@/types'
 import {
   mdiDeleteOutline,
   mdiPause,
@@ -225,6 +262,55 @@ const statusLabel = (r: RecurringRule) => (isEnded(r) ? 'Ended' : r.active ? 'Ac
 const statusColor = (r: RecurringRule) =>
   isEnded(r) ? undefined : r.active ? 'success' : 'warning'
 
+const nextDialog = ref(false)
+const nextRule = ref<RecurringRule | null>(null)
+const nextTransaction = ref<Transaction | null>(null)
+const nextTarget = ref<{ ruleId: number; date: string }>()
+const skipRule = ref<RecurringRule | null>(null)
+const skipping = ref(false)
+function editNext(rule: RecurringRule) {
+  nextRule.value = rule
+  nextTarget.value = { ruleId: rule.id, date: toDateInput(rule.nextDate) }
+  const exception = rule.nextException
+  nextTransaction.value = {
+    id: 0,
+    type: rule.type,
+    userId: rule.userId,
+    amount: exception?.amount ?? rule.amount,
+    categoryId: exception?.categoryId ?? rule.categoryId,
+    category: null,
+    date: rule.nextDate,
+    createdAt: '',
+    description: exception?.comment ?? rule.description,
+    tags: exception?.tags ?? [],
+    recurringId: rule.id
+  }
+  nextDialog.value = true
+}
+function onNextSaved({ queued }: { queued: boolean }) {
+  showSnack(...mutationFeedback(queued, 'Next occurrence updated; the rule stays unchanged.'))
+}
+async function skipNext() {
+  if (!skipRule.value || skipping.value) return
+  skipping.value = true
+  const rule = skipRule.value
+  try {
+    const response = await api(`/recurring/${rule.id}/occurrences/${toDateInput(rule.nextDate)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ kind: 'SKIP' })
+    })
+    if (!response.ok)
+      throw new Error((await response.json()).error || 'Could not skip this occurrence.')
+    showSnack(
+      ...mutationFeedback(isQueuedResponse(response), `Skipped ${formatDateOnly(rule.nextDate)}.`)
+    )
+    skipRule.value = null
+  } catch (error) {
+    showSnack((error as Error).message, 'error')
+  } finally {
+    skipping.value = false
+  }
+}
 const dialog = ref(false)
 const editingRule = ref<RecurringRule | null>(null)
 

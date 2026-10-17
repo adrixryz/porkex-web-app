@@ -47,7 +47,8 @@
                 v-model="form.date"
                 label="Date"
                 type="date"
-                :max="todayInput()"
+                :max="occurrence ? undefined : todayInput()"
+                :readonly="!!occurrence"
                 class="mb-2"
               ></v-text-field>
             </div>
@@ -151,11 +152,13 @@ const props = withDefaults(
     type?: 'INCOME' | 'EXPENSE'
     transaction?: Transaction | null
     categories?: Category[]
+    occurrence?: { ruleId: number; date: string }
   }>(),
   {
     type: 'EXPENSE',
     transaction: null,
-    categories: () => []
+    categories: () => [],
+    occurrence: undefined
   }
 )
 
@@ -197,7 +200,13 @@ const isEditing = computed(() => !!props.transaction)
 const isIncome = computed(() => props.type === 'INCOME')
 
 const title = computed(() =>
-  isEditing.value ? 'Edit Transaction' : props.type === 'INCOME' ? 'New Income' : 'New Expense'
+  props.occurrence
+    ? 'Edit next occurrence'
+    : isEditing.value
+      ? 'Edit Transaction'
+      : props.type === 'INCOME'
+        ? 'New Income'
+        : 'New Expense'
 )
 
 // The parent may pass its own categories (e.g. for the filter); if not, they are loaded here.
@@ -254,8 +263,12 @@ const submit = async () => {
   submitting.value = true
   error.value = ''
 
-  const url = isEditing.value ? `/transactions/${props.transaction!.id}` : '/transactions'
-  const method = isEditing.value ? 'PUT' : 'POST'
+  const url = props.occurrence
+    ? `/recurring/${props.occurrence.ruleId}/occurrences/${props.occurrence.date}`
+    : isEditing.value
+      ? `/transactions/${props.transaction!.id}`
+      : '/transactions'
+  const method = props.occurrence || isEditing.value ? 'PUT' : 'POST'
 
   try {
     const res = await api(url, {
@@ -263,6 +276,7 @@ const submit = async () => {
       body: JSON.stringify({
         ...(!isEditing.value ? { clientId: clientId.value } : {}),
         ...form.value,
+        ...(props.occurrence ? { kind: 'EDIT' } : {}),
         comment: form.value.description.trim(),
         type: props.type,
         date: fromDateInput(form.value.date)

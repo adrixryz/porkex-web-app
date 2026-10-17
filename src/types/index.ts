@@ -182,6 +182,7 @@ export interface BudgetsResponse {
 export type RecurringFrequency = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'
 
 export interface RecurringRule {
+  nextException?: { date: string; amount: number; comment: string; categoryId: number; tags: Tag[] } | null
   id: number
   userId: number
   categoryId: number

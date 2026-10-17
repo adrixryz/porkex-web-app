@@ -203,3 +203,5 @@ La matriz de los 23 puntos y sus límites de validación está en [RELIABILITY_R
 Tags are managed from Edit tags inside movement dialogs: create, rename, confirm global deletion and drag the handle (or use arrow keys) to save manual order. Movements allow 0–5 tags and an optional Comment. The desktop table and shared compact summary render the same catalog; pending catalog operations remain available offline. The API still accepts legacy description payloads.
 
 Deleting a movement offers Deshacer for 8 seconds. Scheduled deletions are stored separately until expiry, grouped while the window is open, and then copied idempotently into the normal outbox under Web Locks. Navigation, reload and offline recovery preserve them; no replacement movement is created. Confirmed totals refresh after the actual DELETE.
+
+Recurring rules offer Skip next and Edit next for an exact scheduled date. The next-only editor reuses the movement fields with a read-only date and 0–5 tags. A conflict stays visible rather than silently affecting a later date; ordinary edits retain the rule schedule and base values.

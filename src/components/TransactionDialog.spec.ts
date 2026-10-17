@@ -136,3 +136,47 @@ it('reuses the create clientId after a failed write while keeping the form open'
     vi.unstubAllGlobals()
   }
 })
+
+it('edits the pinned next occurrence through its own endpoint', async () => {
+  const fetch = vi.fn(
+    async (_url: string, options?: RequestInit) =>
+      new Response(options?.method === 'PUT' ? '{}' : JSON.stringify(CATEGORIES))
+  )
+  vi.stubGlobal('fetch', fetch)
+  try {
+    const wrapper = mount(TransactionDialog, {
+      props: {
+        modelValue: false,
+        type: 'EXPENSE',
+        occurrence: { ruleId: 7, date: '2090-01-01' },
+        transaction: {
+          id: 0,
+          amount: 10,
+          type: 'EXPENSE',
+          categoryId: 1,
+          category: null,
+          description: '',
+          userId: 1,
+          recurringId: 7,
+          date: '2090-01-01',
+          createdAt: ''
+        }
+      },
+      global: { stubs }
+    })
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { submit: () => Promise<void> }
+    await vm.submit()
+    const write = fetch.mock.calls.find(args => args[1]?.method === 'PUT')!
+    expect(write[0]).toBe('/api/recurring/7/occurrences/2090-01-01')
+    expect(JSON.parse(write[1]!.body as string)).toMatchObject({
+      kind: 'EDIT',
+      comment: '',
+      tagIds: []
+    })
+    expect(wrapper.text()).toContain('Edit next occurrence')
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})

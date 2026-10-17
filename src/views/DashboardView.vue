@@ -200,42 +200,7 @@
                 </div>
                 <template v-for="(tx, i) in db.recentTransactions" :key="tx.id">
                   <v-list-item class="px-6 py-3 hover-item">
-                    <template v-slot:prepend>
-                      <v-avatar
-                        :color="tx.type === 'INCOME' ? 'success' : 'error'"
-                        variant="tonal"
-                        size="44"
-                      >
-                        <v-icon :icon="tx.type === 'INCOME' ? mdiCashPlus : mdiCashMinus"></v-icon>
-                      </v-avatar>
-                    </template>
-                    <v-list-item-title class="font-weight-medium text-body-1">{{
-                      tx.description || 'No description'
-                    }}</v-list-item-title>
-                    <!-- Plain div, not v-list-item-subtitle: the latter paints its
-                         children at opacity 0.7, which dulls the category chip.
-                         Same structure as the Transactions list, where it looks right. -->
-                    <div class="mt-1 d-flex align-center flex-wrap ga-2">
-                      <v-chip
-                        size="x-small"
-                        :color="tx.category?.color ?? undefined"
-                        variant="flat"
-                        class="font-weight-medium"
-                        :style="`color: ${textOn(tx.category?.color)}`"
-                        >{{ tx.category?.name }}</v-chip
-                      >
-                      <span class="opacity-70 text-caption">{{
-                        formatDateOnly(tx.date, { month: 'short', day: 'numeric' })
-                      }}</span>
-                    </div>
-                    <template v-slot:append>
-                      <span
-                        class="font-weight-bold text-subtitle-1"
-                        :class="tx.type === 'INCOME' ? 'text-success' : 'text-error'"
-                      >
-                        {{ tx.type === 'INCOME' ? '+' : '-' }}{{ cs }}{{ formatMoney(tx.amount) }}
-                      </span>
-                    </template>
+                    <TransactionSummary :transaction="tx" />
                   </v-list-item>
                   <v-divider
                     v-if="i < db.recentTransactions.length - 1"
@@ -349,6 +314,7 @@
 <script setup lang="ts">
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed } from 'vue'
+import TransactionSummary from '@/components/TransactionSummary.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
 import { Chart as ChartJS, ArcElement, Tooltip } from 'chart.js'
@@ -359,14 +325,12 @@ import { fetchJson } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { BudgetsResponse, DashboardResponse } from '@/types'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
-import { formatDateOnly, todayInput } from '@/utils/date'
-import { textOn, themeColors } from '@/utils/color'
+import { todayInput } from '@/utils/date'
+import { themeColors } from '@/utils/color'
 import { useTheme } from 'vuetify'
 import {
   mdiArrowDownCircleOutline,
   mdiArrowUpCircleOutline,
-  mdiCashMinus,
-  mdiCashPlus,
   mdiChartPie,
   mdiMinus,
   mdiPlus,

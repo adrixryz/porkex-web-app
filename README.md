@@ -199,3 +199,5 @@ These local checks do not validate a deployed Render/Turso installation or a
 physical Android device. Those checks remain manual after your review/deploy.
 
 La matriz de los 23 puntos y sus límites de validación está en [RELIABILITY_REVIEW.md](RELIABILITY_REVIEW.md).
+
+Tags are managed from Edit tags inside movement dialogs: create, rename, confirm global deletion and drag the handle (or use arrow keys) to save manual order. Movements allow 0–5 tags and an optional Comment. The desktop table and shared compact summary render the same catalog; pending catalog operations remain available offline. The API still accepts legacy description payloads.

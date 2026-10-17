@@ -29,7 +29,16 @@ export interface Category {
   recurringCount: number
 }
 
+export interface Tag {
+  id: string
+  name: string
+  position: number
+  aliases?: string[]
+}
+
 export interface Transaction {
+  comment?: string
+  tags?: Tag[]
   id: number
   amount: number
   type: TxType

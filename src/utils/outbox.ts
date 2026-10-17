@@ -25,6 +25,7 @@ export interface FlushResult {
   stopped: 'empty' | 'network' | 'server' | 'auth' | 'blocked' | 'session'
 }
 
+export const outboxRevision = ref(0)
 export const pendingCount = ref(0)
 export const lastFlushError = ref('')
 export const firstBlockedMutation = ref<QueuedMutation | null>(null)
@@ -68,7 +69,12 @@ function writeAll(items: StoredMutation[]) {
   refreshPendingCount()
 }
 
+export function ownedPending(userId: number) {
+  return readAll().filter(item => item.userId === userId)
+}
+
 export function refreshPendingCount() {
+  outboxRevision.value++
   try {
     const items = readAll()
     const mine = items.filter(item => item.userId === currentUserId)

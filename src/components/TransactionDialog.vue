@@ -20,46 +20,65 @@
       </v-card-title>
       <v-card-text class="pa-6">
         <v-form @submit.prevent="submit">
-          <v-text-field
-            v-model="form.amount"
-            label="Amount"
-            type="number"
-            inputmode="decimal"
-            :prefix="cs"
-            min="0.01"
-            step="0.01"
-            hide-spin-buttons
-            autofocus
-            class="mb-2"
-          >
-            <template #append-inner>
-              <AmountStepper
-                :label="isIncome ? 'income amount' : 'expense amount'"
-                @step="stepAmount"
-              ></AmountStepper>
-            </template>
-          </v-text-field>
-          <v-text-field
-            v-model="form.date"
-            label="Date"
-            type="date"
-            :max="todayInput()"
-            class="mb-2"
-          ></v-text-field>
-          <v-text-field
-            v-model="form.description"
-            label="Description"
-            maxlength="200"
-            :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Grocery shopping'"
-            class="mb-2"
-          ></v-text-field>
+          <div class="amount-date-row">
+            <div>
+              <v-text-field
+                v-model="form.amount"
+                label="Amount"
+                type="number"
+                inputmode="decimal"
+                :prefix="cs"
+                min="0.01"
+                step="0.01"
+                hide-spin-buttons
+                autofocus
+                class="mb-2"
+              >
+                <template #append-inner>
+                  <AmountStepper
+                    :label="isIncome ? 'income amount' : 'expense amount'"
+                    @step="stepAmount"
+                  ></AmountStepper>
+                </template>
+              </v-text-field>
+            </div>
+            <div>
+              <v-text-field
+                v-model="form.date"
+                label="Date"
+                type="date"
+                :max="todayInput()"
+                class="mb-2"
+              ></v-text-field>
+            </div>
+          </div>
+
           <v-select
             v-model="form.categoryId"
             :items="categoryOptions"
             item-title="name"
             item-value="id"
             label="Category"
+            ><template #selection="{ item }"
+              ><span class="category-dot" :style="{ backgroundColor: item.color || '#777' }"></span
+              >{{ item.name }}</template
+            ><template #item="{ props: option, item }"
+              ><v-list-item v-bind="option"
+                ><template #prepend
+                  ><span
+                    class="category-dot"
+                    :style="{ backgroundColor: item.color || '#777' }"
+                  ></span></template></v-list-item></template
           ></v-select>
+
+          <v-text-field
+            v-model="form.description"
+            label="Comment (optional)"
+            maxlength="200"
+            :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Grocery shopping'"
+            class="mb-2"
+          ></v-text-field>
+          <TagPicker v-model="form.tagIds" />
 
           <v-alert
             v-if="!categoryOptions.length && categoriesError"
@@ -117,6 +136,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import TagPicker from '@/components/TagPicker.vue'
 import AmountStepper from '@/components/AmountStepper.vue'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
@@ -149,6 +169,7 @@ const cs = useCurrencySymbol()
 const form = ref({
   amount: '',
   description: '',
+  tagIds: [] as string[],
   categoryId: null as number | null,
   date: todayInput()
 })
@@ -188,11 +209,7 @@ const categoryOptions = computed(() => allCategories.value.filter(c => c.type ==
 const isValid = computed(() => {
   const amount = Number(form.value.amount)
   return (
-    Number.isFinite(amount) &&
-    amount > 0 &&
-    !!form.value.description.trim() &&
-    !!form.value.date &&
-    form.value.categoryId !== null
+    Number.isFinite(amount) && amount > 0 && !!form.value.date && form.value.categoryId !== null
   )
 })
 
@@ -201,7 +218,8 @@ const reset = () => {
   const tx = props.transaction
   form.value = {
     amount: tx ? String(tx.amount) : '',
-    description: tx?.description ?? '',
+    description: tx?.comment ?? tx?.description ?? '',
+    tagIds: (tx?.tags ?? []).map(tag => tag.id),
     categoryId: tx?.categoryId ?? null,
     date: tx ? toDateInput(tx.date) : todayInput()
   }
@@ -245,7 +263,7 @@ const submit = async () => {
       body: JSON.stringify({
         ...(!isEditing.value ? { clientId: clientId.value } : {}),
         ...form.value,
-        description: form.value.description.trim(),
+        comment: form.value.description.trim(),
         type: props.type,
         date: fromDateInput(form.value.date)
       })
@@ -266,3 +284,19 @@ const submit = async () => {
   }
 }
 </script>
+
+<style scoped>
+.amount-date-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.category-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+</style>

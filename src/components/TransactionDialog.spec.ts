@@ -40,6 +40,7 @@ const CATEGORIES: Category[] = [
 const VSelectStub = { props: ['items'], template: '<div class="category-select" />' }
 
 const stubs = {
+  TagPicker: true,
   'v-dialog': {
     props: ['modelValue'],
     template: '<div v-if="modelValue"><slot /></div>'

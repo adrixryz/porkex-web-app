@@ -17,7 +17,7 @@ test('real API and temporary SQLite confirm a replay exactly once', async ({
   const dialog = page.getByRole('dialog')
   const description = `SQLite ${info.project.name}`
   await dialog.getByLabel('Amount', { exact: true }).fill('18.76')
-  await dialog.getByLabel('Description', { exact: true }).fill(description)
+  await dialog.getByLabel('Comment (optional)', { exact: true }).fill(description)
   await dialog.locator('.v-select').click()
   await page.getByRole('option', { name: 'Food', exact: true }).click()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()

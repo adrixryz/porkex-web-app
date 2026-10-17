@@ -26,7 +26,7 @@ async function openExpense(page: Page, description: string) {
   await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Amount', { exact: true }).fill('12.34')
-  await dialog.getByLabel('Description', { exact: true }).fill(description)
+  await dialog.getByLabel('Comment (optional)', { exact: true }).fill(description)
   await dialog.locator('.v-select').click()
   await page.getByRole('option', { name: 'Food', exact: true }).click()
   return dialog
@@ -102,12 +102,12 @@ test('real waiting service worker protects a modified form until explicit update
   await expect(page.getByText('A new version is available.', { exact: false })).toBeVisible()
   const update = page.getByRole('button', { name: 'Update', exact: true })
   await expect(update).toBeDisabled()
-  await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue('Unsaved draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Unsaved draft')
   expect(
     await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())?.waiting)
   ).toBe(true)
   await page.getByRole('button', { name: 'Later', exact: true }).click()
-  await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue('Unsaved draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Unsaved draft')
   await dialog.getByRole('button', { name: 'Close dialog' }).click()
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(update).toBeEnabled()
@@ -125,7 +125,7 @@ test('stale bundle errors offer an update and preserve the draft', async ({ page
     window.dispatchEvent(new Event('vite:preloadError', { cancelable: true }))
   )
   await expect(page.getByRole('button', { name: 'Update', exact: true })).toBeDisabled()
-  await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue('Keep my draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Keep my draft')
 })
 test('closed registration hides signup and leaves login available', async ({ page }) => {
   await page.goto('/login')
@@ -151,7 +151,7 @@ test('quota failure keeps the unsaved form and never acknowledges a queued write
   await expect(
     dialog.getByText('Could not save the change on this device.', { exact: false })
   ).toBeVisible()
-  await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue('Storage full')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Storage full')
   expect(await page.evaluate(() => localStorage.getItem('porkex_outbox'))).toBeNull()
 })
 test('PUT 404 stays blocked until explicit discard, DELETE 404 completes', async ({ page }) => {
@@ -266,7 +266,7 @@ test('incomplete recurring totals recover without closing a draft', async ({ pag
   await expect(
     page.getByText('Recurring transactions are still updating.', { exact: false })
   ).not.toBeVisible()
-  await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue('Unchanged draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Unchanged draft')
 })
 test('offline filters use only their own saved rows', async ({ page, context }) => {
   const date = new Date().toISOString()

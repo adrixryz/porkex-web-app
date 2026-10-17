@@ -130,7 +130,8 @@ const WRITE_INVALIDATES = [
   '/categories',
   '/budgets',
   '/recurring',
-  '/analytics'
+  '/analytics',
+  '/tags'
 ]
 const READ_TIMEOUT_MS = 45_000
 const WRITE_TIMEOUT_MS = 45_000

@@ -1,0 +1,59 @@
+<template>
+  <div class="mt-3">
+    <div class="text-caption mb-2">
+      Tags <span class="text-on-surface-variant">({{ modelValue.length }}/5)</span>
+    </div>
+    <div class="d-flex flex-wrap ga-2">
+      <v-chip
+        v-for="tag in tags"
+        :key="tag.id"
+        tag="button"
+        type="button"
+        :aria-pressed="selected(tag)"
+        :variant="selected(tag) ? 'flat' : 'outlined'"
+        :color="selected(tag) ? 'primary' : undefined"
+        :disabled="!selected(tag) && modelValue.length >= 5"
+        @click="toggle(tag)"
+        >{{ tag.name }}</v-chip
+      >
+      <v-btn
+        type="button"
+        size="small"
+        rounded="pill"
+        variant="text"
+        :prepend-icon="mdiPencilOutline"
+        @click="editing = true"
+        >Edit tags</v-btn
+      >
+    </div>
+    <div v-if="error && !tags.length" class="text-caption text-warning">{{ error }}</div>
+    <TagManagerDialog v-model="editing" @removed="remove" />
+  </div>
+</template>
+<script setup lang="ts">
+import { ref } from 'vue'
+import { mdiPencilOutline } from '@mdi/js'
+import { useTags } from '@/composables/useTags'
+import type { Tag } from '@/types'
+import TagManagerDialog from './TagManagerDialog.vue'
+const props = defineProps<{ modelValue: string[] }>()
+const emit = defineEmits<{ 'update:modelValue': [ids: string[]] }>()
+const { tags, error } = useTags()
+const editing = ref(false)
+const selected = (tag: Tag) =>
+  props.modelValue.some(id => id === tag.id || tag.aliases?.includes(id))
+function toggle(tag: Tag) {
+  if (selected(tag))
+    emit(
+      'update:modelValue',
+      props.modelValue.filter(id => id !== tag.id && !tag.aliases?.includes(id))
+    )
+  else if (props.modelValue.length < 5) emit('update:modelValue', [...props.modelValue, tag.id])
+}
+function remove(ids: string[]) {
+  emit(
+    'update:modelValue',
+    props.modelValue.filter(key => !ids.includes(key))
+  )
+}
+</script>

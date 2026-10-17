@@ -59,7 +59,7 @@
 
           <v-text-field
             v-model="form.description"
-            label="Description"
+            label="Comment (optional)"
             maxlength="200"
             :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Rent'"
             class="mb-2"
@@ -248,7 +248,6 @@ const isValid = computed(() => {
     Number.isInteger(interval) &&
     interval >= 1 &&
     interval <= MAX_INTERVAL &&
-    !!form.value.description.trim() &&
     !!form.value.startDate &&
     form.value.categoryId !== null &&
     endOk

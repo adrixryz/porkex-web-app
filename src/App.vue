@@ -85,6 +85,9 @@
           <template v-else-if="staleSavedAt">
             {{ wakingHint }}
           </template>
+          <template v-else
+            >Some data is unavailable. Check the error below or reconnect to try again.</template
+          >
         </v-alert>
 
         <v-alert
@@ -216,9 +219,11 @@ const wakingHint = computed(() => {
 })
 
 const pendingHint = (n: number) =>
-  n === 1
-    ? '1 change waiting to sync. It will be sent automatically.'
-    : `${n} changes waiting to sync. They will be sent automatically.`
+  firstBlockedMutation.value
+    ? `${n} pending change${n === 1 ? '' : 's'}. Resolve the rejected change below to continue syncing.`
+    : n === 1
+      ? '1 change waiting to sync. It will be sent automatically.'
+      : `${n} changes waiting to sync. They will be sent automatically.`
 
 const handleNavIconClick = () => {
   if (mobile.value) {

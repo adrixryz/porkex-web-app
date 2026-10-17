@@ -5,7 +5,13 @@ import pluginVue from 'eslint-plugin-vue'
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**']
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      'test-results/**',
+      'playwright-report/**'
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -52,7 +58,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ['**/*.spec.ts'],
+    files: ['**/*.spec.ts', 'tests/**/*.mjs', 'playwright.config.ts'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } }
   }
 )

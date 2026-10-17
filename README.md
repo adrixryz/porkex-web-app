@@ -58,18 +58,18 @@ the real request runs in the background and replaces it when it answers. A view
 passes a `cacheKey` to `useAsyncData` to opt in; because the key can be a
 function, each filter combination of the transaction list gets its own entry.
 `App.vue` shows a banner while stale data is on screen, with different wording
-for "no signal" and "the server is waking up".
+for an offline device and data that could not be refreshed.
 
-The cache holds at most 12 entries (LRU) and skips any response over 256 KB. It
+The cache holds at most 12 recent responses and skips any response over 256 KB. It
 is wiped on logout along with the token, so financial figures never outlive the
 session that produced them.
 
-**Writes — queued and replayed (`utils/outbox.ts`).** A mutation that never
-reached the server is stored and replayed on app start, on the browser's `online`
-event, and after any write that got through. Reads are never queued. A 4xx is
-not queued either: the server answered, so the payload is wrong rather than the
-network, and it would fail identically on a retry. A 5xx is retried up to five
-times and then dropped, so one bad write cannot block the queue.
+**Writes — queued and replayed (utils/outbox.ts).** A network failure or timeout
+leaves the server outcome uncertain; the mutation is persisted for retry on app
+start or recovery. Reads are never queued. A direct HTTP error stays visible
+for the user to correct/retry. Already queued changes are retained on transient
+server failures and retried by recovery; a permanent rejection pauses the queue
+until the user chooses Retry or Discard.
 
 Replays are safe because a transaction or recurring-rule create gets a `clientId`
 **before the first attempt** (`utils/api.ts`). If the server stores the row and the
@@ -167,3 +167,35 @@ black background in `pwa-assets.config.ts`).
 Registration is closed by default on the API. Login reads `/auth/config` and
 shows Sign Up only when explicitly enabled; an unavailable configuration keeps
 signup hidden without preventing an existing account from logging in.
+
+## Reliability verification
+
+Use Node 24 (the CI runtime), then run:
+
+~~~sh
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npx playwright install chromium
+npm run test:browser
+~~~
+
+Browser tests build a production PWA with an empty API origin and a controlled
+local server. They cover desktop Chromium and Pixel 7 Android emulation, offline
+reload/replay, storage quota, rejected changes, slow writes from two tabs, URL
+history, registration and a real waiting service worker. Failure traces are
+kept under test-results (ignored by Git). No production API is contacted.
+
+With the backend checked out beside this repository and its dependencies
+installed, run npm run test:integration. PORKEX_BACKEND_DIR may override that
+path. The backend harness forces an isolated temporary SQLite database and
+clears inherited Turso credentials. The browser server only proxies an explicit
+localhost API, verifies one offline replay against real persisted data, and
+cleans up the API and temporary database after the browser processes exit.
+
+These local checks do not validate a deployed Render/Turso installation or a
+physical Android device. Those checks remain manual after your review/deploy.
+
+La matriz de los 23 puntos y sus límites de validación está en [RELIABILITY_REVIEW.md](RELIABILITY_REVIEW.md).

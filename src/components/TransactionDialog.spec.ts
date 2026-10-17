@@ -103,3 +103,35 @@ describe('TransactionDialog categories offline', () => {
     vi.unstubAllGlobals()
   })
 })
+
+it('reuses the create clientId after a failed write while keeping the form open', async () => {
+  const bodies: { clientId: string }[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, options?: RequestInit) => {
+      if (!options?.method || options.method === 'GET')
+        return new Response(JSON.stringify(CATEGORIES))
+      bodies.push(JSON.parse(options.body as string))
+      return new Response(bodies.length === 1 ? '{"error":"Retry"}' : '{"id":1}', {
+        status: bodies.length === 1 ? 500 : 201
+      })
+    })
+  )
+  try {
+    const wrapper = await openDialog()
+    const vm = wrapper.vm as unknown as {
+      form: Record<string, unknown>
+      submit: () => Promise<void>
+    }
+    Object.assign(vm.form, { amount: '10', description: 'Lunch', categoryId: 1 })
+    await vm.submit()
+    expect(wrapper.emitted('saved')).toBeUndefined()
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    await vm.submit()
+    expect(bodies[0]!.clientId).toBeTruthy()
+    expect(bodies[1]!.clientId).toBe(bodies[0]!.clientId)
+    expect(wrapper.emitted('saved')![0]).toEqual([{ isEditing: false, queued: false }])
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})

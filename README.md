@@ -161,3 +161,6 @@ black background in `pwa-assets.config.ts`).
 - Icons are inline SVG from `@mdi/js`, not an icon font. To add one, import it
   and pass it as `:icon="mdiFoo"`. Vuetify's own internal icons come from the
   alias table in `plugins/mdiSvg.ts`.
+Registration is closed by default on the API. Login reads `/auth/config` and
+shows Sign Up only when explicitly enabled; an unavailable configuration keeps
+signup hidden without preventing an existing account from logging in.

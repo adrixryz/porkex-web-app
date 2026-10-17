@@ -18,7 +18,7 @@
         <!-- TABS -->
         <v-tabs v-model="tab" color="primary" align-tabs="center" class="mb-2">
           <v-tab value="login">Log In</v-tab>
-          <v-tab value="register">Sign Up</v-tab>
+          <v-tab v-if="registrationEnabled" value="register">Sign Up</v-tab>
         </v-tabs>
 
         <v-card-text class="pa-6 pt-4">
@@ -89,11 +89,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi, setToken, setUser } from '@/utils/api'
 import { setCurrencyByCode } from '@/utils/currency'
 import { applyPreferences } from '@/utils/preferences'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import type { AuthResponse } from '@/types'
 import { mdiAccountOutline, mdiEmailOutline, mdiEye, mdiEyeOff, mdiLockOutline } from '@mdi/js'
 
@@ -103,12 +104,38 @@ const tab = ref('login')
 const showPass = ref(false)
 const loading = ref(false)
 const error = ref('')
+const registrationEnabled = ref(false)
+const configController = new AbortController()
 
 const form = ref({
   name: '',
   email: '',
   password: ''
 })
+
+useUnsavedChanges(
+  () => !!(form.value.name || form.value.email || form.value.password),
+  () => loading.value
+)
+
+// Login remains usable when the public configuration cannot be loaded.
+onMounted(async () => {
+  const origin = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
+  try {
+    const signal =
+      typeof AbortSignal.any === 'function'
+        ? AbortSignal.any([configController.signal, AbortSignal.timeout(30_000)])
+        : configController.signal
+    const response = await fetch(`${origin}/auth/config`, { signal })
+    if (!response.ok || configController.signal.aborted) return
+    const config = (await response.json()) as { registrationEnabled?: unknown }
+    if (!configController.signal.aborted)
+      registrationEnabled.value = config.registrationEnabled === true
+  } catch {
+    registrationEnabled.value = false
+  }
+})
+onUnmounted(() => configController.abort())
 
 // Switching between Log In and Sign Up should not carry over a stale error or
 // a half-typed password from the other tab.
@@ -118,6 +145,7 @@ watch(tab, () => {
 })
 
 const submit = async () => {
+  if (loading.value || (tab.value === 'register' && !registrationEnabled.value)) return
   loading.value = true
   error.value = ''
 

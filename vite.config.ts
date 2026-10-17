@@ -24,7 +24,9 @@ const apiProxy = {
 
 export default defineConfig({
   plugins: [
-    vue(),
+    // Public root URLs are served verbatim. Importing them as modules also
+    // produces invalid file:/// URLs in the Windows test runner.
+    vue({ template: { transformAssetUrls: { includeAbsolute: false } } }),
     vuetify({ autoImport: true }),
     // Installable app with an offline shell. The service worker precaches the
     // built assets only: API responses are deliberately left out, because the
@@ -32,7 +34,6 @@ export default defineConfig({
     // outbox, and a second, invisible cache layer would fight with them.
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
       manifest: {
         name: 'Porkex',
         short_name: 'Porkex',

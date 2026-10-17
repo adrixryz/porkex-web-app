@@ -107,8 +107,11 @@ service worker that precaches the built assets and answers any navigation with
 from the read cache and the outbox above. The worker never caches API
 responses — that is `utils/cache.ts`'s job.
 
-Updates are automatic (`registerType: 'autoUpdate'`): after a deploy the new
-worker takes over and an open tab reloads itself.
+Updates use a prompt (Update/Later). The new worker stays waiting until the user
+accepts. A modified form, form submission or API write disables Update; a worker
+activated by another tab cannot reload an unfinished form. Stale bundle loading
+errors offer the same update action and never reload automatically. Passwords
+and form drafts are never persisted for an update.
 
 The icons are generated from `public/porkex-icon.svg` (white pig on a black
 tile) with the official generator and committed, so a normal build needs

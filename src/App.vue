@@ -1,5 +1,6 @@
 <template>
   <v-app>
+    <UpdateNotice />
     <div v-if="route.name === 'login'" class="fill-height">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -155,6 +156,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import UpdateNotice from '@/components/UpdateNotice.vue'
 import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { getUser, syncPendingWrites, USER_CHANGE_EVENT, recurringState } from '@/utils/api'

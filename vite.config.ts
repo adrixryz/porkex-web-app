@@ -33,7 +33,8 @@ export default defineConfig({
     // app already has its own read cache (stale-while-revalidate) and write
     // outbox, and a second, invisible cache layer would fight with them.
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      injectRegister: false,
       manifest: {
         name: 'Porkex',
         short_name: 'Porkex',

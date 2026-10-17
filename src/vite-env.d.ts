@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/vue" />
 
 // Vuetify only exposes "vuetify/styles" as CSS/Sass (no types).
 // This declaration lets vue-tsc resolve the import without changing anything at runtime.

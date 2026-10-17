@@ -1,7 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, clearAuth, setToken } from './api'
-import { clearOutbox, flushOutbox, pendingCount, type QueuedMutation } from './outbox'
+import {
+  activeWrites,
+  api,
+  clearAuth,
+  getSessionIdentity,
+  isQueuedResponse,
+  recurringState,
+  setToken,
+  setUser,
+  syncPendingWrites
+} from './api'
+import { enqueue, flushOutbox, pendingCount, setOutboxUser, type QueuedMutation } from './outbox'
 import { writeCache } from './cache'
+import { DATA_REVALIDATE_EVENT } from './revalidation'
+import { deferred, installTestLocks } from './locks.test-helper'
 
 const TOKEN = 'test-token'
 
@@ -12,10 +24,12 @@ const networkDown = () =>
   })
 
 beforeEach(() => {
-  localStorage.clear()
-  clearOutbox()
-  setToken(TOKEN)
   vi.restoreAllMocks()
+  localStorage.clear()
+  installTestLocks()
+  setToken(TOKEN)
+  setUser({ id: 1, name: 'Test', email: 'test@example.com' })
+  recurringState.value = 'ready'
 })
 
 describe('reads are never queued', () => {
@@ -307,7 +321,7 @@ describe('cache invalidation after a write', () => {
 })
 
 describe('logout', () => {
-  it('drops the queue, the cache and the token together', async () => {
+  it('clears credentials and cache while preserving the account-owned queue', async () => {
     vi.stubGlobal('fetch', networkDown())
     await api('/transactions', { method: 'POST', body: '{}' })
     writeCache('/dashboard', { globalBalance: 1 })
@@ -318,5 +332,283 @@ describe('logout', () => {
     expect(pendingCount.value).toBe(0)
     expect(localStorage.getItem('porkex_cache')).toBeNull()
     expect(localStorage.getItem('porkex_token')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toHaveLength(1)
+    setToken(TOKEN)
+    setUser({ id: 1, name: 'Test', email: 'test@example.com' })
+    expect(pendingCount.value).toBe(1)
+  })
+})
+
+describe('ordered writes and session boundaries', () => {
+  const pending = (over: Partial<QueuedMutation> = {}) => ({
+    id: 'pending',
+    userId: 1,
+    method: 'PUT',
+    path: '/transactions/7',
+    body: '{"amount":10}',
+    ...over
+  })
+
+  it('sends the old edit before the new edit, preventing rollback', async () => {
+    await enqueue(pending())
+    const amounts: number[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        amounts.push(JSON.parse(init.body as string).amount)
+        return new Response('{}', { status: 200 })
+      })
+    )
+    await api('/transactions/7', { method: 'PUT', body: '{"amount":20}' })
+    expect(amounts).toEqual([10, 20])
+    expect(pendingCount.value).toBe(0)
+    vi.unstubAllGlobals()
+  })
+
+  it('queues newer changes after the blocked first item without sending them', async () => {
+    await enqueue(pending())
+    const send = vi.fn(async () => new Response('{"error":"Missing"}', { status: 404 }))
+    vi.stubGlobal('fetch', send)
+    const response = await api('/transactions/7', { method: 'PUT', body: '{"amount":20}' })
+    expect(isQueuedResponse(response)).toBe(true)
+    expect(send).toHaveBeenCalledOnce()
+    expect(pendingCount.value).toBe(2)
+    vi.unstubAllGlobals()
+  })
+
+  it('surfaces failed persistence instead of returning queued success', async () => {
+    vi.stubGlobal('fetch', networkDown())
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('full')
+    })
+    await expect(api('/transactions', { method: 'POST', body: '{}' })).rejects.toThrow(
+      'Could not save'
+    )
+    expect(pendingCount.value).toBe(0)
+    vi.unstubAllGlobals()
+  })
+
+  it('does not send a write if safe locking is unavailable, while reads still work', async () => {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined })
+    const send = vi.fn(async () => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', send)
+    await expect(api('/transactions', { method: 'POST', body: '{}' })).rejects.toThrow(
+      'updated browser'
+    )
+    expect(send).not.toHaveBeenCalled()
+    await api('/dashboard')
+    expect(send).toHaveBeenCalledOnce()
+    vi.unstubAllGlobals()
+  })
+
+  it('preserves a replay receiving 401 for the original account', async () => {
+    await enqueue(pending())
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 401 }))
+    )
+    await syncPendingWrites()
+    expect(localStorage.getItem('porkex_token')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toHaveLength(1)
+    setToken('another-token')
+    setUser({ id: 2, name: 'Other', email: 'other@example.com' })
+    const send = vi.fn(async () => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', send)
+    await syncPendingWrites()
+    expect(send).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('a late 401 from the old token cannot sign a newer session out', async () => {
+    const waiting = deferred<Response>()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => waiting.promise)
+    )
+    const oldIdentity = getSessionIdentity()
+    const reading = api('/dashboard')
+    clearAuth()
+    setToken('new-token')
+    setUser({ id: 2, name: 'Other', email: 'other@example.com' })
+    waiting.resolve(new Response('{}', { status: 401 }))
+    await expect(reading).rejects.toThrow('Session changed')
+    expect(getSessionIdentity()).not.toBe(oldIdentity)
+    expect(localStorage.getItem('porkex_token')).toBe('new-token')
+    vi.unstubAllGlobals()
+  })
+
+  it('does not persist a failed old write under the new account', async () => {
+    const started = deferred<void>()
+    const waiting = deferred<Response>()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        started.resolve()
+        return waiting.promise
+      })
+    )
+    const writing = api('/transactions', { method: 'POST', body: '{}' })
+    await started.promise
+    setToken('new-token')
+    setUser({ id: 2, name: 'Other', email: 'other@example.com' })
+    waiting.reject(new TypeError('Offline'))
+    await expect(writing).rejects.toThrow('Session changed')
+    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toMatchObject([{ userId: 1 }])
+    expect(pendingCount.value).toBe(0)
+    vi.unstubAllGlobals()
+  })
+
+  it('does not assign legacy entries to an account that logs in later', async () => {
+    localStorage.setItem(
+      'porkex_outbox',
+      JSON.stringify([
+        {
+          id: 'legacy',
+          method: 'PUT',
+          path: '/profile',
+          body: '{}',
+          createdAt: 0,
+          attempts: 0
+        }
+      ])
+    )
+    setOutboxUser(1)
+    const send = vi.fn(async () => new Response('{"id":1}', { status: 200 }))
+    vi.stubGlobal('fetch', send)
+    await syncPendingWrites()
+    expect(send).not.toHaveBeenCalled()
+    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)[0].userId).toBeUndefined()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('confirmed synchronization and response metadata', () => {
+  it('invalidates cached reads and asks active views to refresh after replay', async () => {
+    await enqueue({ id: 'replay', userId: 1, method: 'PUT', path: '/profile', body: '{}' })
+    writeCache('/dashboard', { balance: 10 })
+    writeCache('/profile', { name: 'Old' })
+    const revalidate = vi.fn()
+    window.addEventListener(DATA_REVALIDATE_EVENT, revalidate)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 200 }))
+    )
+    await syncPendingWrites()
+    await Promise.resolve()
+    expect(JSON.parse(localStorage.getItem('porkex_cache')!)).toEqual({})
+    expect(revalidate).toHaveBeenCalled()
+    window.removeEventListener(DATA_REVALIDATE_EVENT, revalidate)
+    vi.unstubAllGlobals()
+  })
+
+  it('uses the current browser timezone on reads and replays while preserving body dates', async () => {
+    const send = vi.fn(
+      async (_url: string, _options: RequestInit) => new Response('{}', { status: 200 })
+    )
+    vi.stubGlobal('fetch', send)
+    await api('/dashboard')
+    const headers = new Headers(send.mock.calls[0]?.[1].headers)
+    expect(headers.get('X-Porkex-Time-Zone')).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone)
+    await enqueue({
+      id: 'zone',
+      userId: 1,
+      method: 'PUT',
+      path: '/transactions/1',
+      body: '{"date":"2026-10-16"}'
+    })
+    await syncPendingWrites()
+    const queuedHeaders = new Headers(send.mock.calls.at(-1)?.[1].headers)
+    expect(queuedHeaders.get('X-Porkex-Time-Zone')).toBe(
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    )
+    expect(JSON.parse(send.mock.calls.at(-1)![1].body as string).date).toBe('2026-10-16')
+    vi.unstubAllGlobals()
+  })
+
+  it('reports incomplete recurring materialization while retaining useful API data', async () => {
+    const retry = vi.fn()
+    window.addEventListener('porkex-read-failed', retry)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('{}', {
+            status: 200,
+            headers: { 'X-Porkex-Recurring-State': 'failed' }
+          })
+      )
+    )
+    const response = await api('/dashboard')
+    expect(response.ok).toBe(true)
+    expect(recurringState.value).toBe('failed')
+    expect(retry).toHaveBeenCalledOnce()
+    window.removeEventListener('porkex-read-failed', retry)
+    vi.unstubAllGlobals()
+  })
+
+  it('exposes active writes including password requests for update protection', async () => {
+    const started = deferred<void>()
+    const waiting = deferred<Response>()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        started.resolve()
+        return waiting.promise
+      })
+    )
+    const writing = api('/password', { method: 'PUT', body: '{}' })
+    await started.promise
+    expect(activeWrites.value).toBe(1)
+    waiting.resolve(new Response('{}', { status: 200 }))
+    await writing
+    expect(activeWrites.value).toBe(0)
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('legacy migration across app upgrades', () => {
+  const legacy = () => {
+    localStorage.setItem(
+      'porkex_outbox',
+      JSON.stringify([
+        { id: 'old', method: 'PUT', path: '/transactions/1', body: '{}', createdAt: 0, attempts: 0 }
+      ])
+    )
+  }
+
+  it('verifies the original signed-in account before attaching and replaying old entries', async () => {
+    legacy()
+    vi.resetModules()
+    const upgraded = await import('./api')
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        calls.push(url)
+        return new Response(url.endsWith('/profile') ? '{"id":1}' : '{}', { status: 200 })
+      })
+    )
+    await upgraded.syncPendingWrites()
+    expect(calls).toEqual(['/api/profile', '/api/transactions/1'])
+    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toEqual([])
+    vi.unstubAllGlobals()
+  })
+
+  it('does not associate a signed-out legacy queue with a later login, even after reload', async () => {
+    localStorage.clear()
+    legacy()
+    vi.resetModules()
+    const upgraded = await import('./api')
+    expect(localStorage.getItem('porkex_legacy_outbox_owner')).toBe('null')
+    upgraded.setToken('new-token')
+    upgraded.setUser({ id: 2, name: 'Other', email: 'other@example.com' })
+    vi.resetModules()
+    const reloaded = await import('./api')
+    const send = vi.fn(async () => new Response('{"id":2}', { status: 200 }))
+    vi.stubGlobal('fetch', send)
+    await reloaded.syncPendingWrites()
+    expect(send).not.toHaveBeenCalled()
+    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)[0].userId).toBeUndefined()
+    vi.unstubAllGlobals()
   })
 })

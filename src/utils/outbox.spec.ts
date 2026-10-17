@@ -1,242 +1,232 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  clearOutbox,
+  claimLegacyOutbox,
+  discardFirstBlocked,
   enqueue,
+  firstBlockedMutation,
   flushOutbox,
+  hasLegacyOutbox,
   lastFlushError,
   pendingCount,
   refreshPendingCount,
+  retryFirstBlocked,
+  setOutboxUser,
   type QueuedMutation
 } from './outbox'
+import { deferred, installTestLocks } from './locks.test-helper'
 
-const item = (
-  over: Partial<QueuedMutation> = {}
-): Omit<QueuedMutation, 'createdAt' | 'attempts'> => ({
+const item = (over: Partial<QueuedMutation> = {}) => ({
   id: 'a',
+  userId: 1,
   method: 'POST',
   path: '/transactions',
   body: '{"amount":1}',
   ...over
 })
-
-const ok = () => new Response('{}', { status: 200 })
-const fail = () => new Response('{}', { status: 500 })
-const dead = (status: number) => new Response('{}', { status })
+const response = (status = 200) => new Response('{"error":"Invalid change"}', { status })
 
 beforeEach(() => {
+  vi.restoreAllMocks()
   localStorage.clear()
-  clearOutbox()
-  lastFlushError.value = ''
+  installTestLocks()
+  setOutboxUser(1)
 })
 
-describe('enqueue', () => {
-  it('tracks how many writes are waiting', () => {
-    expect(pendingCount.value).toBe(0)
-    enqueue(item({ id: '1' }))
-    enqueue(item({ id: '2' }))
-    expect(pendingCount.value).toBe(2)
-  })
-
-  it('ignores a duplicate id', () => {
-    enqueue(item({ id: 'same' }))
-    enqueue(item({ id: 'same' }))
-    expect(pendingCount.value).toBe(1)
-  })
-
-  it('survives a corrupted store', () => {
-    localStorage.setItem('porkex_outbox', '{not json')
-    expect(() => enqueue(item({ id: 'x' }))).not.toThrow()
-    expect(pendingCount.value).toBe(1)
-  })
-
-  it('reads back the count after a reload', () => {
-    enqueue(item({ id: '1' }))
+describe('durable account-owned queue', () => {
+  it('persists ordered changes and ignores duplicate ids', async () => {
+    await enqueue(item({ id: '1' }))
+    await enqueue(item({ id: '2' }))
+    await enqueue(item({ id: '1' }))
     refreshPendingCount()
-    expect(pendingCount.value).toBe(1)
-  })
-})
-
-describe('flushOutbox', () => {
-  it('sends nothing when the queue is empty', async () => {
-    const send = vi.fn()
-    await flushOutbox(send)
-    expect(send).not.toHaveBeenCalled()
-  })
-
-  it('replays a queued write and empties the queue', async () => {
-    enqueue(item({ id: '1' }))
-    const send = vi.fn(async (_m: QueuedMutation) => ok())
-
-    await flushOutbox(send)
-
-    expect(send).toHaveBeenCalledTimes(1)
-    expect(pendingCount.value).toBe(0)
-  })
-
-  it('passes the stored mutation to the sender', async () => {
-    enqueue(item({ id: '1', method: 'PUT', path: '/transactions/7', body: '{"a":1}' }))
-    const send = vi.fn(async (_m: QueuedMutation) => ok())
-
-    await flushOutbox(send)
-
-    const sent = send.mock.calls[0][0] as QueuedMutation
-    expect(sent.method).toBe('PUT')
-    expect(sent.path).toBe('/transactions/7')
-    expect(sent.body).toBe('{"a":1}')
-  })
-
-  it('preserves the order of queued writes', async () => {
-    enqueue(item({ id: '1', path: '/a' }))
-    enqueue(item({ id: '2', path: '/b' }))
-    enqueue(item({ id: '3', path: '/c' }))
-    const seen: string[] = []
-
-    await flushOutbox(async m => {
-      seen.push(m.path)
-      return ok()
-    })
-
-    expect(seen).toEqual(['/a', '/b', '/c'])
-  })
-
-  it('keeps everything and stops when the network is still down', async () => {
-    enqueue(item({ id: '1' }))
-    enqueue(item({ id: '2' }))
-    const send = vi.fn(async () => {
-      throw new TypeError('Failed to fetch')
-    })
-
-    await flushOutbox(send)
-
-    // Only the first was attempted: the rest keep their order behind it.
-    expect(send).toHaveBeenCalledTimes(1)
     expect(pendingCount.value).toBe(2)
-    expect(lastFlushError.value).toBe('Could not reach the server.')
-  })
-
-  it('treats a 404 on a replay as already done', async () => {
-    // The delete landed the first time; only the confirmation was lost.
-    enqueue(item({ id: '1', method: 'DELETE', path: '/transactions/7', body: null }))
-
-    await flushOutbox(async () => dead(404))
-
-    expect(pendingCount.value).toBe(0)
-    expect(lastFlushError.value).toBe('')
-  })
-
-  it('drops a write the server permanently rejects instead of retrying forever', async () => {
-    enqueue(item({ id: '1' }))
-
-    await flushOutbox(async () => dead(400))
-
-    expect(pendingCount.value).toBe(0)
-    // Dropping used to be silent; now the banner says what was lost.
-    expect(lastFlushError.value).toContain('rejected')
-  })
-
-  it('drops writes that are too old to replay', async () => {
-    enqueue(item({ id: '1' }))
-    const stored = JSON.parse(localStorage.getItem('porkex_outbox')!)
-    stored[0].createdAt = Date.now() - 8 * 24 * 60 * 60 * 1000
-    localStorage.setItem('porkex_outbox', JSON.stringify(stored))
-
-    const send = vi.fn(async (_m: QueuedMutation) => ok())
-    await flushOutbox(send)
-
-    expect(send).not.toHaveBeenCalled()
-    expect(pendingCount.value).toBe(0)
-    expect(lastFlushError.value).toContain('expired')
-  })
-
-  it('leaves the queue alone while another tab holds the flush lock', async () => {
-    enqueue(item({ id: '1' }))
-    localStorage.setItem('porkex_outbox_lock', JSON.stringify({ id: 'other-tab', at: Date.now() }))
-
-    const send = vi.fn(async (_m: QueuedMutation) => ok())
-    await flushOutbox(send)
-
-    expect(send).not.toHaveBeenCalled()
-    expect(pendingCount.value).toBe(1)
-  })
-
-  it('ignores a lock left behind by a tab that crashed', async () => {
-    enqueue(item({ id: '1' }))
-    localStorage.setItem(
-      'porkex_outbox_lock',
-      JSON.stringify({ id: 'dead-tab', at: Date.now() - 60_000 })
-    )
-
-    const send = vi.fn(async (_m: QueuedMutation) => ok())
-    await flushOutbox(send)
-
-    expect(send).toHaveBeenCalledTimes(1)
-    expect(pendingCount.value).toBe(0)
-  })
-
-  it('keeps a 5xx and counts the attempt', async () => {
-    enqueue(item({ id: '1' }))
-    const send = vi.fn(async () => fail())
-
-    await flushOutbox(send)
-    expect(pendingCount.value).toBe(1)
-
-    await flushOutbox(send)
-    expect(pendingCount.value).toBe(1)
-  })
-
-  it('gives up on a write that keeps failing at 5xx', async () => {
-    enqueue(item({ id: '1' }))
-    const send = vi.fn(async () => fail())
-
-    // MAX_ATTEMPTS is 5.
-    for (let i = 0; i < 5; i++) await flushOutbox(send)
-
-    expect(pendingCount.value).toBe(0)
-    expect(lastFlushError.value).toContain('were dropped')
-  })
-
-  it('continues past a rejected write to the ones behind it', async () => {
-    enqueue(item({ id: '1', path: '/bad' }))
-    enqueue(item({ id: '2', path: '/good' }))
     const seen: string[] = []
-
-    await flushOutbox(async m => {
-      seen.push(m.path)
-      return m.path === '/bad' ? dead(400) : ok()
+    await flushOutbox(async mutation => {
+      seen.push(mutation.id)
+      return response()
     })
-
-    expect(seen).toEqual(['/bad', '/good'])
+    expect(seen).toEqual(['1', '2'])
     expect(pendingCount.value).toBe(0)
   })
 
-  it('does not run two flushes at once', async () => {
-    enqueue(item({ id: '1' }))
-    let calls = 0
-    const send = vi.fn(async () => {
-      calls += 1
-      await new Promise(r => setTimeout(r, 10))
-      return ok()
+  it('does not announce a persisted change if storage is full', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Full', 'QuotaExceededError')
     })
+    await expect(enqueue(item())).rejects.toThrow('Could not save')
+    expect(pendingCount.value).toBe(0)
+    expect(localStorage.getItem('porkex_outbox')).toBeNull()
+  })
 
-    const a = flushOutbox(send)
-    const b = flushOutbox(send)
-    await Promise.all([a, b])
+  it('preserves a corrupt store instead of replacing it', async () => {
+    localStorage.setItem('porkex_outbox', '{broken')
+    await expect(enqueue(item())).rejects.toThrow('preserved')
+    expect(localStorage.getItem('porkex_outbox')).toBe('{broken')
+  })
 
-    expect(calls).toBe(1)
+  it('does not queue without cross-tab exclusion', async () => {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined })
+    await expect(enqueue(item())).rejects.toThrow('updated browser')
+    expect(pendingCount.value).toBe(0)
+  })
+
+  it('keeps accounts isolated when signing out and signing back in', async () => {
+    await enqueue(item())
+    setOutboxUser(null)
+    expect(pendingCount.value).toBe(0)
+    setOutboxUser(2)
+    const send = vi.fn(async () => response())
+    await flushOutbox(send)
+    expect(send).not.toHaveBeenCalled()
+    setOutboxUser(1)
+    expect(pendingCount.value).toBe(1)
+  })
+
+  it('does not dispatch unowned legacy entries before explicit verification', async () => {
+    const legacy = { id: 'legacy', method: 'PUT', path: '/profile', body: '{}' }
+    localStorage.setItem(
+      'porkex_outbox',
+      JSON.stringify([{ ...legacy, createdAt: 0, attempts: 0 }])
+    )
+    expect(hasLegacyOutbox()).toBe(true)
+    const send = vi.fn(async (_mutation: QueuedMutation) => response())
+    await flushOutbox(send)
+    expect(send).not.toHaveBeenCalled()
+    await claimLegacyOutbox(1)
+    await flushOutbox(send)
+    expect(send).toHaveBeenCalledOnce()
+    expect(send.mock.calls[0]?.[0]).toMatchObject({ userId: 1, status: 'pending' })
   })
 })
 
-describe('clearOutbox', () => {
-  it('drops everything and resets the error', async () => {
-    enqueue(item({ id: '1' }))
-    await flushOutbox(async () => {
-      throw new TypeError('Failed to fetch')
+describe('serial replay without lost updates', () => {
+  it('retains entries enqueued while an older request is in flight', async () => {
+    await enqueue(item({ id: 'first' }))
+    const started = deferred<void>()
+    const waiting = deferred<Response>()
+    const seen: string[] = []
+    const flushing = flushOutbox(async mutation => {
+      seen.push(mutation.id)
+      if (mutation.id === 'first') {
+        started.resolve()
+        return waiting.promise
+      }
+      return response()
     })
-    expect(lastFlushError.value).not.toBe('')
-
-    clearOutbox()
-
+    await started.promise
+    await enqueue(item({ id: 'second' }))
+    waiting.resolve(response())
+    await flushing
+    expect(seen).toEqual(['first', 'second'])
     expect(pendingCount.value).toBe(0)
-    expect(lastFlushError.value).toBe('')
+  })
+
+  it('holds exclusion across long requests and competing flushes', async () => {
+    await enqueue(item())
+    const started = deferred<void>()
+    const waiting = deferred<Response>()
+    const send = vi.fn(async () => {
+      started.resolve()
+      return waiting.promise
+    })
+    const first = flushOutbox(send)
+    await started.promise
+    // A timestamp lease would expire while this request is still alive.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_000)
+    const second = flushOutbox(send)
+    await Promise.resolve()
+    expect(send).toHaveBeenCalledOnce()
+    waiting.resolve(response())
+    await Promise.all([first, second])
+    expect(send).toHaveBeenCalledOnce()
+  })
+
+  it('stops before the next entry when the captured session changes', async () => {
+    await enqueue(item({ id: '1' }))
+    await enqueue(item({ id: '2' }))
+    let current = true
+    const send = vi.fn(async () => {
+      current = false
+      return response()
+    })
+    await flushOutbox(send, 1, () => current)
+    expect(send).toHaveBeenCalledOnce()
+    expect(pendingCount.value).toBe(1)
+  })
+
+  it('keeps all entries after a network failure', async () => {
+    await enqueue(item({ id: '1' }))
+    await enqueue(item({ id: '2' }))
+    const send = vi.fn(async () => {
+      throw new TypeError('Offline')
+    })
+    await flushOutbox(send)
+    expect(send).toHaveBeenCalledOnce()
+    expect(pendingCount.value).toBe(2)
+    expect(lastFlushError.value).toContain('still saved')
+  })
+
+  it('does not expire old changes or drop repeated server failures', async () => {
+    await enqueue(item({ createdAt: 0 }))
+    const items = JSON.parse(localStorage.getItem('porkex_outbox')!)
+    items[0].createdAt = 0
+    localStorage.setItem('porkex_outbox', JSON.stringify(items))
+    for (let attempt = 0; attempt < 8; attempt += 1) await flushOutbox(async () => response(500))
+    expect(pendingCount.value).toBe(1)
+    const send = vi.fn(async () => response())
+    await flushOutbox(send)
+    expect(send).toHaveBeenCalledOnce()
+  })
+})
+
+describe('HTTP outcomes and explicit recovery', () => {
+  it('retains unauthorized changes without blocking them permanently', async () => {
+    await enqueue(item())
+    await flushOutbox(async () => response(401))
+    expect(pendingCount.value).toBe(1)
+    expect(firstBlockedMutation.value).toBeNull()
+    await flushOutbox(async () => response())
+    expect(pendingCount.value).toBe(0)
+  })
+
+  it('accepts 404 only for DELETE', async () => {
+    await enqueue(item({ method: 'DELETE' }))
+    await flushOutbox(async () => response(404))
+    expect(pendingCount.value).toBe(0)
+    await enqueue(item({ method: 'PUT' }))
+    await flushOutbox(async () => response(404))
+    expect(pendingCount.value).toBe(1)
+    expect(firstBlockedMutation.value?.status).toBe('blocked')
+  })
+
+  it('preserves a rejection, stops dependent writes and supports explicit retry', async () => {
+    await enqueue(item({ id: 'bad' }))
+    await enqueue(item({ id: 'later' }))
+    const send = vi.fn(async () => response(422))
+    await flushOutbox(send)
+    await flushOutbox(send)
+    expect(send).toHaveBeenCalledOnce()
+    expect(firstBlockedMutation.value).toMatchObject({ id: 'bad', lastError: 'Invalid change' })
+    expect(pendingCount.value).toBe(2)
+    await retryFirstBlocked()
+    await flushOutbox(async () => response())
+    expect(pendingCount.value).toBe(0)
+  })
+
+  it('discards only the explicitly selected blocked change', async () => {
+    await enqueue(item({ id: 'bad' }))
+    await enqueue(item({ id: 'later' }))
+    await flushOutbox(async () => response(400))
+    await discardFirstBlocked()
+    expect(pendingCount.value).toBe(1)
+    const send = vi.fn(async (_mutation: QueuedMutation) => response())
+    await flushOutbox(send)
+    expect(send.mock.calls[0]?.[0]).toMatchObject({ id: 'later' })
+  })
+
+  it.each([408, 425, 429, 500, 503])('retains retryable status %s', async status => {
+    await enqueue(item())
+    await flushOutbox(async () => response(status))
+    expect(pendingCount.value).toBe(1)
+    expect(firstBlockedMutation.value).toBeNull()
   })
 })

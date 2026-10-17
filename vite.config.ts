@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import vuetify from 'vite-plugin-vuetify'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // In local development, and for `vite preview`, the app is built without
 // VITE_API_BASE so it calls a relative /api. Both servers forward that to the
@@ -24,7 +25,41 @@ const apiProxy = {
 export default defineConfig({
   plugins: [
     vue(),
-    vuetify({ autoImport: true })
+    vuetify({ autoImport: true }),
+    // Installable app with an offline shell. The service worker precaches the
+    // built assets only: API responses are deliberately left out, because the
+    // app already has its own read cache (stale-while-revalidate) and write
+    // outbox, and a second, invisible cache layer would fight with them.
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      manifest: {
+        name: 'Porkex',
+        short_name: 'Porkex',
+        description: 'Personal finance tracker',
+        display: 'standalone',
+        start_url: '/',
+        theme_color: '#000000',
+        background_color: '#000000',
+        icons: [
+          { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          {
+            src: 'maskable-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // Deep links (e.g. /transactions) must open the app shell offline.
+        navigateFallback: '/index.html',
+        cleanupOutdatedCaches: true
+      }
+    })
   ],
   resolve: {
     alias: {

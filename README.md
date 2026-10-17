@@ -29,6 +29,7 @@ The dev server runs on `http://localhost:5173` and proxies `/api` and `/auth` to
 | `npm run typecheck` | `vue-tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |
+| `npm run icons` | Regenerates the PWA icons from `public/porkex-icon.svg` |
 
 ## Structure
 
@@ -85,6 +86,30 @@ reads fall back to the cache and writes are queued.
 
 A pending write is counted in a banner, not shown in the list: the table keeps
 showing what the server last confirmed.
+
+## PWA
+
+The app is installable (Android: "Install app"; iOS: Share → Add to Home
+Screen) and opens offline. `vite-plugin-pwa` generates the manifest and a
+service worker that precaches the built assets and answers any navigation with
+`index.html`, so the shell loads with no network; the data itself then comes
+from the read cache and the outbox above. The worker never caches API
+responses — that is `utils/cache.ts`'s job.
+
+Updates are automatic (`registerType: 'autoUpdate'`): after a deploy the new
+worker takes over and an open tab reloads itself.
+
+The icons are generated from `public/porkex-icon.svg` (white pig on a black
+tile) with the official generator and committed, so a normal build needs
+nothing extra:
+
+```bash
+npm run icons
+```
+
+That writes `pwa-*.png`, `maskable-icon-512x512.png`,
+`apple-touch-icon-180x180.png` and `favicon.ico` into `public/` (preset and
+black background in `pwa-assets.config.ts`).
 
 ## Notes
 

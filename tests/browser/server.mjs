@@ -20,6 +20,8 @@ function state(key) {
   if (!states.has(key))
     states.set(key, {
       rows: [],
+      tags: [],
+      rules: [],
       requests: [],
       failure: 0,
       recurring: 'ready',
@@ -91,12 +93,111 @@ const server = createServer(async (req, res) => {
         await new Promise(r => setTimeout(r, db.delay))
         db.active--
       }
+      const decorate = row => ({
+        ...row,
+        comment: row.comment ?? row.description ?? '',
+        tags: row.tagIds
+          ? db.tags
+              .filter(tag => row.tagIds.some(id => tag.id === id || tag.aliases?.includes(id)))
+              .sort((a, b) => a.position - b.position)
+          : (row.tags ?? [])
+      })
+      if (url.pathname === '/api/tags') {
+        if (req.method === 'POST') {
+          let tag = db.tags.find(
+            tag => tag.id === body.id || tag.name.toLowerCase() === body.name.trim().toLowerCase()
+          )
+          if (!tag) {
+            tag = {
+              id: body.id,
+              name: body.name.trim(),
+              aliases: [body.id],
+              position: db.tags.length
+            }
+            db.tags.push(tag)
+          } else if (!tag.aliases.includes(body.id)) tag.aliases.push(body.id)
+          return json(res, tag, 201, headers)
+        }
+        return json(
+          res,
+          [...db.tags].sort((a, b) => a.position - b.position),
+          200,
+          headers
+        )
+      }
+      if (url.pathname === '/api/tags/order') {
+        const ordered = body.ids
+          .map(id => db.tags.find(tag => tag.id === id || tag.aliases?.includes(id)))
+          .filter(Boolean)
+        db.tags = [...ordered, ...db.tags.filter(tag => !ordered.includes(tag))].map(
+          (tag, position) => ({ ...tag, position })
+        )
+        return json(res, db.tags, 200, headers)
+      }
+      if (url.pathname.startsWith('/api/tags/')) {
+        const id = url.pathname.split('/')[3]
+        const tag = db.tags.find(tag => tag.id === id || tag.aliases?.includes(id))
+        if (!tag) return json(res, { error: 'Tag not found' }, 404, headers)
+        if (req.method === 'DELETE') db.tags = db.tags.filter(item => item !== tag)
+        else tag.name = body.name
+        return json(res, tag, 200, headers)
+      }
+      if (/^\/api\/recurring\/\d+\/occurrences\//.test(url.pathname)) {
+        const [, , , id, , day] = url.pathname.split('/')
+        const rule = db.rules.find(rule => rule.id === Number(id))
+        if (!rule || rule.nextDate.slice(0, 10) !== day)
+          return json(res, { error: 'Occurrence changed' }, 409, headers)
+        if (body.kind === 'SKIP') {
+          const following = new Date(rule.nextDate)
+          following.setUTCDate(following.getUTCDate() + 1)
+          rule.nextDate = following.toISOString()
+          rule.nextException = null
+        } else
+          rule.nextException = {
+            date: day,
+            amount: Number(body.amount),
+            comment: body.comment ?? '',
+            categoryId: body.categoryId,
+            tags: db.tags.filter(tag => body.tagIds?.includes(tag.id))
+          }
+        return json(res, { success: true }, 200, headers)
+      }
+      if (url.pathname === '/api/analytics/comparison') {
+        const mode = url.searchParams.get('mode') || 'year'
+        const anchor = url.searchParams.get('anchor') || new Date().toISOString().slice(0, 10)
+        const year = Number(anchor.slice(0, 4))
+        const zero = { income: 0, expense: 0, net: 0, count: 0 }
+        return json(
+          res,
+          {
+            mode,
+            partial: false,
+            ranges: {
+              current: {
+                from: mode === 'year' ? year + '-01-01' : anchor,
+                to: mode === 'year' ? year + '-12-31' : anchor
+              },
+              previous: { from: year - 1 + '-01-01', to: year - 1 + '-12-31' }
+            },
+            current: zero,
+            previous: zero,
+            delta: {
+              income: { absolute: 0, percent: 0 },
+              expense: { absolute: 0, percent: 0 },
+              net: { absolute: 0, percent: 0 }
+            },
+            buckets: []
+          },
+          200,
+          headers
+        )
+      }
       if (url.pathname === '/api/categories') return json(res, categories, 200, headers)
       if (url.pathname === '/api/profile')
         return json(res, { ...user, createdAt: new Date().toISOString() }, 200, headers)
       if (url.pathname === '/api/budgets')
         return json(res, { budgets: [], totals: [] }, 200, headers)
-      if (url.pathname === '/api/recurring') return json(res, [], 200, headers)
+      if (url.pathname === '/api/recurring') return json(res, db.rules, 200, headers)
       if (url.pathname === '/api/analytics')
         return json(
           res,
@@ -135,7 +236,7 @@ const server = createServer(async (req, res) => {
             totalIncome,
             totalExpense,
             transactionCount: db.rows.length,
-            recentTransactions: db.rows,
+            recentTransactions: db.rows.map(decorate),
             pieChartData: []
           },
           200,
@@ -156,7 +257,7 @@ const server = createServer(async (req, res) => {
             }
             db.rows.push(row)
           }
-          return json(res, row, 201, headers)
+          return json(res, decorate(row), 201, headers)
         }
         let rows = db.rows
         if (url.searchParams.get('type'))
@@ -168,7 +269,7 @@ const server = createServer(async (req, res) => {
         return json(
           res,
           {
-            items: rows.slice((page - 1) * perPage, page * perPage),
+            items: rows.slice((page - 1) * perPage, page * perPage).map(decorate),
             total: rows.length,
             page,
             perPage,

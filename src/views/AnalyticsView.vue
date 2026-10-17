@@ -33,6 +33,7 @@
     </template>
 
     <template v-else>
+      <ComparisonPanel />
       <v-row class="mb-4">
         <v-col cols="12">
           <h1 class="text-h4 font-weight-bold text-on-surface">Analytics</h1>
@@ -329,6 +330,7 @@
 </template>
 
 <script setup lang="ts">
+import ComparisonPanel from '@/components/ComparisonPanel.vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
@@ -560,13 +562,8 @@ const lineOptions = {
 
 // The range lives in the URL, so a view can be bookmarked and Back works.
 async function syncRangeQuery(mode: 'push' | 'replace' = 'replace') {
-  const query = { months: String(months.value), days: String(trendDays.value) }
-  if (
-    Object.keys(route.query).length === 2 &&
-    route.query.months === query.months &&
-    route.query.days === query.days
-  )
-    return
+  const query = { ...route.query, months: String(months.value), days: String(trendDays.value) }
+  if (route.query.months === query.months && route.query.days === query.days) return
   await router[mode]({ query })
 }
 
@@ -639,12 +636,9 @@ async function restoreRange() {
   hydrating = false
   await loadAnalytics()
 }
-watch(
-  () => route.query,
-  () => {
-    if (!hydrating) void restoreRange()
-  }
-)
+watch([() => route.query.months, () => route.query.days], () => {
+  if (!hydrating) void restoreRange()
+})
 onMounted(restoreRange)
 </script>
 

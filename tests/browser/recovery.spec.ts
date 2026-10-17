@@ -102,12 +102,16 @@ test('real waiting service worker protects a modified form until explicit update
   await expect(page.getByText('A new version is available.', { exact: false })).toBeVisible()
   const update = page.getByRole('button', { name: 'Update', exact: true })
   await expect(update).toBeDisabled()
-  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Unsaved draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue(
+    'Unsaved draft'
+  )
   expect(
     await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())?.waiting)
   ).toBe(true)
   await page.getByRole('button', { name: 'Later', exact: true }).click()
-  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Unsaved draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue(
+    'Unsaved draft'
+  )
   await dialog.getByRole('button', { name: 'Close dialog' }).click()
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(update).toBeEnabled()
@@ -125,7 +129,9 @@ test('stale bundle errors offer an update and preserve the draft', async ({ page
     window.dispatchEvent(new Event('vite:preloadError', { cancelable: true }))
   )
   await expect(page.getByRole('button', { name: 'Update', exact: true })).toBeDisabled()
-  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Keep my draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue(
+    'Keep my draft'
+  )
 })
 test('closed registration hides signup and leaves login available', async ({ page }) => {
   await page.goto('/login')
@@ -266,7 +272,9 @@ test('incomplete recurring totals recover without closing a draft', async ({ pag
   await expect(
     page.getByText('Recurring transactions are still updating.', { exact: false })
   ).not.toBeVisible()
-  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Unchanged draft')
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue(
+    'Unchanged draft'
+  )
 })
 test('offline filters use only their own saved rows', async ({ page, context }) => {
   const date = new Date().toISOString()
@@ -325,4 +333,21 @@ test('analytics history restores missing ranges to defaults', async ({ page }) =
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('6')
   await page.goForward()
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
+})
+
+test('comparison controls keep existing Analytics ranges and restore browser history', async ({
+  page
+}) => {
+  await page.goto('/analytics?months=9&days=60&comparison=week&anchor=2024-01-03')
+  await expect(page.getByLabel('Comparison week', { exact: true })).toHaveValue('2024-01-03')
+  await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
+  await page.getByRole('button', { name: 'Year vs year', exact: true }).click()
+  await page.getByLabel('Comparison year', { exact: true }).fill('2023')
+  await page.getByLabel('Comparison year', { exact: true }).press('Enter')
+  await expect(page).toHaveURL(/anchor=2023-01-01/)
+  await expect(page.getByLabel('Days', { exact: true })).toHaveValue('60')
+  await page.goBack()
+  await page.goBack()
+  await expect(page.getByLabel('Comparison week', { exact: true })).toHaveValue('2024-01-03')
+  await expect(page.getByText('No movements in these periods.', { exact: true })).toBeVisible()
 })

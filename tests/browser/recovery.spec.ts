@@ -351,3 +351,322 @@ test('comparison controls keep existing Analytics ranges and restore browser his
   await expect(page.getByLabel('Comparison week', { exact: true })).toHaveValue('2024-01-03')
   await expect(page.getByText('No movements in these periods.', { exact: true })).toBeVisible()
 })
+
+test('tag manager creates, renames, reorders and globally deletes without losing the movement draft', async ({
+  page
+}, info) => {
+  await page.goto('/transactions')
+  const dialog = await openExpense(page, 'Keep this comment')
+  await dialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
+  const manager = page
+    .getByRole('dialog')
+    .filter({ has: page.getByText('Edit tags', { exact: true }) })
+  for (const name of ['First', 'Second', 'Third']) {
+    await manager.getByLabel('New tag name', { exact: true }).fill(name)
+    await manager.getByLabel('New tag name', { exact: true }).press('Enter')
+    await expect(manager.getByLabel(`Tag name ${name}`, { exact: true })).toHaveValue(name)
+  }
+  await manager.getByLabel('Tag name First', { exact: true }).fill('Renamed')
+  await manager.getByLabel('Tag name First', { exact: true }).press('Enter')
+  await expect(manager.getByLabel('Tag name Renamed', { exact: true })).toHaveValue('Renamed')
+  const handle = manager.getByRole('button', {
+    name: 'Reorder Third; arrow keys move it',
+    exact: true
+  })
+  await handle.focus()
+  await handle.press('ArrowUp')
+  await expect
+    .poll(async () => (await state(page)).tags.map((tag: { name: string }) => tag.name))
+    .toEqual(['Renamed', 'Third', 'Second'])
+  // The pointer gesture uses the same hold-and-drag handle on desktop/mobile emulation.
+  const source = await manager
+    .getByRole('button', { name: 'Reorder Second; arrow keys move it', exact: true })
+    .boundingBox()
+  const target = await manager
+    .getByRole('button', { name: 'Reorder Renamed; arrow keys move it', exact: true })
+    .boundingBox()
+  if (info.project.name === 'android') {
+    const cdp = await page.context().newCDPSession(page)
+    const x = source!.x + source!.width / 2,
+      y = source!.y + source!.height / 2
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+    await page.waitForTimeout(300)
+    for (let step = 1; step <= 8; step++)
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x, y: y + ((target!.y + target!.height / 2 - y) * step) / 8 }]
+      })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await cdp.detach()
+  } else {
+    await page.mouse.move(source!.x + source!.width / 2, source!.y + source!.height / 2)
+    await page.mouse.down()
+    await page.waitForTimeout(300)
+    await page.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2, {
+      steps: 8
+    })
+    await page.mouse.up()
+  }
+  await expect.poll(async () => (await state(page)).tags[0].name).toBe('Second')
+  await manager.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue(
+    'Keep this comment'
+  )
+  await dialog.getByRole('button', { name: 'Renamed', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  if (info.project.name === 'android') {
+    await page.getByRole('button', { name: 'Show 1 tags', exact: true }).click()
+    await expect(page.getByRole('listitem').filter({ hasText: 'Renamed' })).toBeVisible()
+    await page.keyboard.press('Escape')
+  } else await expect(page.getByText('Renamed', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  const newDialog = page.getByRole('dialog')
+  await newDialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
+  const editor = page
+    .getByRole('dialog')
+    .filter({ has: page.getByText('Edit tags', { exact: true }) })
+  await editor.getByRole('button', { name: 'Delete tag Renamed', exact: true }).click()
+  const confirmation = page
+    .getByRole('dialog')
+    .filter({ has: page.getByText('Delete tag?', { exact: true }) })
+  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(editor.getByLabel('Tag name Renamed', { exact: true })).toBeVisible()
+  await editor.getByRole('button', { name: 'Delete tag Renamed', exact: true }).click()
+  await confirmation.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(editor.getByLabel('Tag name Renamed', { exact: true })).toHaveCount(0)
+  expect((await state(page)).rows).toHaveLength(1)
+})
+
+test('offline tags and a commentless movement replay in dependency order', async ({
+  page,
+  context
+}) => {
+  await page.goto('/transactions')
+  const dialog = await openExpense(page, '')
+  await context.setOffline(true)
+  await dialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
+  const manager = page
+    .getByRole('dialog')
+    .filter({ has: page.getByText('Edit tags', { exact: true }) })
+  await manager.getByLabel('New tag name', { exact: true }).fill('Offline tag')
+  await manager.getByLabel('New tag name', { exact: true }).press('Enter')
+  await expect(manager.getByLabel('Tag name Offline tag', { exact: true })).toBeVisible()
+  await manager.getByRole('button', { name: 'Done', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Offline tag', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await context.setOffline(false)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect.poll(async () => (await state(page)).rows.length).toBe(1)
+  const saved = await state(page)
+  expect(saved.rows[0].comment).toBe('')
+  expect(saved.rows[0].tagIds).toEqual([saved.tags[0].id])
+  expect(
+    saved.requests
+      .filter((r: { method: string }) => r.method === 'POST')
+      .map((r: { path: string }) => r.path)
+  ).toEqual(['/api/tags', '/api/transactions'])
+})
+
+test('undo survives navigation and an expired deletion survives reload', async ({ page }) => {
+  const date = new Date().toISOString()
+  await state(page, {
+    rows: [
+      {
+        id: 1,
+        amount: 10,
+        type: 'EXPENSE',
+        categoryId: 1,
+        description: 'Undo me',
+        date,
+        createdAt: date,
+        category: { name: 'Food', color: '#EA4335' }
+      }
+    ]
+  })
+  await page.goto('/transactions')
+  await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  await page.evaluate(() => {
+    history.pushState({}, '', '/')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await page.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  expect((await state(page)).rows).toHaveLength(1)
+  await page.goto('/transactions')
+  await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  await expect.poll(async () => (await state(page)).rows.length, { timeout: 12_000 }).toBe(0)
+  expect(
+    (await state(page)).requests.filter((r: { method: string }) => r.method === 'DELETE')
+  ).toHaveLength(1)
+})
+
+test('next-only edit and skip preserve the rule base and target exact dates', async ({ page }) => {
+  const next = '2090-01-01T00:00:00.000Z'
+  await state(page, {
+    rules: [
+      {
+        id: 1,
+        userId: 1,
+        categoryId: 1,
+        type: 'EXPENSE',
+        amount: 10,
+        description: 'Regular',
+        frequency: 'DAY',
+        interval: 1,
+        startDate: next,
+        nextDate: next,
+        endDate: null,
+        active: true,
+        category: { id: 1, name: 'Food', color: '#EA4335', type: 'EXPENSE' }
+      }
+    ]
+  })
+  await page.goto('/recurring')
+  await page.getByRole('button', { name: 'Edit next', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('Date', { exact: true })).toHaveAttribute('readonly', '')
+  await dialog.getByLabel('Amount', { exact: true }).fill('33.21')
+  await dialog.getByLabel('Comment (optional)', { exact: true }).fill('Only once')
+  await dialog.getByRole('button', { name: 'Update', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect(page.getByText('Next only:', { exact: false })).toBeVisible()
+  expect((await state(page)).rules[0].amount).toBe(10)
+  expect((await state(page)).rules[0].nextException.amount).toBe(33.21)
+  await page.getByRole('button', { name: 'Skip next', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Skip', exact: true }).click()
+  await expect
+    .poll(async () => (await state(page)).rules[0].nextDate)
+    .toBe('2090-01-02T00:00:00.000Z')
+})
+
+test('transaction layouts and filter controls fit narrow and wide screens', async ({
+  page
+}, info) => {
+  const date = new Date().toISOString()
+  const tags = Array.from({ length: 5 }, (_, index) => ({
+    id: `tag-${index}`,
+    name: `Long tag name ${index}`,
+    position: index,
+    aliases: [`tag-${index}`]
+  }))
+  await state(page, {
+    tags,
+    rows: [
+      {
+        id: 1,
+        amount: 123456.78,
+        type: 'EXPENSE',
+        description:
+          'A longer comment that must stay between the category information and the amount without overlapping anything.',
+        tags,
+        categoryId: 1,
+        category: { name: 'Food and groceries', color: '#34A853' },
+        date,
+        createdAt: date
+      }
+    ]
+  })
+  await page.goto('/transactions')
+  for (const width of [320, 360, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+    const bounds = await page.locator('.transaction-filters').evaluate(element => {
+      const controls = Array.from(element.children).map(child => child.getBoundingClientRect())
+      return controls.every((rect, i) =>
+        controls
+          .slice(i + 1)
+          .every(
+            other =>
+              rect.right <= other.left + 1 ||
+              other.right <= rect.left + 1 ||
+              rect.bottom <= other.top + 1 ||
+              other.bottom <= rect.top + 1
+          )
+      )
+    })
+    expect(bounds).toBe(true)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+    if (width === 1280) {
+      const headers = await page.locator('.tx-table th').allTextContents()
+      expect(headers.map(text => text.trim())).toEqual([
+        'Date',
+        'Category',
+        'Tags',
+        'Comment',
+        'Amount',
+        'Actions'
+      ])
+      await expect(
+        page.getByRole('columnheader', { name: 'Actions', exact: true })
+      ).toBeInViewport()
+      await expect(
+        page.getByRole('button', { name: 'Sort by amount', exact: true })
+      ).toBeInViewport()
+    }
+    await page.screenshot({
+      path: info.outputPath(`transactions-${width}.png`),
+      fullPage: true,
+      animations: 'disabled'
+    })
+  }
+  await page.setViewportSize({ width: 320, height: 900 })
+  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('Amount', { exact: true })).toBeVisible()
+  const amount = await dialog.getByLabel('Amount', { exact: true }).boundingBox()
+  const dateBounds = await dialog.getByLabel('Date', { exact: true }).boundingBox()
+  expect(amount!.x + amount!.width).toBeLessThanOrEqual(dateBounds!.x + 1)
+  await dialog.evaluate(async element => {
+    const overlay = element.closest('.v-overlay') ?? element
+    await Promise.all(
+      overlay
+        .getAnimations({ subtree: true })
+        .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map(animation => animation.finished.catch(() => {}))
+    )
+  })
+  await page.screenshot({ path: info.outputPath('movement-dialog-320.png'), fullPage: true })
+})
+
+test('another tab can undo the same scheduled deletion before it is sent', async ({
+  page,
+  context
+}) => {
+  const date = new Date().toISOString()
+  await state(page, {
+    rows: [
+      {
+        id: 1,
+        type: 'EXPENSE',
+        amount: 10,
+        description: 'Shared undo',
+        categoryId: 1,
+        category: { name: 'Food', color: '#EA4335' },
+        date,
+        createdAt: date
+      }
+    ]
+  })
+  await page.goto('/transactions')
+  const other = await context.newPage()
+  await other.goto('/transactions')
+  await page.getByRole('button', { name: 'Delete Shared undo', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(other.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  await other.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await expect(page.getByText('Shared undo', { exact: true })).toBeVisible()
+  const saved = await state(page)
+  expect(saved.rows).toHaveLength(1)
+  expect(
+    saved.requests.filter((request: { method: string }) => request.method === 'DELETE')
+  ).toHaveLength(0)
+})

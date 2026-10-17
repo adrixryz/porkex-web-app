@@ -18,7 +18,7 @@
           label="Comparison year"
           type="number"
           min="1900"
-          :max="currentYear"
+          :max="currentYear()"
           hide-details
           density="compact"
           @change="applyYear"
@@ -107,10 +107,10 @@ interface Comparison {
 const route = useRoute(),
   router = useRouter()
 const cs = useCurrencySymbol()
-const currentYear = new Date().getFullYear()
+const currentYear = () => new Date().getFullYear()
 const mode = ref<'year' | 'week'>('year')
-const anchor = ref(`${currentYear}-01-01`)
-const year = ref(String(currentYear)),
+const anchor = ref(`${currentYear()}-01-01`)
+const year = ref(String(currentYear())),
   week = ref(todayInput())
 const metrics: Metric[] = ['income', 'expense', 'net']
 const titles = { income: 'Income', expense: 'Expenses', net: 'Balance' }
@@ -145,7 +145,7 @@ async function restore() {
         ? raw.slice(0, 4) + '-01-01'
         : raw
       : mode.value === 'year'
-        ? `${currentYear}-01-01`
+        ? `${currentYear()}-01-01`
         : todayInput()
     year.value = anchor.value.slice(0, 4)
     week.value = anchor.value
@@ -164,11 +164,11 @@ async function navigate(nextMode: 'year' | 'week', nextAnchor: string) {
 }
 function changeMode(value: unknown) {
   if (value === 'year' || value === 'week')
-    void navigate(value, value === 'year' ? `${currentYear}-01-01` : todayInput())
+    void navigate(value, value === 'year' ? `${currentYear()}-01-01` : todayInput())
 }
 function applyYear() {
   const value = Number(year.value)
-  if (Number.isInteger(value) && value >= 1900 && value <= currentYear)
+  if (Number.isInteger(value) && value >= 1900 && value <= currentYear())
     void navigate('year', `${value}-01-01`)
   else year.value = anchor.value.slice(0, 4)
 }

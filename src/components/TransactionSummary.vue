@@ -14,7 +14,9 @@
         />
       </div>
       <div class="summary-date text-caption">
-        <span>{{ formatDateOnly(transaction.date) }}</span
+        <span>{{
+          formatDateOnly(transaction.date, { month: 'numeric', day: 'numeric', year: '2-digit' })
+        }}</span
         ><TagChips :tags="transaction.tags" compact />
       </div>
     </div>
@@ -48,13 +50,15 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
   min-width: 0;
 }
 .summary-meta {
+  container-type: inline-size;
+  container-name: summary-meta;
   flex: 1 1 110px;
-  min-width: 0;
+  min-width: 96px;
 }
 .summary-date {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   color: #bdbdbd;
 }
@@ -77,11 +81,15 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
   font-size: 13px;
 }
 @media (max-width: 359px) {
+  .summary-row :deep(.v-avatar) {
+    width: 28px !important;
+    height: 28px !important;
+  }
   .summary-row {
     gap: 6px;
   }
   .summary-meta {
-    flex-basis: 80px;
+    flex-basis: 96px;
   }
   .summary-comment {
     flex-basis: 45px;

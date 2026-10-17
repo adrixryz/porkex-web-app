@@ -1,26 +1,29 @@
 <template>
-  <span class="tag-chips">
+  <span class="tag-chips" :class="{ compact }">
     <v-chip
       v-for="tag in shown"
       :key="tag.id"
+      :title="tag.name"
       size="x-small"
       color="grey-darken-2"
       variant="flat"
       class="tag-pill"
       >{{ tag.name }}</v-chip
     >
-    <v-menu v-if="overflow.length"
+    <v-menu v-if="compact && ordered.length"
       ><template #activator="{ props: activator }"
         ><button
           type="button"
-          class="text-caption text-white"
+          class="tag-overflow text-caption text-white"
+          :class="{ 'single-tag': !overflow.length }"
           v-bind="activator"
-          :aria-label="`Show ${overflow.length} more tags`"
+          :aria-label="`Show ${ordered.length} tags`"
         >
-          +{{ overflow.length }}
+          <span class="overflow-count">+{{ overflow.length }}</span>
+          <span class="total-count">+{{ ordered.length }}</span>
         </button></template
       ><v-list density="compact"
-        ><v-list-item v-for="tag in overflow" :key="tag.id" :title="tag.name" /></v-list
+        ><v-list-item v-for="tag in ordered" :key="tag.id" :title="tag.name" /></v-list
     ></v-menu>
   </span>
 </template>
@@ -57,5 +60,36 @@ const overflow = computed(() => (props.compact ? ordered.value.slice(1) : []))
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.tag-chips.compact {
+  flex-wrap: nowrap;
+  flex: 1;
+  overflow: hidden;
+}
+.compact .tag-pill {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.compact button {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #616161;
+  padding-inline: 5px;
+  font-size: 10px !important;
+  line-height: 18px;
+}
+.total-count,
+.single-tag {
+  display: none;
+}
+@container summary-meta (max-width: 140px) {
+  .compact .tag-pill,
+  .overflow-count {
+    display: none;
+  }
+  .compact .tag-overflow,
+  .total-count {
+    display: inline;
+  }
 }
 </style>

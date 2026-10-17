@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import type { Transaction } from '@/types'
-import { getUser, isAuthenticated, syncPendingWrites, USER_CHANGE_EVENT } from './api'
+import { activeWrites, getUser, isAuthenticated, syncPendingWrites, USER_CHANGE_EVENT } from './api'
 import { enqueue, outboxRevision, ownedPending, withOutboxLock, withSendLock } from './outbox'
 
 const KEY = 'porkex_scheduled_deletes'
@@ -85,27 +85,37 @@ export const hiddenTransactionIds = computed(() => {
 export async function scheduleDelete(transaction: Transaction) {
   const userId = getUser()?.id
   if (!isAuthenticated() || !userId) throw new Error('Sign in before deleting a movement.')
-  await withOutboxLock(LOCK, async () => {
-    const all = read()
-    if (all.some(item => item.userId === userId && item.transaction.id === transaction.id)) return
-    const now = Date.now()
-    const deadline = now + WINDOW
-    const value = all.map(item =>
-      item.userId === userId && item.deadline > now ? { ...item, deadline } : item
-    )
-    value.push({ id: crypto.randomUUID(), userId, deadline, transaction })
-    write(value)
-    clock.value = now
-    deleteError.value = ''
-  })
+  activeWrites.value++
+  try {
+    await withOutboxLock(LOCK, async () => {
+      const all = read()
+      if (all.some(item => item.userId === userId && item.transaction.id === transaction.id)) return
+      const now = Date.now()
+      const deadline = now + WINDOW
+      const value = all.map(item =>
+        item.userId === userId && item.deadline > now ? { ...item, deadline } : item
+      )
+      value.push({ id: crypto.randomUUID(), userId, deadline, transaction })
+      write(value)
+      clock.value = now
+      deleteError.value = ''
+    })
+  } finally {
+    activeWrites.value--
+  }
 }
 export async function undoDeletes() {
   const userId = getUser()?.id
-  await withOutboxLock(LOCK, async () => {
-    // The clock is checked inside the same lock as publication, not only in UI.
-    write(read().filter(item => item.userId !== userId || item.deadline <= Date.now()))
-    clock.value = Date.now()
-  })
+  activeWrites.value++
+  try {
+    await withOutboxLock(LOCK, async () => {
+      // The clock is checked inside the same lock as publication, not only in UI.
+      write(read().filter(item => item.userId !== userId || item.deadline <= Date.now()))
+      clock.value = Date.now()
+    })
+  } finally {
+    activeWrites.value--
+  }
 }
 export async function publishScheduledDeletes() {
   if (transferring) return transferring

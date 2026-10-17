@@ -87,3 +87,23 @@ it('keeps scheduled deletions bound to the original account after logout', async
   expect(hiddenTransactionIds.value.size).toBe(0)
   expect(JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)).toHaveLength(1)
 })
+
+it('preserves the scheduled copy when publishing to a full outbox fails', async () => {
+  await scheduleDelete(row(9))
+  stop?.()
+  vi.setSystemTime(Date.now() + 8_001)
+  const original = Storage.prototype.setItem
+  const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+    this: Storage,
+    key,
+    value
+  ) {
+    if (key === 'porkex_outbox') throw new DOMException('Full', 'QuotaExceededError')
+    original.call(this, key, value)
+  })
+  await expect(publishScheduledDeletes()).rejects.toThrow('Could not save')
+  expect(JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)).toHaveLength(1)
+  storage.mockRestore()
+  await publishScheduledDeletes()
+  expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toHaveLength(1)
+})

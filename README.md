@@ -207,3 +207,5 @@ Deleting a movement offers Deshacer for 8 seconds. Scheduled deletions are store
 Recurring rules offer Skip next and Edit next for an exact scheduled date. The next-only editor reuses the movement fields with a read-only date and 0–5 tags. A conflict stays visible rather than silently affecting a later date; ordinary edits retain the rule schedule and base values.
 
 Analytics includes Year vs year and Week vs week comparisons, using equal elapsed calendar portions for the current period. Income, expenses and balance have paired totals/deltas and a two-series chart. Comparison controls preserve months/days URL parameters and browser history, respect week-start preference, and show zero-base/no-data states explicitly.
+
+La matriz de las nuevas funcionalidades, pruebas, commits y límites de validación está en [FEATURES_REVIEW.md](FEATURES_REVIEW.md).

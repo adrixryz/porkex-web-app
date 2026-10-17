@@ -128,10 +128,13 @@ let press: ReturnType<typeof setTimeout> | undefined
 let initial: string[] = []
 watch(
   [tags, () => props.modelValue],
-  () => {
+  (_value, previous) => {
     if (!dragging.value && !busy.value) {
       ordered.value = [...tags.value]
-      names.value = Object.fromEntries(tags.value.map(tag => [tag.id, tag.name]))
+      const old = new Map((previous?.[0] ?? []).map(tag => [tag.id, tag.name]))
+      for (const tag of tags.value)
+        if (names.value[tag.id] === undefined || names.value[tag.id] === old.get(tag.id))
+          names.value[tag.id] = tag.name
     }
   },
   { immediate: true }
@@ -142,10 +145,12 @@ useUnsavedChanges(
     (!!newName.value || tags.value.some(tag => names.value[tag.id] !== tag.name)),
   () => busy.value || dragging.value !== null
 )
-function valid(value: string) {
+function valid(value: string, exceptId?: string) {
   const clean = value.trim().normalize('NFC')
   if (Array.from(clean).length < 1 || Array.from(clean).length > 20)
     throw new Error('Tag names must contain 1–20 characters.')
+  if (tags.value.some(tag => tag.id !== exceptId && tag.name.toLowerCase() === clean.toLowerCase()))
+    throw new Error('A tag with that name already exists.')
   return clean
 }
 async function write(path: string, method: string, body?: object) {
@@ -157,7 +162,7 @@ async function write(path: string, method: string, body?: object) {
     const queued = isQueuedResponse(response)
     messageType.value = queued ? 'info' : 'success'
     message.value = queued ? 'Saved on this device; waiting to sync.' : 'Tags updated.'
-    if (!queued) await refreshTags()
+    if (!queued) await refreshTags(true)
     return true
   } catch (error) {
     messageType.value = 'error'
@@ -184,7 +189,7 @@ async function create() {
 }
 async function rename(tag: Tag) {
   try {
-    if (await write('/tags/' + tag.id, 'PUT', { name: valid(names.value[tag.id] ?? '') }))
+    if (await write('/tags/' + tag.id, 'PUT', { name: valid(names.value[tag.id] ?? '', tag.id) }))
       names.value[tag.id] = tags.value.find(t => t.id === tag.id)?.name ?? ''
   } catch (error) {
     messageType.value = 'error'

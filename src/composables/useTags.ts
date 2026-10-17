@@ -10,6 +10,7 @@ const error = ref('')
 let owner: number | undefined
 let loading: Promise<void> | undefined
 let consumers = 0
+let refreshAfter = false
 function session() {
   const next = getUser()?.id
   if (owner !== next) {
@@ -52,10 +53,13 @@ export const tags = computed(() => {
   }
   return result.map((tag, position) => ({ ...tag, position }))
 })
-export function refreshTags(): Promise<void> {
+export function refreshTags(force = false): Promise<void> {
   session()
   if (!owner) return Promise.resolve()
-  if (loading) return loading
+  if (loading) {
+    if (force) refreshAfter = true
+    return loading
+  }
   const identity = getSessionIdentity()
   loading = (async () => {
     try {
@@ -67,13 +71,19 @@ export function refreshTags(): Promise<void> {
     } catch (e) {
       if (identity === getSessionIdentity()) error.value = (e as Error).message
     } finally {
-      if (identity === getSessionIdentity()) loading = undefined
+      if (identity === getSessionIdentity()) {
+        loading = undefined
+        if (refreshAfter && consumers) {
+          refreshAfter = false
+          void refreshTags()
+        }
+      }
     }
   })()
   return loading
 }
 const revalidate = () => {
-  if (consumers) void refreshTags()
+  if (consumers) void refreshTags(true)
 }
 window.addEventListener(DATA_REVALIDATE_EVENT, revalidate)
 window.addEventListener(USER_CHANGE_EVENT, () => {

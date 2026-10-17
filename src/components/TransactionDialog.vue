@@ -22,9 +22,10 @@
         <v-form @submit.prevent="submit">
           <div class="amount-date-row">
             <div>
+              <div class="text-caption mb-1">Amount</div>
               <v-text-field
                 v-model="form.amount"
-                label="Amount"
+                aria-label="Amount"
                 type="number"
                 inputmode="decimal"
                 :prefix="cs"
@@ -43,9 +44,10 @@
               </v-text-field>
             </div>
             <div>
+              <div class="text-caption mb-1">Date</div>
               <v-text-field
                 v-model="form.date"
-                label="Date"
+                aria-label="Date"
                 type="date"
                 :max="occurrence ? undefined : todayInput()"
                 :readonly="!!occurrence"
@@ -312,5 +314,9 @@ const submit = async () => {
   border-radius: 50%;
   margin-right: 10px;
   flex-shrink: 0;
+}
+.amount-date-row :deep(.v-field-label) {
+  max-width: none;
+  overflow: visible;
 }
 </style>

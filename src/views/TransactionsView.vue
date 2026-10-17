@@ -443,7 +443,7 @@
                           variant="text"
                           size="small"
                           color="primary"
-                          :aria-label="`Edit ${tx.description}`"
+                          :aria-label="`Edit ${tx.comment || tx.description || tx.category?.name}`"
                           @click="editTx(tx)"
                         ></v-btn>
                         <v-btn
@@ -451,7 +451,7 @@
                           variant="text"
                           size="small"
                           color="error"
-                          :aria-label="`Delete ${tx.description}`"
+                          :aria-label="`Delete ${tx.comment || tx.description || tx.category?.name}`"
                           @click="confirmDelete(tx)"
                         ></v-btn>
                       </td>
@@ -1028,7 +1028,7 @@ onMounted(async () => {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-/* Fixed layout so Description absorbs the leftover space; the narrow columns
+/* Fixed layout so Comment absorbs the leftover space; the narrow columns
    keep a constant width no matter what they contain. */
 .tx-table {
   table-layout: fixed;
@@ -1045,7 +1045,7 @@ onMounted(async () => {
   width: 150px;
 }
 .col-actions {
-  width: 104px;
+  width: 128px;
 }
 
 .description-cell {
@@ -1097,6 +1097,30 @@ onMounted(async () => {
   padding-inline: 10px;
 }
 .col-tags {
-  width: 20%;
+  width: 22%;
+}
+.tx-table :deep(table) {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 850px;
+}
+.tx-table :deep(td) {
+  white-space: normal;
+}
+.tx-table :deep(.description-cell) {
+  white-space: nowrap;
+}
+.compact-toggle {
+  max-width: 100%;
+  flex-wrap: wrap;
+  height: auto !important;
+  overflow: visible;
+}
+@media (max-width: 600px) {
+  .compact-toggle :deep(.v-btn) {
+    padding-inline: 6px !important;
+    font-size: 12px !important;
+    min-height: 32px;
+  }
 }
 </style>

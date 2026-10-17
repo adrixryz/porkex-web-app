@@ -94,7 +94,11 @@
                 step="1"
                 hide-spin-buttons
                 :label="`Every (${unitLabel(form.frequency)})`"
-              ></v-text-field>
+              >
+                <template #append-inner>
+                  <AmountStepper label="interval" @step="stepInterval"></AmountStepper>
+                </template>
+              </v-text-field>
             </v-col>
           </v-row>
 
@@ -294,6 +298,14 @@ const stepAmount = (delta: number) => {
   const base = Number.isFinite(current) ? current : 0
   const next = Math.max(0.01, Math.round((base + delta) * 100) / 100)
   form.value.amount = String(next)
+}
+
+// The interval uses the same custom stepper as the amount. Both bounds are
+// clamped so a few extra clicks can never leave the field invalid.
+const stepInterval = (delta: number) => {
+  const current = Number.parseInt(form.value.interval, 10)
+  const base = Number.isFinite(current) ? current : 1
+  form.value.interval = String(Math.min(MAX_INTERVAL, Math.max(1, base + delta)))
 }
 
 const submit = async () => {

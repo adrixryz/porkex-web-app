@@ -186,6 +186,39 @@ describe('RecurringDialog form', () => {
     vi.unstubAllGlobals()
   })
 
+  it('steps the interval with the custom stepper, clamped to the valid range', async () => {
+    vi.stubGlobal('fetch', fetchMock())
+
+    const wrapper = await openDialog()
+    const vm = wrapper.vm as unknown as { form: { value?: unknown }; isValid: unknown }
+    const form = unwrap(vm.form) as Record<string, unknown>
+
+    form.amount = '25'
+    form.description = 'Gym'
+    form.categoryId = 1
+    await nextTick()
+
+    const increase = wrapper.find('button[aria-label="Increase interval"]')
+    const decrease = wrapper.find('button[aria-label="Decrease interval"]')
+    expect(increase.exists()).toBe(true)
+    expect(decrease.exists()).toBe(true)
+
+    await increase.trigger('click')
+    expect(form.interval).toBe('2')
+
+    // Extra clicks cannot push it past the API maximum or below one.
+    for (let i = 0; i < 30; i++) await increase.trigger('click')
+    expect(form.interval).toBe('24')
+    await nextTick()
+    expect(unwrap(vm.isValid as boolean)).toBe(true)
+
+    for (let i = 0; i < 30; i++) await decrease.trigger('click')
+    expect(form.interval).toBe('1')
+    await nextTick()
+    expect(unwrap(vm.isValid as boolean)).toBe(true)
+    vi.unstubAllGlobals()
+  })
+
   it('edits an existing rule against its id, in UTC days', async () => {
     const fetch = fetchMock()
     vi.stubGlobal('fetch', fetch)

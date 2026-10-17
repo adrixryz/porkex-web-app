@@ -93,30 +93,52 @@
             </div>
           </v-card>
 
-          <!-- ABOUT -->
+          <!-- SECURITY -->
           <v-card color="surface" elevation="1" class="rounded-xl pa-6 mb-4">
-            <div class="text-subtitle-1 font-weight-medium mb-4">About</div>
-            <v-list bg-color="transparent">
-              <v-list-item
-                :prepend-icon="mdiInformationOutline"
-                title="App Version"
-                :subtitle="appVersion"
-              ></v-list-item>
-              <v-list-item
-                title="Porkex Finance Tracker"
-                subtitle="Track your income and expenses with ease"
+            <div class="text-subtitle-1 font-weight-medium mb-4">Security</div>
+            <v-form @submit.prevent="updatePassword">
+              <v-text-field
+                v-model="currentPassword"
+                label="Current Password"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="current-password"
+                :prepend-inner-icon="mdiLockOutline"
+                :append-inner-icon="showPassword ? mdiEyeOff : mdiEye"
+                @click:append-inner="showPassword = !showPassword"
+                class="mb-2"
+              ></v-text-field>
+              <v-text-field
+                v-model="newPassword"
+                label="New Password"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                :prepend-inner-icon="mdiLockOutline"
+                hint="At least 6 characters"
+                persistent-hint
+                class="mb-2"
+              ></v-text-field>
+              <v-text-field
+                v-model="confirmPassword"
+                label="Confirm New Password"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                :prepend-inner-icon="mdiLockOutline"
+                :error="confirmMismatch"
+                :error-messages="confirmMismatch ? 'Passwords do not match' : ''"
+                class="mb-2"
+              ></v-text-field>
+              <v-btn
+                type="submit"
+                color="primary"
+                elevation="0"
+                rounded="pill"
+                :loading="savingPassword"
+                :disabled="!canSavePassword"
+                class="mt-2"
               >
-                <template v-slot:prepend>
-                  <img
-                    src="/porkex-logo.svg"
-                    alt="Porkex logo"
-                    width="24"
-                    height="24"
-                    class="brand-logo mr-7"
-                  />
-                </template>
-              </v-list-item>
-            </v-list>
+                Update Password
+              </v-btn>
+            </v-form>
           </v-card>
 
           <!-- DANGER ZONE -->
@@ -175,18 +197,17 @@ import { useAsyncData } from '@/composables/useAsyncData'
 import type { CurrencyOption, Profile } from '@/types'
 import { CURRENCIES, getCurrency, setCurrency, setCurrencyByCode } from '@/utils/currency'
 import { formatDate } from '@/utils/date'
-import pkg from '../../package.json'
 import {
   mdiAccountOutline,
   mdiCurrencyUsd,
   mdiEmailOutline,
-  mdiInformationOutline,
+  mdiEye,
+  mdiEyeOff,
+  mdiLockOutline,
   mdiLogout
 } from '@mdi/js'
 
 const router = useRouter()
-
-const appVersion = pkg.version
 
 const currentCurrency = getCurrency()
 const selectedCurrency = ref<CurrencyOption>(
@@ -197,8 +218,25 @@ const editName = ref('')
 const saving = ref(false)
 const savingCurrency = ref(false)
 
+const currentPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const savingPassword = ref(false)
+const showPassword = ref(false)
+
 const userInitial = computed(() =>
   profile.value.name ? profile.value.name.charAt(0).toUpperCase() : 'U'
+)
+
+const confirmMismatch = computed(
+  () => confirmPassword.value.length > 0 && confirmPassword.value !== newPassword.value
+)
+
+const canSavePassword = computed(
+  () =>
+    currentPassword.value.length > 0 &&
+    newPassword.value.length >= 6 &&
+    newPassword.value === confirmPassword.value
 )
 
 const EMPTY_PROFILE: Profile = { id: 0, name: '', email: '', currency: 'USD', createdAt: '' }
@@ -301,6 +339,35 @@ const onCurrencyChange = async (val: CurrencyOption | string | null) => {
     showSnack('Currency changed locally, but could not be saved.', 'error')
   }
   savingCurrency.value = false
+}
+
+// A password change is never queued offline (see api.ts): it needs an
+// immediate answer, so a dead connection is reported instead of replayed.
+const updatePassword = async () => {
+  if (!canSavePassword.value) return
+  savingPassword.value = true
+  try {
+    const res = await api('/password', {
+      method: 'PUT',
+      body: JSON.stringify({
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value
+      })
+    })
+    if (res.ok) {
+      currentPassword.value = ''
+      newPassword.value = ''
+      confirmPassword.value = ''
+      showSnack('Password updated!', 'success')
+    } else {
+      const data = await res.json().catch(() => null)
+      showSnack(data?.error || 'Could not update the password.', 'error')
+    }
+  } catch (e) {
+    console.error(e)
+    showSnack('Connection error. The password was not changed.', 'error')
+  }
+  savingPassword.value = false
 }
 
 const logoutDialog = ref(false)

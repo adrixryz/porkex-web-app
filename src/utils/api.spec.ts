@@ -67,6 +67,23 @@ describe('writes that never reach the server are queued', () => {
   })
 })
 
+describe('a password change is never queued', () => {
+  it('rethrows instead of storing the passwords in localStorage', async () => {
+    vi.stubGlobal('fetch', networkDown())
+
+    await expect(
+      api('/password', {
+        method: 'PUT',
+        body: JSON.stringify({ currentPassword: 'vieja123', newPassword: 'nueva123' })
+      })
+    ).rejects.toThrow()
+
+    expect(pendingCount.value).toBe(0)
+    expect(localStorage.getItem('porkex_outbox')).toBeNull()
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('writes the server answered are not queued', () => {
   it('a 400 is not a network problem', async () => {
     vi.stubGlobal(

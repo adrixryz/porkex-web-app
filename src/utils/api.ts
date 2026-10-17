@@ -169,7 +169,10 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
       }
     })
   } catch (err) {
-    if (isRead || !isNetworkFailure(err)) throw err
+    // A password change is never queued: the outbox keeps bodies in
+    // localStorage (which must not hold passwords), and a change the user
+    // cannot verify right away is worse than an honest error.
+    if (isRead || path === '/password' || !isNetworkFailure(err)) throw err
     enqueue({
       id: crypto.randomUUID(),
       method,

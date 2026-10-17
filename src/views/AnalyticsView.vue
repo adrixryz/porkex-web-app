@@ -34,51 +34,11 @@
 
     <template v-else>
       <v-row class="mb-4">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-md-row align-start align-md-center justify-space-between ga-4"
-        >
-          <div>
-            <h1 class="text-h4 font-weight-bold text-on-surface">Analytics</h1>
-            <p class="text-body-2 text-on-surface-variant mt-1">
-              Track your financial trends and patterns
-            </p>
-          </div>
-          <div class="d-flex flex-wrap align-center ga-4">
-            <div class="d-flex align-center ga-2">
-              <span class="text-caption text-on-surface-variant">Months</span>
-              <v-btn-toggle
-                v-model="months"
-                mandatory
-                color="primary"
-                density="compact"
-                rounded="pill"
-                variant="outlined"
-                class="range-toggle"
-                aria-label="Number of months"
-              >
-                <v-btn :value="3">3</v-btn>
-                <v-btn :value="6">6</v-btn>
-                <v-btn :value="12">12</v-btn>
-              </v-btn-toggle>
-            </div>
-            <div class="d-flex align-center ga-2">
-              <span class="text-caption text-on-surface-variant">Trend</span>
-              <v-btn-toggle
-                v-model="trendDays"
-                mandatory
-                color="primary"
-                density="compact"
-                rounded="pill"
-                variant="outlined"
-                class="range-toggle"
-                aria-label="Trend window in days"
-              >
-                <v-btn :value="30">30d</v-btn>
-                <v-btn :value="90">90d</v-btn>
-              </v-btn-toggle>
-            </div>
-          </div>
+        <v-col cols="12">
+          <h1 class="text-h4 font-weight-bold text-on-surface">Analytics</h1>
+          <p class="text-body-2 text-on-surface-variant mt-1">
+            Track your financial trends and patterns
+          </p>
         </v-col>
       </v-row>
 
@@ -169,14 +129,32 @@
 
       <!-- CHARTS -->
       <v-row class="mb-6">
-        <!-- BAR CHART: Income vs Expenses + 3-month moving average -->
+        <!-- BAR CHART: Income / Expenses / Profit-Loss per month -->
         <v-col cols="12" md="7">
           <v-card color="surface" elevation="1" class="rounded-xl fill-height">
-            <v-card-title class="px-6 py-4 border-b border-outline-variant">
+            <v-card-title
+              class="px-6 py-4 border-b border-outline-variant d-flex flex-wrap align-center justify-space-between ga-2"
+            >
               <span class="font-weight-medium text-subtitle-1">Income vs Expenses</span>
-              <span class="text-caption text-on-surface-variant ml-2"
-                >(Last {{ months }} Months)</span
+              <v-text-field
+                v-model="monthsInput"
+                type="number"
+                label="Months"
+                inputmode="numeric"
+                step="1"
+                density="compact"
+                hide-details
+                hide-spin-buttons
+                :min="MIN_MONTHS"
+                :max="MAX_MONTHS"
+                style="max-width: 132px"
+                @change="applyMonths"
+                @keydown.enter="applyMonths"
               >
+                <template #append-inner>
+                  <AmountStepper label="months" @step="stepMonths"></AmountStepper>
+                </template>
+              </v-text-field>
             </v-card-title>
             <v-card-text class="pa-6">
               <div
@@ -193,11 +171,29 @@
         <!-- LINE CHART: Balance Trend -->
         <v-col cols="12" md="5">
           <v-card color="surface" elevation="1" class="rounded-xl fill-height">
-            <v-card-title class="px-6 py-4 border-b border-outline-variant">
+            <v-card-title
+              class="px-6 py-4 border-b border-outline-variant d-flex flex-wrap align-center justify-space-between ga-2"
+            >
               <span class="font-weight-medium text-subtitle-1">Balance Trend</span>
-              <span class="text-caption text-on-surface-variant ml-2"
-                >(Last {{ trendDays }} Days)</span
+              <v-text-field
+                v-model="daysInput"
+                type="number"
+                label="Days"
+                inputmode="numeric"
+                step="1"
+                density="compact"
+                hide-details
+                hide-spin-buttons
+                :min="MIN_TREND_DAYS"
+                :max="MAX_TREND_DAYS"
+                style="max-width: 120px"
+                @change="applyDays"
+                @keydown.enter="applyDays"
               >
+                <template #append-inner>
+                  <AmountStepper label="days" @step="stepDays"></AmountStepper>
+                </template>
+              </v-text-field>
             </v-card-title>
             <v-card-text class="pa-6">
               <div
@@ -348,6 +344,7 @@ import {
   Filler
 } from 'chart.js'
 import { Chart, Line } from 'vue-chartjs'
+import AmountStepper from '@/components/AmountStepper.vue'
 import { fetchJson } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useRoute, useRouter } from 'vue-router'
@@ -357,7 +354,7 @@ import { themeColors } from '@/utils/color'
 import { useTheme } from 'vuetify'
 import { mdiChartPie, mdiMinus, mdiTrendingDown, mdiTrendingUp } from '@mdi/js'
 import { todayInput } from '@/utils/date'
-import type { ChartData, TooltipItem } from 'chart.js'
+import type { ChartData } from 'chart.js'
 
 ChartJS.register(
   CategoryScale,
@@ -379,8 +376,17 @@ const colors = computed(() =>
 )
 const cs = useCurrencySymbol()
 
+// Editable windows: the backend accepts any whole range inside these bounds.
+const MIN_MONTHS = 3
+const MAX_MONTHS = 12
+const MIN_TREND_DAYS = 7
+const MAX_TREND_DAYS = 120
+
 const months = ref(6)
 const trendDays = ref(30)
+// The title fields hold text while typing and commit on change/Enter.
+const monthsInput = ref('6')
+const daysInput = ref('30')
 const EMPTY_ANALYTICS: AnalyticsResponse = {
   range: { months: 6, days: 30 },
   monthlyData: [],
@@ -423,12 +429,12 @@ const topCategories = computed(() => analytics.value.topCategories)
 const categoryComparison = computed(() => analytics.value.categoryComparison)
 const insights = computed(() => analytics.value.insights)
 
-// Chart tooltips show the raw numbers unless a formatter is provided.
-// 'bar' | 'line' is the pair of chart types the tooltip is used with (the bar
-// chart is mixed, hence both).
+// Chart tooltips show the raw numbers unless a formatter is provided. The
+// parameter stays structural so the same formatter serves the bar and the
+// line chart without pinning either chart type.
 const moneyTooltip = {
   callbacks: {
-    label: (ctx: TooltipItem<'bar' | 'line'>) => {
+    label: (ctx: { parsed: { y: number | null }; dataset: { label?: string } }) => {
       const parsed = ctx.parsed
       return ` ${ctx.dataset.label ? ctx.dataset.label + ': ' : ''}${cs.value}${formatMoney(parsed.y)}`
     }
@@ -438,9 +444,16 @@ const moneyTooltip = {
 const barReady = computed(() => monthlyData.value.length > 0)
 const lineReady = computed(() => trendData.value.length > 0)
 
+// Yellow for the moving-average line: the theme has no yellow, and its
+// warning orange already marks a loss bar, so a literal keeps them apart.
+const AVG_LINE_COLOR = '#ffeb3b'
+
 // Mixed chart (bar + line): a dataset's own type wins over the chart's, which
 // is why this uses the generic <Chart> component and a two-type ChartData
 // instead of <Bar>, whose data prop is pinned to bar datasets only.
+// Three bars per month: income, expenses and the net result (income − expense,
+// negative months included). Profit reads blue, an overspent month reads
+// orange; the yellow line is the 3-month moving average of expenses.
 const barChartData = computed<ChartData<'bar' | 'line', number[]>>(() => ({
   labels: monthlyData.value.map(d => d.month),
   datasets: [
@@ -459,14 +472,23 @@ const barChartData = computed<ChartData<'bar' | 'line', number[]>>(() => ({
       data: monthlyData.value.map(d => d.expense)
     },
     {
+      label: 'Profit/Loss',
+      type: 'bar' as const,
+      backgroundColor: monthlyData.value.map(d =>
+        d.net >= 0 ? colors.value.primary : colors.value.warning
+      ),
+      borderRadius: 8,
+      data: monthlyData.value.map(d => d.net)
+    },
+    {
       label: '3-month avg expense',
       type: 'line' as const,
-      borderColor: colors.value.warning,
+      borderColor: AVG_LINE_COLOR,
       backgroundColor: 'transparent',
       borderWidth: 2,
       tension: 0.3,
       pointRadius: 3,
-      pointBackgroundColor: colors.value.warning,
+      pointBackgroundColor: AVG_LINE_COLOR,
       data: monthlyData.value.map(d => d.avgExpense)
     }
   ]
@@ -541,10 +563,45 @@ function syncRangeQuery() {
   router.replace({ query: { months: String(months.value), days: String(trendDays.value) } })
 }
 
+// Turns a typed or bookmarked window into a whole number inside [min, max];
+// empty or non-numeric input keeps the fallback (the current value).
+function clampWindow(raw: unknown, min: number, max: number, fallback: number): number {
+  const text = String(raw ?? '').trim()
+  const n = Number(text)
+  if (text === '' || !Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, Math.trunc(n)))
+}
+
 function readRangeQuery() {
   const q = route.query
-  if (q.months === '3' || q.months === '6' || q.months === '12') months.value = Number(q.months)
-  if (q.days === '30' || q.days === '90') trendDays.value = Number(q.days)
+  months.value = clampWindow(q.months, MIN_MONTHS, MAX_MONTHS, months.value)
+  trendDays.value = clampWindow(q.days, MIN_TREND_DAYS, MAX_TREND_DAYS, trendDays.value)
+}
+
+// Committed from the title fields on blur or Enter: out-of-range numbers are
+// clamped, so the field always ends up holding a valid window.
+function applyMonths() {
+  months.value = clampWindow(monthsInput.value, MIN_MONTHS, MAX_MONTHS, months.value)
+  monthsInput.value = String(months.value)
+}
+
+function applyDays() {
+  trendDays.value = clampWindow(daysInput.value, MIN_TREND_DAYS, MAX_TREND_DAYS, trendDays.value)
+  daysInput.value = String(trendDays.value)
+}
+
+// Custom steppers (AmountStepper) replace the native number spinner, like the
+// amount fields elsewhere. Each click commits at once, clamped to the window.
+function stepMonths(delta: number) {
+  const base = clampWindow(monthsInput.value, MIN_MONTHS, MAX_MONTHS, months.value)
+  monthsInput.value = String(base + delta)
+  applyMonths()
+}
+
+function stepDays(delta: number) {
+  const base = clampWindow(daysInput.value, MIN_TREND_DAYS, MAX_TREND_DAYS, trendDays.value)
+  daysInput.value = String(base + delta)
+  applyDays()
 }
 
 const loadAnalytics = async () => {
@@ -559,6 +616,9 @@ const loadAnalytics = async () => {
 let hydrating = false
 
 watch([months, trendDays], () => {
+  // Keep the title fields in sync when hydration reads a bookmarked range.
+  monthsInput.value = String(months.value)
+  daysInput.value = String(trendDays.value)
   if (hydrating) return
   syncRangeQuery()
   loadAnalytics()
@@ -580,10 +640,5 @@ onMounted(async () => {
 }
 .hover-row:hover {
   background-color: rgba(255, 255, 255, 0.04) !important;
-}
-
-.range-toggle :deep(.v-btn) {
-  min-width: unset !important;
-  padding: 0 12px !important;
 }
 </style>

@@ -62,6 +62,16 @@
           ></v-select>
 
           <v-alert
+            v-if="!categoryOptions.length && categoriesError"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+          >
+            Categories could not be loaded. Connect once and they will stay available offline.
+          </v-alert>
+
+          <v-alert
             v-if="error"
             type="error"
             variant="tonal"
@@ -105,7 +115,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import AmountStepper from '@/components/AmountStepper.vue'
-import { api } from '@/utils/api'
+import { api, fetchJson } from '@/utils/api'
+import { useAsyncData } from '@/composables/useAsyncData'
 import { useCurrencySymbol } from '@/utils/currency'
 import { fromDateInput, toDateInput, todayInput, formatDateTime } from '@/utils/date'
 import type { Category, Transaction } from '@/types'
@@ -140,7 +151,17 @@ const form = ref({
 })
 const submitting = ref(false)
 const error = ref('')
-const ownCategories = ref<Category[]>([])
+
+// Own copy of the categories, used when the parent does not pass its list (the
+// dashboard quick-add). It goes through the shared read cache, so opening the
+// dialog offline still shows the last known categories instead of nothing.
+const {
+  data: ownCategories,
+  error: categoriesError,
+  run: fetchCategories
+} = useAsyncData<Category[]>(signal => fetchJson<Category[]>('/categories', { signal }), [], {
+  cacheKey: '/categories'
+})
 
 const isEditing = computed(() => !!props.transaction)
 const isIncome = computed(() => props.type === 'INCOME')
@@ -166,15 +187,6 @@ const isValid = computed(() => {
   )
 })
 
-const fetchCategories = async () => {
-  try {
-    const res = await api('/categories')
-    if (res.ok) ownCategories.value = await res.json()
-  } catch (e) {
-    console.error(e)
-  }
-}
-
 const reset = () => {
   const tx = props.transaction
   form.value = {
@@ -186,7 +198,7 @@ const reset = () => {
   error.value = ''
   // Always refresh when the parent does not supply its own list, otherwise the
   // dropdown would stay frozen at whatever was fetched first.
-  if (!props.categories?.length) fetchCategories()
+  if (!props.categories?.length) void fetchCategories()
 }
 
 // The parent sets `transaction` before opening, so the form is ready by the time it shows.

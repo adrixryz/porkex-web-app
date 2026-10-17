@@ -69,9 +69,10 @@
             variant="outlined"
             aria-label="Filter by period"
           >
-            <v-btn value="week">This week</v-btn>
-            <v-btn value="month">This month</v-btn>
-            <v-btn value="all">All time</v-btn>
+            <v-btn value="day">Day</v-btn>
+            <v-btn value="week">Week</v-btn>
+            <v-btn value="month">Month</v-btn>
+            <v-btn value="year">Year</v-btn>
           </v-btn-toggle>
         </v-col>
       </v-row>
@@ -301,8 +302,9 @@ import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
 import { api, fetchJson } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
-import type { Category } from '@/types'
+import type { Category, PeriodFilter } from '@/types'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
+import { getDefaultPeriod } from '@/utils/preferences'
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, toDateOnly } from '@/utils/date'
 import {
   mdiCheck,
@@ -322,9 +324,15 @@ const editingId = ref<number | null>(null)
 const submitting = ref(false)
 const filterType = ref('EXPENSE')
 const filterLabel = computed(() => (filterType.value === 'INCOME' ? 'income' : 'expense'))
-const period = ref('week')
+const period = ref<PeriodFilter>(getDefaultPeriod())
 const periodLabel = computed(() =>
-  period.value === 'week' ? 'this week' : period.value === 'month' ? 'this month' : 'all time'
+  period.value === 'day'
+    ? 'today'
+    : period.value === 'week'
+      ? 'this week'
+      : period.value === 'month'
+        ? 'this month'
+        : 'this year'
 )
 const catForm = ref({ name: '', type: 'EXPENSE', color: '#EA4335' })
 
@@ -338,12 +346,19 @@ const deleting = ref(false)
 // one to the full UTC day, so the totals match what the user sees.
 const categoriesUrl = () => {
   const params = new URLSearchParams()
-  if (period.value === 'week') {
+  const today = new Date()
+  if (period.value === 'day') {
+    params.set('from', toDateOnly(today))
+    params.set('to', toDateOnly(today))
+  } else if (period.value === 'week') {
     params.set('from', toDateOnly(startOfWeek()))
     params.set('to', toDateOnly(endOfWeek()))
   } else if (period.value === 'month') {
     params.set('from', toDateOnly(startOfMonth()))
     params.set('to', toDateOnly(endOfMonth()))
+  } else {
+    params.set('from', toDateOnly(new Date(today.getFullYear(), 0, 1)))
+    params.set('to', toDateOnly(new Date(today.getFullYear(), 11, 31)))
   }
   const qs = params.toString()
   return `/categories${qs ? `?${qs}` : ''}`

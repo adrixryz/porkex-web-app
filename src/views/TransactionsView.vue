@@ -619,6 +619,7 @@ import TransactionDialog from '@/components/TransactionDialog.vue'
 import { fetchJson, api } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { formatDate, formatDateOnly, parseDateOnly, startOfWeek, toDateOnly } from '@/utils/date'
+import { getDefaultPeriod } from '@/utils/preferences'
 import { textOn } from '@/utils/color'
 import type { Category, Transaction, TransactionsResponse } from '@/types'
 import { useDisplay } from 'vuetify'
@@ -663,7 +664,7 @@ const DEFAULT_PER_PAGE = 15
 const perPageOptions = [10, 15, 25, 50]
 const perPage = ref(DEFAULT_PER_PAGE)
 
-const periodMode = ref<'day' | 'week' | 'month' | 'year' | 'custom'>('week')
+const periodMode = ref<'day' | 'week' | 'month' | 'year' | 'custom'>(getDefaultPeriod())
 const offset = ref(0)
 const customFrom = ref('')
 const customTo = ref('')

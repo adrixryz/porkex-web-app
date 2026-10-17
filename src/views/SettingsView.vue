@@ -86,11 +86,32 @@
               @update:model-value="onCurrencyChange"
               class="mb-2"
             ></v-select>
-            <div class="text-caption text-on-surface-variant">
-              The symbol is only used for display: amounts are stored and added up as they are, with
-              no currency conversion. This choice is saved to your account, so it follows you to any
-              browser.
-            </div>
+            <v-select
+              v-model="defaultPeriod"
+              :items="periodOptions"
+              label="Default period"
+              :prepend-inner-icon="mdiCalendarRange"
+              :loading="savingPreferences"
+              @update:model-value="onDefaultPeriodChange"
+              class="mb-2"
+            ></v-select>
+            <v-select
+              v-model="weekStart"
+              :items="weekDayOptions"
+              label="First day of the week"
+              :prepend-inner-icon="mdiCalendarWeekBegin"
+              :loading="savingPreferences"
+              @update:model-value="onWeekStartChange"
+              class="mb-2"
+            ></v-select>
+            <v-select
+              v-model="decimalSeparator"
+              :items="separatorOptions"
+              label="Decimal separator"
+              :prepend-inner-icon="mdiDecimal"
+              :loading="savingPreferences"
+              @update:model-value="onDecimalSeparatorChange"
+            ></v-select>
           </v-card>
 
           <!-- SECURITY -->
@@ -194,12 +215,24 @@ const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
 import { useRouter } from 'vue-router'
 import { api, fetchJson, clearAuth, setUser, getUser } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
-import type { CurrencyOption, Profile } from '@/types'
+import type { CurrencyOption, DecimalSeparator, PeriodFilter, Profile, WeekDay } from '@/types'
 import { CURRENCIES, getCurrency, setCurrency, setCurrencyByCode } from '@/utils/currency'
+import {
+  applyPreferences,
+  getDecimalSeparator,
+  getDefaultPeriod,
+  getFirstDayOfWeek,
+  setDecimalSeparator,
+  setDefaultPeriod,
+  setFirstDayOfWeek
+} from '@/utils/preferences'
 import { formatDate } from '@/utils/date'
 import {
   mdiAccountOutline,
+  mdiCalendarRange,
+  mdiCalendarWeekBegin,
   mdiCurrencyUsd,
+  mdiDecimal,
   mdiEmailOutline,
   mdiEye,
   mdiEyeOff,
@@ -213,6 +246,35 @@ const currentCurrency = getCurrency()
 const selectedCurrency = ref<CurrencyOption>(
   CURRENCIES.find(c => c.code === currentCurrency.code) || CURRENCIES[0]
 )
+
+const periodOptions = [
+  { title: 'Day', value: 'day' },
+  { title: 'Week', value: 'week' },
+  { title: 'Month', value: 'month' },
+  { title: 'Year', value: 'year' }
+]
+
+const weekDayOptions = [
+  { title: 'Monday', value: 'MONDAY' },
+  { title: 'Tuesday', value: 'TUESDAY' },
+  { title: 'Wednesday', value: 'WEDNESDAY' },
+  { title: 'Thursday', value: 'THURSDAY' },
+  { title: 'Friday', value: 'FRIDAY' },
+  { title: 'Saturday', value: 'SATURDAY' },
+  { title: 'Sunday', value: 'SUNDAY' }
+]
+
+const separatorOptions = [
+  { title: 'Dot (1,234.56)', value: '.', label: 'dot' },
+  { title: 'Comma (1.234,56)', value: ',', label: 'comma' }
+]
+
+// The selects mirror the stored preferences; the setters ignore invalid values,
+// so re-reading after each change normalizes the model.
+const defaultPeriod = ref<PeriodFilter>(getDefaultPeriod())
+const weekStart = ref<WeekDay>(getFirstDayOfWeek())
+const decimalSeparator = ref<DecimalSeparator>(getDecimalSeparator())
+const savingPreferences = ref(false)
 
 const editName = ref('')
 const saving = ref(false)
@@ -239,7 +301,16 @@ const canSavePassword = computed(
     newPassword.value === confirmPassword.value
 )
 
-const EMPTY_PROFILE: Profile = { id: 0, name: '', email: '', currency: 'USD', createdAt: '' }
+const EMPTY_PROFILE: Profile = {
+  id: 0,
+  name: '',
+  email: '',
+  currency: 'USD',
+  defaultPeriod: 'week',
+  firstDayOfWeek: 'MONDAY',
+  decimalSeparator: '.',
+  createdAt: ''
+}
 
 const {
   data: profile,
@@ -259,6 +330,10 @@ function applyProfile(data: Profile) {
     const match = CURRENCIES.find(c => c.code === data.currency)
     if (match) selectedCurrency.value = match
   }
+  applyPreferences(data)
+  defaultPeriod.value = getDefaultPeriod()
+  weekStart.value = getFirstDayOfWeek()
+  decimalSeparator.value = getDecimalSeparator()
 }
 
 const loadProfile = async () => {
@@ -339,6 +414,64 @@ const onCurrencyChange = async (val: CurrencyOption | string | null) => {
     showSnack('Currency changed locally, but could not be saved.', 'error')
   }
   savingCurrency.value = false
+}
+
+// Same pattern as the currency: the three display preferences are applied
+// locally first (the whole app follows immediately, even offline), then
+// persisted to the account; a queued write is reported as such.
+async function savePreference(
+  payload: Record<string, string>,
+  savedMessage: string,
+  queuedMessage: string
+) {
+  savingPreferences.value = true
+  try {
+    const res = await api('/profile', { method: 'PUT', body: JSON.stringify(payload) })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      showSnack(data?.error || 'Could not save the preference.', 'error')
+    } else {
+      const data = (await res.json().catch(() => null)) as { queued?: boolean } | null
+      showSnack(data?.queued ? queuedMessage : savedMessage, data?.queued ? 'info' : 'success')
+    }
+  } catch (e) {
+    console.error(e)
+    showSnack('The preference changed on this device, but could not be saved.', 'error')
+  }
+  savingPreferences.value = false
+}
+
+const onDefaultPeriodChange = async (value: string | null) => {
+  setDefaultPeriod(value)
+  defaultPeriod.value = getDefaultPeriod()
+  const title = periodOptions.find(p => p.value === defaultPeriod.value)?.title ?? ''
+  await savePreference(
+    { defaultPeriod: defaultPeriod.value },
+    `Default period changed to ${title}`,
+    `Default period changed to ${title}; it will be saved when the connection is back.`
+  )
+}
+
+const onWeekStartChange = async (value: string | null) => {
+  setFirstDayOfWeek(value)
+  weekStart.value = getFirstDayOfWeek()
+  const title = weekDayOptions.find(d => d.value === weekStart.value)?.title ?? ''
+  await savePreference(
+    { firstDayOfWeek: weekStart.value },
+    `First day of the week changed to ${title}`,
+    `First day of the week changed to ${title}; it will be saved when the connection is back.`
+  )
+}
+
+const onDecimalSeparatorChange = async (value: string | null) => {
+  setDecimalSeparator(value)
+  decimalSeparator.value = getDecimalSeparator()
+  const label = separatorOptions.find(o => o.value === decimalSeparator.value)?.label ?? ''
+  await savePreference(
+    { decimalSeparator: decimalSeparator.value },
+    `Decimal separator changed to ${label}`,
+    `Decimal separator changed to ${label}; it will be saved when the connection is back.`
+  )
 }
 
 // A password change is never queued offline (see api.ts): it needs an

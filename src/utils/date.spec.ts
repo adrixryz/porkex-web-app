@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   startOfMonth,
   endOfMonth,
@@ -12,6 +12,7 @@ import {
   formatDate,
   formatDateOnly
 } from './date'
+import { setFirstDayOfWeek } from './preferences'
 
 const localYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -128,6 +129,32 @@ describe('startOfWeek / endOfWeek', () => {
     expect(d.getHours()).toBe(23)
     expect(d.getMinutes()).toBe(59)
     expect(d.getSeconds()).toBe(59)
+  })
+})
+
+describe('startOfWeek with a configured first day', () => {
+  afterEach(() => {
+    setFirstDayOfWeek('MONDAY')
+  })
+
+  it('anchors to Sunday when that is the first day', () => {
+    setFirstDayOfWeek('SUNDAY')
+    // 2024-01-15 is a Monday; its Sunday-anchored week is 2024-01-14..01-20.
+    expect(localYmd(startOfWeek(new Date(2024, 0, 15)))).toBe('2024-01-14')
+    expect(localYmd(endOfWeek(new Date(2024, 0, 15)))).toBe('2024-01-20')
+  })
+
+  it('a Saturday belongs to the week that started the Saturday before', () => {
+    setFirstDayOfWeek('SATURDAY')
+    // 2024-01-15 is a Monday; the week starts 2024-01-13 (a Saturday).
+    expect(localYmd(startOfWeek(new Date(2024, 0, 15)))).toBe('2024-01-13')
+    expect(localYmd(endOfWeek(new Date(2024, 0, 15)))).toBe('2024-01-19')
+  })
+
+  it('a day that is itself the first day opens its own week', () => {
+    setFirstDayOfWeek('WEDNESDAY')
+    // 2024-01-17 is a Wednesday.
+    expect(localYmd(startOfWeek(new Date(2024, 0, 17)))).toBe('2024-01-17')
   })
 })
 

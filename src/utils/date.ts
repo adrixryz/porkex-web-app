@@ -1,3 +1,5 @@
+import { weekStartIndex } from './preferences'
+
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n))
 
 // Calendar dates travel as 'YYYY-MM-DD' strings end to end. The backend stores
@@ -85,11 +87,11 @@ export function endOfMonth(date = new Date()): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
 }
 
-// Weeks start on Monday (ISO-8601), not on Sunday.
+// Weeks start on the user's configured first day (Monday by default, ISO-8601).
 export function startOfWeek(date = new Date()): Date {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const daysSinceMonday = (d.getDay() + 6) % 7
-  d.setDate(d.getDate() - daysSinceMonday)
+  const daysSinceFirst = (d.getDay() - weekStartIndex() + 7) % 7
+  d.setDate(d.getDate() - daysSinceFirst)
   return d
 }
 

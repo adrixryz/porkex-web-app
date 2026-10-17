@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   CURRENCIES,
   getCurrency,
@@ -8,6 +8,7 @@ import {
   currencySymbol,
   getCurrencyCode
 } from './currency'
+import { setDecimalSeparator } from './preferences'
 
 beforeEach(() => {
   localStorage.clear()
@@ -42,6 +43,19 @@ describe('formatMoney', () => {
 
   it('handles negative balances', () => {
     expect(formatMoney(-42.5)).toBe('-42.50')
+  })
+})
+
+describe('formatMoney with a comma decimal separator', () => {
+  afterEach(() => {
+    setDecimalSeparator('.')
+  })
+
+  it('writes the decimal comma and groups with dots', () => {
+    setDecimalSeparator(',')
+    expect(formatMoney(10)).toBe('10,00')
+    expect(formatMoney(1234.5)).toBe('1.234,50')
+    expect(formatMoney(-42.5)).toBe('-42,50')
   })
 })
 

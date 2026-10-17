@@ -93,6 +93,7 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi, setToken, setUser } from '@/utils/api'
 import { setCurrencyByCode } from '@/utils/currency'
+import { applyPreferences } from '@/utils/preferences'
 import type { AuthResponse } from '@/types'
 import { mdiAccountOutline, mdiEmailOutline, mdiEye, mdiEyeOff, mdiLockOutline } from '@mdi/js'
 
@@ -138,9 +139,11 @@ const submit = async () => {
     if (res.ok && data) {
       setToken(data.token)
       setUser(data.user)
-      // The currency travels with the account: this is what makes it follow the
-      // user to another browser, instead of staying on this device only.
+      // The currency and the display preferences travel with the account: this
+      // is what makes them follow the user to another browser, instead of
+      // staying on this device only.
       setCurrencyByCode(data.user?.currency)
+      applyPreferences(data.user ?? {})
       router.push('/')
     } else {
       error.value = data?.error || 'Something went wrong.'

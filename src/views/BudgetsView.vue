@@ -325,6 +325,7 @@ import { useSnackbar } from '@/composables/useSnackbar'
 import { api, fetchJson } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { todayInput } from '@/utils/date'
+import { getFirstDayOfWeek } from '@/utils/preferences'
 import type { Budget, BudgetPeriod, BudgetsResponse, Category } from '@/types'
 import {
   mdiClose,
@@ -344,7 +345,8 @@ const period = ref<BudgetPeriod>('MONTH')
 
 // `today` anchors the weekly/monthly window to the user's own calendar day:
 // the backend computes the range in UTC but starts from this day, so the
-// budget no longer rolls over mid-evening on a device west of UTC.
+// budget no longer rolls over mid-evening on a device west of UTC. `weekStart`
+// anchors the weekly window to the configured first day of the week.
 const {
   data,
   loading,
@@ -352,11 +354,15 @@ const {
   run: fetchBudgets
 } = useAsyncData<BudgetsResponse>(
   signal =>
-    fetchJson<BudgetsResponse>(`/budgets?period=${period.value}&today=${todayInput()}`, { signal }),
+    fetchJson<BudgetsResponse>(
+      `/budgets?period=${period.value}&today=${todayInput()}&weekStart=${getFirstDayOfWeek()}`,
+      { signal }
+    ),
   EMPTY_BUDGETS,
   // `today` is only in the request, not the cache key: yesterday's numbers are
-  // still worth showing offline, under the stale banner.
-  { cacheKey: () => `/budgets?period=${period.value}` }
+  // still worth showing offline, under the stale banner. The week start does
+  // change the numbers, so it stays in the key.
+  { cacheKey: () => `/budgets?period=${period.value}&weekStart=${getFirstDayOfWeek()}` }
 )
 
 const budgets = computed(() => data.value.budgets)

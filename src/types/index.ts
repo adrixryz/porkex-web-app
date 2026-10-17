@@ -3,6 +3,14 @@
 
 export type TxType = 'INCOME' | 'EXPENSE'
 
+/** The period filters the transactions and categories screens offer. */
+export type PeriodFilter = 'day' | 'week' | 'month' | 'year'
+
+export type WeekDay =
+  'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
+
+export type DecimalSeparator = '.' | ','
+
 export interface Category {
   id: number
   name: string
@@ -40,6 +48,9 @@ export interface User {
   name: string
   email: string
   currency?: string
+  defaultPeriod?: PeriodFilter
+  firstDayOfWeek?: WeekDay
+  decimalSeparator?: DecimalSeparator
 }
 
 export interface Profile {
@@ -47,6 +58,9 @@ export interface Profile {
   name: string
   email: string
   currency: string
+  defaultPeriod: PeriodFilter
+  firstDayOfWeek: WeekDay
+  decimalSeparator: DecimalSeparator
   createdAt: string
 }
 

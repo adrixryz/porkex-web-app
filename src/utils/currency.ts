@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { getDecimalSeparator, usePreferencesVersion } from './preferences'
 
 const CURRENCY_KEY = 'porkex_currency'
 const CURRENCY_EVENT = 'porkex-currency-change'
@@ -53,8 +54,14 @@ export function setCurrencyByCode(code?: string | null) {
 }
 
 export function formatMoney(value: unknown): string {
+  // Reading the shared version subscribes the render effect calling this, so a
+  // view showing an amount repaints when the decimal separator changes.
+  void usePreferencesVersion().value
   const n = typeof value === 'number' && Number.isFinite(value) ? value : 0
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // The locale picks both conventions at once: 'de-DE' groups with dots and
+  // writes the decimal comma the user asked for.
+  const locale = getDecimalSeparator() === ',' ? 'de-DE' : 'en-US'
+  return n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 // Reactive composable: updates when the currency changes (same tab or another).

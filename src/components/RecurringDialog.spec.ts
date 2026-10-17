@@ -149,9 +149,22 @@ describe('RecurringDialog form', () => {
     form.amount = '25'
     form.description = 'Rent'
     form.categoryId = 1
-    form.interval = 3
+    form.interval = '3'
     await nextTick()
     expect(unwrap(vm.isValid as boolean)).toBe(true)
+
+    // The interval is typed: only whole numbers up to the API's maximum pass.
+    form.interval = '25'
+    await nextTick()
+    expect(unwrap(vm.isValid as boolean)).toBe(false)
+    form.interval = '1.5'
+    await nextTick()
+    expect(unwrap(vm.isValid as boolean)).toBe(false)
+    form.interval = '24'
+    await nextTick()
+    expect(unwrap(vm.isValid as boolean)).toBe(true)
+    form.interval = '3'
+    await nextTick()
 
     await vm.submit()
     await flushPromises()
@@ -183,7 +196,7 @@ describe('RecurringDialog form', () => {
 
     expect(form.description).toBe('Rent')
     expect(form.frequency).toBe('MONTH')
-    expect(form.interval).toBe(2)
+    expect(form.interval).toBe('2')
     // Stored dates are UTC midnights: the input must show that same day.
     expect(form.startDate).toBe('2026-01-31')
 

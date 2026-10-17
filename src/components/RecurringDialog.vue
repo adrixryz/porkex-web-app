@@ -85,11 +85,16 @@
               ></v-select>
             </v-col>
             <v-col cols="5">
-              <v-select
+              <v-text-field
                 v-model="form.interval"
-                :items="intervalItems"
+                type="number"
+                inputmode="numeric"
+                :min="1"
+                :max="MAX_INTERVAL"
+                step="1"
+                hide-spin-buttons
                 :label="`Every (${unitLabel(form.frequency)})`"
-              ></v-select>
+              ></v-text-field>
             </v-col>
           </v-row>
 
@@ -188,7 +193,7 @@ const form = ref({
   description: '',
   categoryId: null as number | null,
   frequency: 'MONTH' as RecurringFrequency,
-  interval: 1,
+  interval: '1',
   startDate: todayInput(),
   endDate: ''
 })
@@ -210,21 +215,28 @@ const isIncome = computed(() => form.value.type === 'INCOME')
 const categoryOptions = computed(() => categories.value.filter(c => c.type === form.value.type))
 
 const frequencyOptions = [
+  { title: 'Daily', value: 'DAY' },
   { title: 'Weekly', value: 'WEEK' },
   { title: 'Monthly', value: 'MONTH' },
   { title: 'Yearly', value: 'YEAR' }
 ]
 
-const intervalItems = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+// The interval is typed, not picked: whole numbers from 1 up to the API's own
+// maximum (MAX_RECURRING_INTERVAL on the backend).
+const MAX_INTERVAL = 24
 
 const startsInPast = computed(() => !!form.value.startDate && form.value.startDate < todayInput())
 
 const isValid = computed(() => {
   const amount = Number(form.value.amount)
+  const interval = Number(form.value.interval)
   const endOk = !form.value.endDate || form.value.endDate >= form.value.startDate
   return (
     Number.isFinite(amount) &&
     amount > 0 &&
+    Number.isInteger(interval) &&
+    interval >= 1 &&
+    interval <= MAX_INTERVAL &&
     !!form.value.description.trim() &&
     !!form.value.startDate &&
     form.value.categoryId !== null &&
@@ -255,7 +267,7 @@ const reset = () => {
     description: rule?.description ?? '',
     categoryId: rule?.categoryId ?? null,
     frequency: rule?.frequency ?? 'MONTH',
-    interval: rule?.interval ?? 1,
+    interval: String(rule?.interval ?? 1),
     startDate: rule ? toDateInput(rule.startDate) : todayInput(),
     endDate: rule?.endDate ? toDateInput(rule.endDate) : ''
   }
@@ -301,7 +313,7 @@ const submit = async () => {
         description: form.value.description.trim(),
         categoryId: form.value.categoryId,
         frequency: form.value.frequency,
-        interval: form.value.interval,
+        interval: Number(form.value.interval),
         startDate: fromDateInput(form.value.startDate),
         endDate: form.value.endDate ? fromDateInput(form.value.endDate) : null
       })

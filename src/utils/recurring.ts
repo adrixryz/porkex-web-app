@@ -1,6 +1,7 @@
 import type { RecurringFrequency } from '@/types'
 
 const UNITS: Record<RecurringFrequency, [one: string, many: string]> = {
+  DAY: ['day', 'days'],
   WEEK: ['week', 'weeks'],
   MONTH: ['month', 'months'],
   YEAR: ['year', 'years']

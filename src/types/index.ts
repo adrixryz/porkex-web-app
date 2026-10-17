@@ -170,7 +170,7 @@ export interface BudgetsResponse {
   totals: BudgetTotals[]
 }
 
-export type RecurringFrequency = 'WEEK' | 'MONTH' | 'YEAR'
+export type RecurringFrequency = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'
 
 export interface RecurringRule {
   id: number

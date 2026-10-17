@@ -208,6 +208,12 @@ async function sendQueued(mutation: QueuedMutation, session: Session): Promise<R
       recordRecurringState(response, session)
       if (response.ok || (mutation.method === 'DELETE' && response.status === 404)) {
         confirmedWrite(mutation.path, false)
+        if (mutation.method === 'DELETE')
+          window.dispatchEvent(
+            new CustomEvent('porkex-delete-confirmed', {
+              detail: { userId: session.userId, path: mutation.path }
+            })
+          )
       }
     }
     return response

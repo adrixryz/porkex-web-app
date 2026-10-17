@@ -198,7 +198,7 @@
                     >
                   </div>
                 </div>
-                <template v-for="(tx, i) in db.recentTransactions" :key="tx.id">
+                <template v-for="(tx, i) in visibleRecent" :key="tx.id">
                   <v-list-item class="px-6 py-3 hover-item">
                     <TransactionSummary :transaction="tx" />
                   </v-list-item>
@@ -314,6 +314,7 @@
 <script setup lang="ts">
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed } from 'vue'
+import { hiddenTransactionIds } from '@/utils/undoDelete'
 import TransactionSummary from '@/components/TransactionSummary.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
@@ -377,6 +378,10 @@ const { data: budgets, run: fetchBudgets } = useAsyncData<BudgetsResponse>(
   signal => fetchJson<BudgetsResponse>(`/budgets?period=MONTH&today=${todayInput()}`, { signal }),
   { budgets: [], totals: [] },
   { cacheKey: '/budgets?period=MONTH' }
+)
+
+const visibleRecent = computed(() =>
+  db.value.recentTransactions.filter(tx => !hiddenTransactionIds.value.has(tx.id))
 )
 
 const monthBudgets = computed(() => budgets.value.budgets)

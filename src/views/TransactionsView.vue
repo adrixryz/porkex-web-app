@@ -567,12 +567,13 @@ import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAsyncData } from '@/composables/useAsyncData'
+import { scheduleDelete, hiddenTransactionIds } from '@/utils/undoDelete'
 import TransactionSummary from '@/components/TransactionSummary.vue'
 import TagChips from '@/components/TagChips.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AmountStepper from '@/components/AmountStepper.vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
-import { fetchJson, api, isQueuedResponse } from '@/utils/api'
+import { fetchJson } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { formatDate, formatDateOnly, parseDateOnly, startOfWeek, toDateOnly } from '@/utils/date'
 import { getDefaultPeriod } from '@/utils/preferences'
@@ -670,7 +671,9 @@ const { data: categories, run: fetchCategories } = useAsyncData<Category[]>(
   { cacheKey: '/categories' }
 )
 
-const transactions = computed(() => list.value?.items ?? [])
+const transactions = computed(() =>
+  (list.value?.items ?? []).filter(tx => !hiddenTransactionIds.value.has(tx.id))
+)
 const totalPages = computed(() => list.value?.totalPages ?? 1)
 
 const categoryOptions = computed(() =>
@@ -943,15 +946,9 @@ const doDelete = async () => {
   if (!deletingTx.value) return
   deleting.value = true
   try {
-    const res = await api(`/transactions/${deletingTx.value.id}`, { method: 'DELETE' })
-    if (res.ok) {
-      showSnack(...mutationFeedback(isQueuedResponse(res), 'Transaction deleted!'))
-      deleteDialog.value = false
-      deletingTx.value = null
-    } else {
-      const data = await res.json().catch(() => null)
-      showSnack(data?.error || 'Failed to delete transaction.', 'error')
-    }
+    await scheduleDelete(deletingTx.value)
+    deleteDialog.value = false
+    deletingTx.value = null
   } catch (e) {
     console.error(e)
     showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')

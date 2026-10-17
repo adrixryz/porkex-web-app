@@ -201,3 +201,5 @@ physical Android device. Those checks remain manual after your review/deploy.
 La matriz de los 23 puntos y sus límites de validación está en [RELIABILITY_REVIEW.md](RELIABILITY_REVIEW.md).
 
 Tags are managed from Edit tags inside movement dialogs: create, rename, confirm global deletion and drag the handle (or use arrow keys) to save manual order. Movements allow 0–5 tags and an optional Comment. The desktop table and shared compact summary render the same catalog; pending catalog operations remain available offline. The API still accepts legacy description payloads.
+
+Deleting a movement offers Deshacer for 8 seconds. Scheduled deletions are stored separately until expiry, grouped while the window is open, and then copied idempotently into the normal outbox under Web Locks. Navigation, reload and offline recovery preserve them; no replacement movement is created. Confirmed totals refresh after the actual DELETE.

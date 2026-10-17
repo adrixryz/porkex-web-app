@@ -116,8 +116,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import AmountStepper from '@/components/AmountStepper.vue'
-import { api, fetchJson } from '@/utils/api'
+import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useCurrencySymbol } from '@/utils/currency'
 import { fromDateInput, toDateInput, todayInput, formatDateTime } from '@/utils/date'
@@ -140,7 +141,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'saved', payload: { isEditing: boolean }): void
+  (e: 'saved', payload: { isEditing: boolean; queued: boolean }): void
 }>()
 
 const cs = useCurrencySymbol()
@@ -153,6 +154,12 @@ const form = ref({
 })
 const submitting = ref(false)
 const error = ref('')
+const clientId = ref('')
+const cleanForm = ref('')
+useUnsavedChanges(
+  () => props.modelValue && JSON.stringify(form.value) !== cleanForm.value,
+  () => submitting.value
+)
 
 // Own copy of the categories, used when the parent does not pass its list (the
 // dashboard quick-add). It goes through the shared read cache, so opening the
@@ -190,6 +197,7 @@ const isValid = computed(() => {
 })
 
 const reset = () => {
+  clientId.value = crypto.randomUUID()
   const tx = props.transaction
   form.value = {
     amount: tx ? String(tx.amount) : '',
@@ -197,6 +205,7 @@ const reset = () => {
     categoryId: tx?.categoryId ?? null,
     date: tx ? toDateInput(tx.date) : todayInput()
   }
+  cleanForm.value = JSON.stringify(form.value)
   error.value = ''
   // Always refresh when the parent does not supply its own list, otherwise the
   // dropdown would stay frozen at whatever was fetched first.
@@ -234,6 +243,7 @@ const submit = async () => {
     const res = await api(url, {
       method,
       body: JSON.stringify({
+        ...(!isEditing.value ? { clientId: clientId.value } : {}),
         ...form.value,
         description: form.value.description.trim(),
         type: props.type,
@@ -242,7 +252,7 @@ const submit = async () => {
     })
 
     if (res.ok) {
-      emit('saved', { isEditing: isEditing.value })
+      emit('saved', { isEditing: isEditing.value, queued: isQueuedResponse(res) })
       close()
     } else {
       const data = await res.json().catch(() => null)
@@ -250,7 +260,7 @@ const submit = async () => {
     }
   } catch (e) {
     console.error(e)
-    error.value = 'Connection error. Is the server running?'
+    error.value = e instanceof Error ? e.message : 'Could not save the change.'
   } finally {
     submitting.value = false
   }

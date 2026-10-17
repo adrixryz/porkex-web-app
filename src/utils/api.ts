@@ -187,9 +187,9 @@ export function isQueuedResponse(response: Response): boolean {
   return response.status === 202
 }
 
-function confirmedWrite(path: string) {
+function confirmedWrite(path: string, notify = true) {
   invalidateCache(...WRITE_INVALIDATES, ...(path === '/profile' ? ['/profile'] : []))
-  requestRevalidation()
+  if (notify) requestRevalidation()
 }
 
 async function sendQueued(mutation: QueuedMutation, session: Session): Promise<Response> {
@@ -206,7 +206,7 @@ async function sendQueued(mutation: QueuedMutation, session: Session): Promise<R
     else if (isCurrent(session)) {
       recordRecurringState(response, session)
       if (response.ok || (mutation.method === 'DELETE' && response.status === 404)) {
-        confirmedWrite(mutation.path)
+        confirmedWrite(mutation.path, false)
       }
     }
     return response
@@ -302,39 +302,42 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
     return queuedResponse()
   }
 
-  return withSendLock(userId, async () => {
-    assertCurrent(session)
-    await verifyLegacyOwner(session)
-    const flushed = await drainOutbox(
-      userId,
-      m => sendQueued(m, session),
-      () => isCurrent(session)
-    )
-    assertCurrent(session)
-    if (flushed.stopped !== 'empty') {
-      if (!queueable) throw new Error('Sync your pending changes before changing the password.')
-      return savePending()
-    }
-    activeWrites.value += 1
-    let response: Response
-    try {
-      response = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        method,
-        body: body ?? undefined,
-        signal: withTimeout(options.signal, WRITE_TIMEOUT_MS),
-        headers: requestHeaders(session, options.headers, timeZone)
-      })
-    } catch (error) {
-      if (!queueable || !isNetworkFailure(error)) throw error
-      return await savePending(true)
-    } finally {
-      activeWrites.value -= 1
-    }
-    const handled = handleResponse(response, session)
-    if (response.ok) confirmedWrite(path)
-    return handled
-  })
+  activeWrites.value += 1
+  try {
+    return await withSendLock(userId, async () => {
+      assertCurrent(session)
+      await verifyLegacyOwner(session)
+      const flushed = await drainOutbox(
+        userId,
+        m => sendQueued(m, session),
+        () => isCurrent(session)
+      )
+      if (flushed.sent > 0 && isCurrent(session)) requestRevalidation()
+      assertCurrent(session)
+      if (flushed.stopped !== 'empty') {
+        if (!queueable) throw new Error('Sync your pending changes before changing the password.')
+        return savePending()
+      }
+      let response: Response
+      try {
+        response = await fetch(`${API_BASE}${path}`, {
+          ...options,
+          method,
+          body: body ?? undefined,
+          signal: withTimeout(options.signal, WRITE_TIMEOUT_MS),
+          headers: requestHeaders(session, options.headers, timeZone)
+        })
+      } catch (error) {
+        if (!queueable || !isNetworkFailure(error)) throw error
+        return await savePending(true)
+      }
+      const handled = handleResponse(response, session)
+      if (response.ok) confirmedWrite(path)
+      return handled
+    })
+  } finally {
+    activeWrites.value -= 1
+  }
 }
 
 let synchronizing: Promise<void> | null = null
@@ -347,11 +350,12 @@ export function syncPendingWrites(): Promise<void> {
   synchronizing = withSendLock(userId, async () => {
     if (!isCurrent(session)) return
     await verifyLegacyOwner(session)
-    await drainOutbox(
+    const flushed = await drainOutbox(
       userId,
       m => sendQueued(m, session),
       () => isCurrent(session)
     )
+    if (flushed.sent > 0 && isCurrent(session)) requestRevalidation()
   }).finally(() => {
     synchronizing = null
   })
@@ -360,7 +364,10 @@ export function syncPendingWrites(): Promise<void> {
 
 export async function readJson<T>(response: Response): Promise<T> {
   const data = (await response.json().catch(() => null)) as ({ error?: string } & T) | null
-  if (!response.ok) throw new Error(data?.error || `Request failed (${response.status})`)
+  if (!response.ok)
+    throw Object.assign(new Error(data?.error || `Request failed (${response.status})`), {
+      status: response.status
+    })
   return data as T
 }
 

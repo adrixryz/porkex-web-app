@@ -196,6 +196,10 @@
           <p class="text-h6 font-weight-medium mb-2">Log out?</p>
           <p class="text-body-2 text-on-surface-variant mb-6">
             You'll need to sign in again to see your transactions.
+            <span v-if="pendingCount > 0">
+              Your {{ pendingCount }} pending change(s) will stay on this device and sync when you
+              sign in to the same account.</span
+            >
           </p>
           <div class="d-flex ga-3 justify-center">
             <v-btn variant="outlined" rounded="pill" @click="logoutDialog = false">Cancel</v-btn>
@@ -208,7 +212,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { pendingCount } from '@/utils/outbox'
 import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
 import { useRouter } from 'vue-router'
@@ -337,9 +343,27 @@ function applyProfile(data: Profile) {
 
 const loadProfile = async () => {
   const data = await fetchProfile()
-  if (data) applyProfile(data)
+  if (data && pendingCount.value === 0) applyProfile(data)
+  else if (data) editName.value = getUser()?.name ?? data.name
   else if (profileError.value) showSnack(profileError.value, 'error')
 }
+
+// Background refresh must not replace an unfinished edit or an offline choice.
+watch(profile, (data, previous) => {
+  if (!data.id || pendingCount.value > 0) return
+  if (!editName.value || editName.value === previous.name) editName.value = data.name
+  if (!savingCurrency.value && !savingPreferences.value) {
+    setCurrencyByCode(data.currency)
+    selectedCurrency.value =
+      CURRENCIES.find(c => c.code === data.currency) ?? selectedCurrency.value
+    applyPreferences(data)
+    defaultPeriod.value = getDefaultPeriod()
+    weekStart.value = getFirstDayOfWeek()
+    decimalSeparator.value = getDecimalSeparator()
+  }
+  const current = getUser()
+  if (current && current.name !== data.name) setUser({ ...current, name: data.name })
+})
 
 const updateProfile = async () => {
   const cleanName = editName.value.trim()
@@ -357,7 +381,8 @@ const updateProfile = async () => {
       // locally and the user is told it will sync later.
       const data = (await res.json().catch(() => null)) as (Profile & { queued?: boolean }) | null
       if (data?.queued) {
-        applyProfile({ ...profile.value, name: cleanName })
+        profile.value = { ...profile.value, name: cleanName }
+        editName.value = cleanName
         const currentUser = getUser()
         if (currentUser) setUser({ ...currentUser, name: cleanName })
         showSnack('You are offline: the change will be saved when the connection is back.', 'info')
@@ -376,7 +401,7 @@ const updateProfile = async () => {
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error. Is the server running?', 'error')
+    showSnack(e instanceof Error ? e.message : 'Could not save the profile.', 'error')
   }
   saving.value = false
 }
@@ -510,5 +535,13 @@ const logout = () => {
   router.push('/login')
 }
 
+useUnsavedChanges(
+  () =>
+    editName.value !== profile.value.name ||
+    !!currentPassword.value ||
+    !!newPassword.value ||
+    !!confirmPassword.value,
+  () => saving.value || savingCurrency.value || savingPreferences.value || savingPassword.value
+)
 onMounted(loadProfile)
 </script>

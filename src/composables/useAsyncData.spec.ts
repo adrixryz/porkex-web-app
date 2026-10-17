@@ -1,9 +1,13 @@
-import { describe, expect, it, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { requestRevalidation } from '@/utils/revalidation'
+import { setToken } from '@/utils/api'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { defineComponent, h, nextTick } from 'vue'
 import { useAsyncData } from './useAsyncData'
 import { writeCache } from '@/utils/cache'
 import { hasStaleData, resetConnection } from '@/utils/connection'
+
+enableAutoUnmount(afterEach)
 
 // A promise the test resolves by hand, so "the server is taking forever" can be
 // observed instead of raced against a timer.
@@ -232,4 +236,117 @@ describe('the stale banner is owned per view', () => {
 
     expect(api.error.value).toBe('The server took too long to answer.')
   })
+})
+
+describe('query identity and recovery regressions', () => {
+  it('uses the new filter cache even after a successful previous filter', async () => {
+    let key = '/week'
+    let next = Promise.resolve({ total: 100 })
+    const { api } = mountUser(() => next, { total: 0 }, { cacheKey: () => key })
+    await nextTick()
+    await nextTick()
+    writeCache('/month', { total: 999 })
+    key = '/month'
+    const d = deferred<{ total: number }>()
+    next = d.promise
+    const run = api.run()
+    expect(api.data.value).toEqual({ total: 999 })
+    expect(api.isStale.value).toBe(true)
+    expect(api.loading.value).toBe(false)
+    d.reject(new TypeError('offline'))
+    await run
+    expect(api.data.value).toEqual({ total: 999 })
+  })
+
+  it('never paints the previous filter under a new label with no cache', async () => {
+    let key = '/a'
+    let next = Promise.resolve('A rows')
+    const { api } = mountUser(() => next, 'empty', { cacheKey: () => key })
+    await nextTick()
+    await nextTick()
+    key = '/b'
+    const d = deferred<string>()
+    next = d.promise
+    const run = api.run()
+    expect(api.data.value).toBe('empty')
+    expect(api.loading.value).toBe(true)
+    d.reject(new TypeError('offline'))
+    await run
+    expect(api.data.value).toBe('empty')
+  })
+
+  it('marks a previously fresh response stale after a failed refresh', async () => {
+    let fail = false
+    const { api } = mountUser(
+      async () => {
+        if (fail) throw new TypeError('offline')
+        return 42
+      },
+      0,
+      { cacheKey: '/same' }
+    )
+    await nextTick()
+    await nextTick()
+    fail = true
+    await api.run()
+    expect(api.data.value).toBe(42)
+    expect(api.isStale.value).toBe(true)
+    expect(hasStaleData.value).toBe(true)
+    expect(api.loading.value).toBe(false)
+  })
+
+  it('revalidates the existing component without remounting or hiding it', async () => {
+    let calls = 0
+    const { api, wrapper } = mountUser(async () => ++calls, 0, { cacheKey: '/live' })
+    await nextTick()
+    await nextTick()
+    requestRevalidation()
+    await nextTick()
+    await nextTick()
+    await nextTick()
+    expect(api.data.value).toBe(2)
+    expect(wrapper.text()).toBe('2')
+    expect(api.loading.value).toBe(false)
+  })
+
+  it('ignores responses after unmount and after a session replacement', async () => {
+    const first = deferred<string>()
+    const a = mountUser(() => first.promise, '', { cacheKey: '/old-unmounted' })
+    a.wrapper.unmount()
+    first.resolve('old private data')
+    await nextTick()
+    await nextTick()
+    expect(localStorage.getItem('porkex_cache')).toBeNull()
+    const second = deferred<string>()
+    const b = mountUser(() => second.promise, '', { cacheKey: '/old-session' })
+    setToken('another-session')
+    second.resolve('old account data')
+    await nextTick()
+    await nextTick()
+    expect(b.api.data.value).toBe('')
+    expect(localStorage.getItem('porkex_cache')).toBeNull()
+  })
+})
+
+it('retries transient failures but does not schedule permanent validation failures', async () => {
+  const failed = vi.fn()
+  window.addEventListener('porkex-read-failed', failed)
+  try {
+    const { api } = mountUser(async () => {
+      throw Object.assign(new Error('Invalid filter'), { status: 400 })
+    }, '')
+    await nextTick()
+    await nextTick()
+    expect(api.error.value).toBe('Invalid filter')
+    expect(failed).not.toHaveBeenCalled()
+    const transient = mountUser(async () => {
+      throw Object.assign(new Error('Unavailable'), { status: 503 })
+    }, '')
+    await nextTick()
+    await nextTick()
+    expect(transient.api.error.value).toBe('Unavailable')
+    expect(failed).toHaveBeenCalledOnce()
+  } finally {
+    window.removeEventListener('porkex-read-failed', failed)
+  }
 })

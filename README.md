@@ -77,12 +77,23 @@ response is lost, the replay carries the same id and the backend returns the
 existing row instead of writing a second one. Generating the id at flush time
 would let that duplicate through.
 
-A queued write older than seven days is dropped on the next flush, and every
-drop — rejected by the server or expired — raises a warning banner instead of
-disappearing without a word. Only one tab replays the queue at a time: a
-short-lived lock in `localStorage` keeps two tabs from racing each other. A
-request that hangs past 45 seconds is treated as "never reached the server":
-reads fall back to the cache and writes are queued.
+Pending changes are kept until confirmed or explicitly discarded. Web Locks
+serialize all writes across tabs, while a separate short lock protects changes
+to the stored queue. Every replay re-reads storage and updates only its own ID.
+Older changes are sent first. A rejected operation blocks later changes and the
+existing warning offers Retry/Discard; only DELETE treats 404 as completed.
+
+A 202 means saved on this device, pending synchronization. Failed persistence
+(quota, damaged storage, unavailable safe locking) keeps the form open and
+reports an error. Creates reuse the form's clientId on retry. Password changes
+are never queued. A 401 or logout keeps pending changes owned by their account;
+unverified older queues remain blocked until their original owner is verified.
+
+Confirmed direct writes and replays invalidate read caches and refresh visible
+queries without remounting forms. Filters load their own cache and obsolete
+responses cannot replace current data. Visible-app recovery groups resume and
+connection events, retries transient failures after 5/15/30/60 seconds, and
+checks for a changed local day or timezone without polling API data.
 
 A pending write is counted in a banner, not shown in the list: the table keeps
 showing what the server last confirmed.
@@ -134,6 +145,9 @@ black background in `pwa-assets.config.ts`).
   window in the backend, sent as `weekStart`); and the decimal separator only
   changes how amounts are rendered (`formatMoney`), never how they are stored or
   typed.
+- Requests include the browser IANA zone in `X-Porkex-Time-Zone`. An explicit
+  recurring pending/failed response warns that totals may be incomplete and
+  schedules recovery while the app is visible.
 - Recurring rules are the backend's job: it turns due occurrences into normal
   transactions, so this side only manages the rules (`/recurring`) and marks the
   movements they generated with a repeat icon in `TransactionsView`.

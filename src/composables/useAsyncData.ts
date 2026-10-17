@@ -2,6 +2,8 @@ import { ref, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
 import { readCache, writeCache } from '@/utils/cache'
 import { markFresh, markStale } from '@/utils/connection'
+import { DATA_REVALIDATE_EVENT } from '@/utils/revalidation'
+import { getSessionIdentity } from '@/utils/api'
 
 interface AsyncDataCore<T> {
   loading: Ref<boolean>
@@ -70,6 +72,14 @@ export function useAsyncData<T>(
   // reaches its own `finally`, and without this it would switch the spinner off
   // while this run is still in flight.
   let runId = 0
+  let started = false
+  let disposed = false
+  let running = false
+  let refreshAfter = false
+  let currentKey: string | undefined
+  let hasKey = false
+  let hasVisibleData = false
+  let savedAt = 0
 
   // The connection banner is global but owned per view: this is the token this
   // view registered when it painted from the cache (see utils/connection.ts).
@@ -89,41 +99,63 @@ export function useAsyncData<T>(
   }
 
   async function run(): Promise<T | null> {
+    if (disposed) return null
+    started = true
     const current = ++runId
     const cacheKey = resolveKey()
-
-    // Paint the cached copy before awaiting anything. This is the whole point:
-    // a cold API takes tens of seconds to answer and would otherwise leave the
-    // skeleton on screen the entire time.
-    let servedFromCache = false
-    if (cacheKey) {
+    const changed = !hasKey || currentKey !== cacheKey
+    if (changed) {
+      releaseStale()
+      currentKey = cacheKey
+      hasKey = true
+      hasLoaded.value = false
+      hasVisibleData = false
+      isStale.value = false
+      data.value = initial ?? null
+      savedAt = 0
+    }
+    if (cacheKey && !hasLoaded.value) {
       const cached = readCache<T>(cacheKey)
-      if (cached && !hasLoaded.value) {
+      if (cached) {
         data.value = cached.data
         isStale.value = true
-        servedFromCache = true
+        hasVisibleData = true
+        savedAt = cached.savedAt
         raiseStale(cached.savedAt)
       }
     }
-    loading.value = !servedFromCache
+    loading.value = !hasVisibleData
+    error.value = ''
 
     controller?.abort()
     const mine = new AbortController()
     controller = mine
+    running = true
+    // A previous account's response must never repopulate its cleared cache.
+    const session = getSessionIdentity()
 
     try {
       const result = await fetcher(mine.signal)
-      if (current !== runId) return null
+      if (current !== runId || session !== getSessionIdentity()) return null
       if (cacheKey) writeCache(cacheKey, result)
       data.value = result
       hasLoaded.value = true
+      hasVisibleData = true
+      savedAt = Date.now()
       isStale.value = false
       error.value = ''
       releaseStale()
+      window.dispatchEvent(new Event('porkex-read-fresh'))
       return result
     } catch (e) {
-      if (current !== runId || (e as Error)?.name === 'AbortError') return null
-      console.error(e)
+      if (
+        current !== runId ||
+        session !== getSessionIdentity() ||
+        (e as Error)?.name === 'AbortError'
+      )
+        return null
+      raiseStale(savedAt)
+      if (hasVisibleData) isStale.value = true
       // A failure with a cached copy on screen is not an error worth reporting:
       // the banner already says the data is old.
       if (!isStale.value) {
@@ -134,27 +166,46 @@ export function useAsyncData<T>(
               ? e.message
               : 'Something went wrong.'
       }
+      const status = (e as { status?: number })?.status
+      if (
+        status === undefined ||
+        status === 408 ||
+        status === 425 ||
+        status === 429 ||
+        status >= 500
+      )
+        window.dispatchEvent(new Event('porkex-read-failed'))
       return null
     } finally {
-      if (current === runId) loading.value = false
+      if (current === runId) {
+        loading.value = false
+        running = false
+        if (refreshAfter && !disposed) {
+          refreshAfter = false
+          void run()
+        }
+      }
     }
   }
 
+  const revalidate = () => {
+    if (!started || disposed) return
+    if (running) refreshAfter = true
+    else void run()
+  }
+  window.addEventListener(DATA_REVALIDATE_EVENT, revalidate)
+
   onUnmounted(() => {
+    disposed = true
+    ++runId
     controller?.abort()
+    window.removeEventListener(DATA_REVALIDATE_EVENT, revalidate)
     // Leaving a stale view releases only this view's banner owner; another
     // view may still be showing cached data.
     releaseStale()
   })
 
   if (options.immediate) {
-    const key = resolveKey()
-    const cached = key ? readCache<T>(key) : null
-    if (cached) {
-      data.value = cached.data
-      isStale.value = true
-      raiseStale(cached.savedAt)
-    }
     void run()
   }
 

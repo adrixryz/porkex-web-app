@@ -298,10 +298,12 @@
 </template>
 
 <script setup lang="ts">
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
-import { api, fetchJson } from '@/utils/api'
+import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { Category, PeriodFilter } from '@/types'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
@@ -336,6 +338,11 @@ const periodLabel = computed(() =>
         : 'this year'
 )
 const catForm = ref({ name: '', type: 'EXPENSE', color: '#EA4335' })
+const cleanForm = ref('')
+useUnsavedChanges(
+  () => dialog.value && JSON.stringify(catForm.value) !== cleanForm.value,
+  () => submitting.value
+)
 
 // Delete confirm
 const deleteDialog = ref(false)
@@ -414,6 +421,7 @@ const openDialog = () => {
   isEditing.value = false
   editingId.value = null
   catForm.value = { name: '', type: filterType.value, color: '#EA4335' }
+  cleanForm.value = JSON.stringify(catForm.value)
   dialog.value = true
 }
 
@@ -421,6 +429,7 @@ const editCat = (cat: Category) => {
   isEditing.value = true
   editingId.value = cat.id
   catForm.value = { name: cat.name, type: cat.type, color: cat.color || '#EA4335' }
+  cleanForm.value = JSON.stringify(catForm.value)
   dialog.value = true
 }
 
@@ -435,15 +444,19 @@ const submitCat = async () => {
     })
     if (res.ok) {
       dialog.value = false
-      showSnack(isEditing.value ? 'Category updated!' : 'Category created!', 'success')
-      await loadCategories()
+      showSnack(
+        ...mutationFeedback(
+          isQueuedResponse(res),
+          isEditing.value ? 'Category updated!' : 'Category created!'
+        )
+      )
     } else {
       const data = await res.json().catch(() => null)
       showSnack(data?.error || 'Failed', 'error')
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error. Is the server running?', 'error')
+    showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
   }
   submitting.value = false
 }
@@ -470,13 +483,14 @@ const doDelete = async () => {
       const data = await res.json().catch(() => null)
       const moved = data?.moved ?? 0
       showSnack(
-        moved > 0
-          ? `Category deleted, ${moved} movement${moved === 1 ? '' : 's'} moved.`
-          : 'Category deleted!',
-        'success'
+        ...mutationFeedback(
+          isQueuedResponse(res),
+          moved > 0
+            ? `Category deleted, ${moved} movement${moved === 1 ? '' : 's'} moved.`
+            : 'Category deleted!'
+        )
       )
       closeDelete()
-      await loadCategories()
     } else {
       const data = await res.json().catch(() => null)
       // The count shown in the dialog is scoped to the selected period, so the
@@ -491,7 +505,7 @@ const doDelete = async () => {
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error. Is the server running?', 'error')
+    showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
   }
   deleting.value = false
 }

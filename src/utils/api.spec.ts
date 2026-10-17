@@ -485,6 +485,7 @@ describe('ordered writes and session boundaries', () => {
 describe('confirmed synchronization and response metadata', () => {
   it('invalidates cached reads and asks active views to refresh after replay', async () => {
     await enqueue({ id: 'replay', userId: 1, method: 'PUT', path: '/profile', body: '{}' })
+    await enqueue({ id: 'replay-2', userId: 1, method: 'PUT', path: '/transactions/1', body: '{}' })
     writeCache('/dashboard', { balance: 10 })
     writeCache('/profile', { name: 'Old' })
     const revalidate = vi.fn()
@@ -496,7 +497,7 @@ describe('confirmed synchronization and response metadata', () => {
     await syncPendingWrites()
     await Promise.resolve()
     expect(JSON.parse(localStorage.getItem('porkex_cache')!)).toEqual({})
-    expect(revalidate).toHaveBeenCalled()
+    expect(revalidate).toHaveBeenCalledOnce()
     window.removeEventListener(DATA_REVALIDATE_EVENT, revalidate)
     vi.unstubAllGlobals()
   })
@@ -564,6 +565,26 @@ describe('confirmed synchronization and response metadata', () => {
     expect(activeWrites.value).toBe(0)
     vi.unstubAllGlobals()
   })
+})
+
+it('counts writes waiting for the send lock as active until they settle', async () => {
+  const waiting = deferred<Response>()
+  const started = deferred<void>()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      started.resolve()
+      return waiting.promise
+    })
+  )
+  const first = api('/transactions/1', { method: 'PUT', body: '{}' })
+  await started.promise
+  const second = api('/transactions/1', { method: 'PUT', body: '{}' })
+  expect(activeWrites.value).toBe(2)
+  waiting.resolve(new Response('{}'))
+  await Promise.all([first, second])
+  expect(activeWrites.value).toBe(0)
+  vi.unstubAllGlobals()
 })
 
 describe('legacy migration across app upgrades', () => {

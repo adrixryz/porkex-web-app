@@ -318,11 +318,13 @@
 </template>
 
 <script setup lang="ts">
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
 import AmountStepper from '@/components/AmountStepper.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useSnackbar } from '@/composables/useSnackbar'
-import { api, fetchJson } from '@/utils/api'
+import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { todayInput } from '@/utils/date'
 import { getFirstDayOfWeek } from '@/utils/preferences'
@@ -396,6 +398,11 @@ const editingBudget = ref<Budget | null>(null)
 const submitting = ref(false)
 const error = ref('')
 const form = ref({ categoryId: null as number | null, amount: '', period: 'MONTH' as BudgetPeriod })
+const cleanForm = ref('')
+useUnsavedChanges(
+  () => dialog.value && JSON.stringify(form.value) !== cleanForm.value,
+  () => submitting.value
+)
 
 const deleteDialog = ref(false)
 const deletingBudget = ref<Budget | null>(null)
@@ -406,7 +413,7 @@ const deleting = ref(false)
 const { data: categories } = useAsyncData<Category[]>(
   signal => fetchJson<Category[]>('/categories', { signal }),
   [],
-  { immediate: true }
+  { immediate: true, cacheKey: '/categories' }
 )
 
 // Categories without a budget for the period currently shown.
@@ -444,6 +451,7 @@ const openDialog = (budget?: Budget) => {
   form.value = budget
     ? { categoryId: budget.categoryId, amount: String(budget.amount), period: budget.period }
     : { categoryId: null, amount: '', period: period.value }
+  cleanForm.value = JSON.stringify(form.value)
   error.value = ''
   dialog.value = true
 }
@@ -468,15 +476,16 @@ const submit = async () => {
     })
     if (res.ok) {
       dialog.value = false
-      showSnack(editing ? 'Budget updated!' : 'Budget created!', 'success')
-      await fetchBudgets()
+      showSnack(
+        ...mutationFeedback(isQueuedResponse(res), editing ? 'Budget updated!' : 'Budget created!')
+      )
     } else {
       const data = await res.json().catch(() => null)
       error.value = data?.error || 'Could not save the budget.'
     }
   } catch (e) {
     console.error(e)
-    error.value = 'Connection error. Is the server running?'
+    error.value = e instanceof Error ? e.message : 'Could not save the change.'
   }
   submitting.value = false
 }
@@ -492,15 +501,14 @@ const doDelete = async () => {
   try {
     const res = await api(`/budgets/${deletingBudget.value.id}`, { method: 'DELETE' })
     if (res.ok) {
-      showSnack('Budget deleted!', 'success')
+      showSnack(...mutationFeedback(isQueuedResponse(res), 'Budget deleted!'))
       deleteDialog.value = false
-      await fetchBudgets()
     } else {
       showSnack('Could not delete the budget.', 'error')
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error. Is the server running?', 'error')
+    showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
   }
   deleting.value = false
 }

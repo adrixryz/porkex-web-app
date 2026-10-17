@@ -559,8 +559,15 @@ const lineOptions = {
 }
 
 // The range lives in the URL, so a view can be bookmarked and Back works.
-function syncRangeQuery() {
-  router.replace({ query: { months: String(months.value), days: String(trendDays.value) } })
+async function syncRangeQuery(mode: 'push' | 'replace' = 'replace') {
+  const query = { months: String(months.value), days: String(trendDays.value) }
+  if (
+    Object.keys(route.query).length === 2 &&
+    route.query.months === query.months &&
+    route.query.days === query.days
+  )
+    return
+  await router[mode]({ query })
 }
 
 // Turns a typed or bookmarked window into a whole number inside [min, max];
@@ -574,8 +581,8 @@ function clampWindow(raw: unknown, min: number, max: number, fallback: number): 
 
 function readRangeQuery() {
   const q = route.query
-  months.value = clampWindow(q.months, MIN_MONTHS, MAX_MONTHS, months.value)
-  trendDays.value = clampWindow(q.days, MIN_TREND_DAYS, MAX_TREND_DAYS, trendDays.value)
+  months.value = clampWindow(q.months, MIN_MONTHS, MAX_MONTHS, 6)
+  trendDays.value = clampWindow(q.days, MIN_TREND_DAYS, MAX_TREND_DAYS, 30)
 }
 
 // Committed from the title fields on blur or Enter: out-of-range numbers are
@@ -620,18 +627,25 @@ watch([months, trendDays], () => {
   monthsInput.value = String(months.value)
   daysInput.value = String(trendDays.value)
   if (hydrating) return
-  syncRangeQuery()
-  loadAnalytics()
+  void syncRangeQuery('push')
 })
 
-onMounted(async () => {
+async function restoreRange() {
   hydrating = true
   readRangeQuery()
   await nextTick()
+  await syncRangeQuery()
+  await nextTick()
   hydrating = false
   await loadAnalytics()
-  syncRangeQuery()
-})
+}
+watch(
+  () => route.query,
+  () => {
+    if (!hydrating) void restoreRange()
+  }
+)
+onMounted(restoreRange)
 </script>
 
 <style scoped>

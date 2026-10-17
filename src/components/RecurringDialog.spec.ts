@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { installTestLocks } from '@/utils/locks.test-helper'
+import { setToken, setUser } from '@/utils/api'
+import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
+import { flushPromises, mount, enableAutoUnmount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import RecurringDialog from './RecurringDialog.vue'
 import { writeCache } from '@/utils/cache'
 import type { Category, RecurringRule } from '@/types'
+
+enableAutoUnmount(afterEach)
 
 const CATEGORIES: Category[] = [
   {
@@ -97,6 +101,9 @@ const unwrap = <T>(value: T | { value: T }): T =>
 beforeEach(() => {
   localStorage.clear()
   vi.restoreAllMocks()
+  installTestLocks()
+  setToken('test-token')
+  setUser({ id: 1, name: 'Test', email: 'test@example.com' })
 })
 
 describe('RecurringDialog categories offline', () => {

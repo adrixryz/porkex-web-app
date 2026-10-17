@@ -347,6 +347,7 @@
 </template>
 
 <script setup lang="ts">
+import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
@@ -457,9 +458,8 @@ const openDialog = (type: 'INCOME' | 'EXPENSE') => {
   dialog.value = true
 }
 
-const onSaved = ({ isEditing }: { isEditing: boolean }) => {
-  showSnack(isEditing ? 'Transaction updated!' : 'Transaction saved!', 'success')
-  loadDashboard()
+const onSaved = ({ isEditing, queued }: { isEditing: boolean; queued: boolean }) => {
+  showSnack(...mutationFeedback(queued, isEditing ? 'Transaction updated!' : 'Transaction saved!'))
 }
 
 onMounted(loadDashboard)

@@ -182,11 +182,12 @@
 </template>
 
 <script setup lang="ts">
+import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted } from 'vue'
 import RecurringDialog from '@/components/RecurringDialog.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useSnackbar } from '@/composables/useSnackbar'
-import { api, fetchJson } from '@/utils/api'
+import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { formatDateOnly, toDateInput } from '@/utils/date'
 import { scheduleLabel } from '@/utils/recurring'
@@ -232,9 +233,8 @@ const openDialog = (rule?: RecurringRule) => {
   dialog.value = true
 }
 
-const onSaved = async ({ isEditing }: { isEditing: boolean }) => {
-  showSnack(isEditing ? 'Rule updated!' : 'Rule created!', 'success')
-  await fetchRules()
+const onSaved = async ({ isEditing, queued }: { isEditing: boolean; queued: boolean }) => {
+  showSnack(...mutationFeedback(queued, isEditing ? 'Rule updated!' : 'Rule created!'))
 }
 
 // Pause/resume sends the rule back as the form would. The API recomputes the
@@ -256,15 +256,16 @@ const toggleActive = async (rule: RecurringRule) => {
       })
     })
     if (res.ok) {
-      showSnack(rule.active ? 'Rule paused!' : 'Rule resumed!', 'success')
-      await fetchRules()
+      showSnack(
+        ...mutationFeedback(isQueuedResponse(res), rule.active ? 'Rule paused!' : 'Rule resumed!')
+      )
     } else {
       const data = await res.json().catch(() => null)
       showSnack(data?.error || 'Could not update the rule.', 'error')
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error. Is the server running?', 'error')
+    showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
   }
 }
 
@@ -283,15 +284,14 @@ const doDelete = async () => {
   try {
     const res = await api(`/recurring/${deletingRule.value.id}`, { method: 'DELETE' })
     if (res.ok) {
-      showSnack('Rule deleted!', 'success')
+      showSnack(...mutationFeedback(isQueuedResponse(res), 'Rule deleted!'))
       deleteDialog.value = false
-      await fetchRules()
     } else {
       showSnack('Could not delete the rule.', 'error')
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error. Is the server running?', 'error')
+    showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
   }
   deleting.value = false
 }

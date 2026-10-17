@@ -165,8 +165,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import AmountStepper from '@/components/AmountStepper.vue'
-import { api, fetchJson } from '@/utils/api'
+import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useCurrencySymbol } from '@/utils/currency'
 import { fromDateInput, toDateInput, todayInput } from '@/utils/date'
@@ -186,7 +187,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'saved', payload: { isEditing: boolean }): void
+  (e: 'saved', payload: { isEditing: boolean; queued: boolean }): void
 }>()
 
 const cs = useCurrencySymbol()
@@ -203,6 +204,12 @@ const form = ref({
 })
 const submitting = ref(false)
 const error = ref('')
+const clientId = ref('')
+const cleanForm = ref('')
+useUnsavedChanges(
+  () => props.modelValue && JSON.stringify(form.value) !== cleanForm.value,
+  () => submitting.value
+)
 
 // Same shared read cache as the transaction dialog: opening this form offline
 // still shows the last known categories.
@@ -264,6 +271,7 @@ watch(
 )
 
 const reset = () => {
+  clientId.value = crypto.randomUUID()
   const rule = props.rule
   form.value = {
     type: rule?.type ?? 'EXPENSE',
@@ -276,6 +284,7 @@ const reset = () => {
     endDate: rule?.endDate ? toDateInput(rule.endDate) : ''
   }
   resetType = form.value.type
+  cleanForm.value = JSON.stringify(form.value)
   error.value = ''
   // Always refresh, unless offline: the cached list is what shows then.
   void fetchCategories()
@@ -320,6 +329,7 @@ const submit = async () => {
     const res = await api(url, {
       method,
       body: JSON.stringify({
+        ...(!isEditing.value ? { clientId: clientId.value } : {}),
         type: form.value.type,
         amount: Number(form.value.amount),
         description: form.value.description.trim(),
@@ -332,7 +342,7 @@ const submit = async () => {
     })
 
     if (res.ok) {
-      emit('saved', { isEditing: isEditing.value })
+      emit('saved', { isEditing: isEditing.value, queued: isQueuedResponse(res) })
       close()
     } else {
       const data = await res.json().catch(() => null)
@@ -340,7 +350,7 @@ const submit = async () => {
     }
   } catch (e) {
     console.error(e)
-    error.value = 'Connection error. Is the server running?'
+    error.value = e instanceof Error ? e.message : 'Could not save the change.'
   } finally {
     submitting.value = false
   }

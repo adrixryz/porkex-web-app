@@ -610,13 +610,14 @@
 </template>
 
 <script setup lang="ts">
+import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AmountStepper from '@/components/AmountStepper.vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
-import { fetchJson, api } from '@/utils/api'
+import { fetchJson, api, isQueuedResponse } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { formatDate, formatDateOnly, parseDateOnly, startOfWeek, toDateOnly } from '@/utils/date'
 import { getDefaultPeriod } from '@/utils/preferences'
@@ -814,6 +815,19 @@ const TYPES = ['ALL', 'INCOME', 'EXPENSE'] as const
 
 function readRouteQuery() {
   const q = route.query
+  periodMode.value = getDefaultPeriod()
+  filterType.value = 'ALL'
+  searchQuery.value = ''
+  filterCategory.value = null
+  minAmount.value = ''
+  maxAmount.value = ''
+  sortBy.value = 'date'
+  order.value = 'desc'
+  page.value = 1
+  perPage.value = DEFAULT_PER_PAGE
+  offset.value = 0
+  customFrom.value = ''
+  customTo.value = ''
   if (typeof q.period === 'string' && (PERIODS as readonly string[]).includes(q.period)) {
     periodMode.value = q.period as typeof periodMode.value
   }
@@ -848,7 +862,7 @@ function readRouteQuery() {
   if (typeof q.to === 'string') customTo.value = q.to
 }
 
-function syncRouteQuery() {
+async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
   const query: Record<string, string> = { period: periodMode.value }
   if (filterType.value !== 'ALL') query.type = filterType.value
   if (searchQuery.value.trim()) query.search = searchQuery.value.trim()
@@ -864,7 +878,14 @@ function syncRouteQuery() {
     if (customFrom.value) query.from = customFrom.value
     if (customTo.value) query.to = customTo.value
   }
-  router.replace({ query })
+  const previous = route.query
+  if (
+    Object.keys(previous).length === Object.keys(query).length &&
+    Object.entries(query).every(([key, value]) => previous[key] === value)
+  )
+    return false
+  await router[mode]({ query })
+  return true
 }
 
 // Custom steppers (AmountStepper) replace the native number spinner.
@@ -879,10 +900,14 @@ const stepAmount = (which: 'min' | 'max', delta: number) => {
 }
 
 // A filter change invalidates the current page, so go back to the first one.
-const reload = () => {
-  syncRouteQuery()
-  if (page.value === 1) load()
-  else page.value = 1
+let navigationTimer: number | undefined
+const reload = (_event?: unknown, mode: 'push' | 'replace' = 'push', resetPage = true) => {
+  if (hydrating) return
+  window.clearTimeout(navigationTimer)
+  if (resetPage) page.value = 1
+  navigationTimer = window.setTimeout(async () => {
+    if (!(await syncRouteQuery(mode))) await load()
+  }, 0)
 }
 
 const load = async () => {
@@ -895,6 +920,7 @@ const navigate = (dir: number) => {
   reload()
 }
 watch(periodMode, () => {
+  if (hydrating) return
   offset.value = 0
   reload()
 })
@@ -924,20 +950,20 @@ let hydrating = false
 watch([searchQuery, minAmount, maxAmount], () => {
   if (hydrating) return
   window.clearTimeout(searchTimer)
-  searchTimer = window.setTimeout(reload, 350)
+  searchTimer = window.setTimeout(() => reload(undefined, 'replace'), 350)
 })
 
-watch([filterType, filterCategory, sortOption], reload)
+watch([filterType, filterCategory, sortOption], () => reload())
 // A different page size reflows the whole list: reload() sends the current
 // page back to 1 (and refetches) exactly like any other filter change.
-watch(perPage, reload)
-watch(page, async p => {
-  syncRouteQuery()
-  await fetchTransactions()
-  if (listError.value) showSnack(listError.value, 'error')
-  void p
+watch(perPage, () => reload())
+watch(page, () => {
+  if (!hydrating) reload(undefined, 'push', false)
 })
-onUnmounted(() => window.clearTimeout(searchTimer))
+onUnmounted(() => {
+  window.clearTimeout(searchTimer)
+  window.clearTimeout(navigationTimer)
+})
 
 const openDialog = (type: 'INCOME' | 'EXPENSE') => {
   editingTx.value = null
@@ -951,9 +977,8 @@ const editTx = (tx: Transaction) => {
   dialog.value = true
 }
 
-const onSaved = async ({ isEditing }: { isEditing: boolean }) => {
-  showSnack(isEditing ? 'Transaction updated!' : 'Transaction saved!', 'success')
-  await reloadAndFixPage()
+const onSaved = async ({ isEditing, queued }: { isEditing: boolean; queued: boolean }) => {
+  showSnack(...mutationFeedback(queued, isEditing ? 'Transaction updated!' : 'Transaction saved!'))
 }
 
 const confirmDelete = (tx: Transaction) => {
@@ -967,37 +992,54 @@ const doDelete = async () => {
   try {
     const res = await api(`/transactions/${deletingTx.value.id}`, { method: 'DELETE' })
     if (res.ok) {
-      showSnack('Transaction deleted!', 'success')
-      await reloadAndFixPage()
+      showSnack(...mutationFeedback(isQueuedResponse(res), 'Transaction deleted!'))
+      deleteDialog.value = false
+      deletingTx.value = null
     } else {
       const data = await res.json().catch(() => null)
       showSnack(data?.error || 'Failed to delete transaction.', 'error')
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error.', 'error')
+    showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
   }
   deleting.value = false
-  deleteDialog.value = false
-  deletingTx.value = null
 }
 
-// After a delete/create the last page can end up empty: step back when needed.
-const reloadAndFixPage = async () => {
-  await fetchTransactions()
-  if (page.value > totalPages.value) page.value = totalPages.value
-  syncRouteQuery()
-}
+watch(
+  () => list.value?.page,
+  actual => {
+    if (actual && actual !== page.value && !loading.value) {
+      hydrating = true
+      page.value = actual
+      void nextTick().then(async () => {
+        await syncRouteQuery()
+        hydrating = false
+      })
+    }
+  }
+)
 
-onMounted(async () => {
+async function restoreRoute() {
   hydrating = true
+  window.clearTimeout(searchTimer)
+  window.clearTimeout(navigationTimer)
   readRouteQuery()
-  // Let the watcher above run once, while hydrating is still true, so it does
-  // not arm the debounce for a request this mount is about to make anyway.
+  await nextTick()
+  await syncRouteQuery()
   await nextTick()
   hydrating = false
-  await Promise.all([fetchTransactions(), fetchCategories()])
-  syncRouteQuery()
+  await load()
+}
+
+watch(
+  () => route.query,
+  () => {
+    if (!hydrating) void restoreRoute()
+  }
+)
+onMounted(async () => {
+  await Promise.all([restoreRoute(), fetchCategories()])
 })
 </script>
 

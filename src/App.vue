@@ -97,8 +97,20 @@
           {{ pendingHint(pendingCount) }}
         </v-alert>
 
-        <!-- Something queued was dropped for good (rejected or expired): say so
-             instead of losing the write without a word. -->
+        <v-alert
+          v-if="recurringState !== 'ready'"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="ma-3"
+        >
+          {{
+            recurringState === 'pending'
+              ? 'Recurring transactions are still updating. Totals may be incomplete.'
+              : 'Recurring transactions could not be updated. Totals may be incomplete; we will retry.'
+          }}
+        </v-alert>
+
         <v-alert
           v-if="lastFlushError"
           type="warning"
@@ -109,7 +121,23 @@
           @click:close="lastFlushError = ''"
         >
           {{ lastFlushError }}
+          <div v-if="firstBlockedMutation" class="d-flex ga-2 mt-2">
+            <v-btn size="small" variant="outlined" @click="retryBlocked">Retry</v-btn>
+            <v-btn size="small" variant="text" @click="discardDialog = true">Discard change</v-btn>
+          </div>
         </v-alert>
+
+        <v-dialog v-model="discardDialog" max-width="380">
+          <v-card
+            title="Discard pending change?"
+            text="This change has not been confirmed by the server. Discarding removes it from this device's queue."
+          >
+            <v-card-actions>
+              <v-btn @click="discardDialog = false">Cancel</v-btn>
+              <v-btn color="error" @click="discardBlocked">Discard</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
 
         <router-view v-slot="{ Component }">
           <!-- No mode="out-in": it makes Vue wait for the leaving view to finish
@@ -129,10 +157,17 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
-import { getUser, syncPendingWrites, USER_CHANGE_EVENT } from '@/utils/api'
+import { getUser, syncPendingWrites, USER_CHANGE_EVENT, recurringState } from '@/utils/api'
 import { useConnection } from '@/utils/connection'
 import { formatAge } from '@/utils/cache'
-import { pendingCount, lastFlushError } from '@/utils/outbox'
+import {
+  pendingCount,
+  lastFlushError,
+  firstBlockedMutation,
+  retryFirstBlocked,
+  discardFirstBlocked
+} from '@/utils/outbox'
+import { startRecovery } from '@/utils/recovery'
 import type { User } from '@/types'
 import {
   mdiAccountCircleOutline,
@@ -148,6 +183,25 @@ const route = useRoute()
 const { mobile } = useDisplay()
 const drawer = ref(!mobile.value)
 const rail = ref(true)
+const discardDialog = ref(false)
+let stopRecovery: (() => void) | undefined
+const retryBlocked = async () => {
+  try {
+    await retryFirstBlocked()
+    await syncPendingWrites()
+  } catch (error) {
+    lastFlushError.value = (error as Error).message
+  }
+}
+const discardBlocked = async () => {
+  try {
+    await discardFirstBlocked()
+    discardDialog.value = false
+    await syncPendingWrites()
+  } catch (error) {
+    lastFlushError.value = (error as Error).message
+  }
+}
 
 const { hasStaleData, staleSavedAt, isOffline } = useConnection()
 
@@ -156,7 +210,7 @@ const { hasStaleData, staleSavedAt, isOffline } = useConnection()
 const isOfflineHint = 'No connection. Showing the last saved copy.'
 const wakingHint = computed(() => {
   const when = staleSavedAt.value ? formatAge(staleSavedAt.value) : 'a moment ago'
-  return `The server is waking up. Showing data from ${when}.`
+  return `Showing data from ${when} while the connection or server recovers.`
 })
 
 const pendingHint = (n: number) =>
@@ -184,20 +238,17 @@ const onUserChange = () => refreshUser()
 
 // Anything the outbox still holds from a previous outage goes out now, and
 // again whenever the device reports it has a connection back.
-const flushQueue = () => void syncPendingWrites()
-
 onMounted(() => {
   refreshUser()
   window.addEventListener(USER_CHANGE_EVENT, onUserChange)
   window.addEventListener('storage', onUserChange)
-  window.addEventListener('online', flushQueue)
-  flushQueue()
+  stopRecovery = startRecovery()
 })
 
 onUnmounted(() => {
   window.removeEventListener(USER_CHANGE_EVENT, onUserChange)
   window.removeEventListener('storage', onUserChange)
-  window.removeEventListener('online', flushQueue)
+  stopRecovery?.()
 })
 
 watch(

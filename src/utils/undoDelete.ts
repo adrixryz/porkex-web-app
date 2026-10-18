@@ -51,11 +51,14 @@ function refresh() {
     deleteError.value = (error as Error).message
   }
 }
-function write(value: ScheduledDelete[]) {
+function write(
+  value: ScheduledDelete[],
+  failure = 'Could not schedule the deletion on this device. The movement has been kept.'
+) {
   try {
     localStorage.setItem(KEY, JSON.stringify(value))
   } catch {
-    throw new Error('Could not schedule the deletion on this device. The movement has been kept.')
+    throw new Error(failure)
   }
   refresh()
 }
@@ -108,10 +111,23 @@ export async function undoDeletes() {
   const userId = getUser()?.id
   activeWrites.value++
   try {
+    // Capture the user's intent at the click. The lock may be held by another
+    // tab past the deadline, or that tab may add a new deletion meanwhile.
+    const clickedAt = Date.now()
+    const selected = new Set(
+      read()
+        .filter(item => item.userId === userId && item.deadline > clickedAt)
+        .map(item => item.id)
+    )
     await withOutboxLock(LOCK, async () => {
-      // The clock is checked inside the same lock as publication, not only in UI.
-      write(read().filter(item => item.userId !== userId || item.deadline <= Date.now()))
+      // Re-read under the publication lock. Only still-scheduled IDs from the
+      // click can be canceled; an already published DELETE is never reversed.
+      write(
+        read().filter(item => item.userId !== userId || !selected.has(item.id)),
+        'Could not save Undo on this device. The deletion is still pending; retry before it is sent.'
+      )
       clock.value = Date.now()
+      deleteError.value = ''
     })
   } finally {
     activeWrites.value--

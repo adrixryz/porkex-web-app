@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { clearAuth, setToken, setUser } from './api'
-import { installTestLocks } from './locks.test-helper'
+import { deferred, installTestLocks } from './locks.test-helper'
 import {
   hiddenTransactionIds,
   publishScheduledDeletes,
@@ -106,4 +106,77 @@ it('preserves the scheduled copy when publishing to a full outbox fails', async 
   storage.mockRestore()
   await publishScheduledDeletes()
   expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toHaveLength(1)
+})
+
+it('honors Undo clicked in time even when the storage lock is released after the deadline', async () => {
+  await scheduleDelete(row(20))
+  stop?.()
+  const release = deferred<void>()
+  const acquired = deferred<void>()
+  const holder = navigator.locks.request('porkex-scheduled-deletes', async () => {
+    acquired.resolve()
+    await release.promise
+  })
+  await acquired.promise
+  const undo = undoDeletes()
+  vi.setSystemTime(Date.now() + 9_000)
+  release.resolve()
+  await holder
+  await undo
+  expect(hiddenTransactionIds.value.has(20)).toBe(false)
+  await publishScheduledDeletes()
+  expect(localStorage.getItem('porkex_outbox')).toBeNull()
+})
+
+it('does not cancel a new deletion added after the Undo click while waiting for the lock', async () => {
+  await scheduleDelete(row(21))
+  stop?.()
+  const release = deferred<void>()
+  const acquired = deferred<void>()
+  const holder = navigator.locks.request('porkex-scheduled-deletes', async () => {
+    acquired.resolve()
+    await release.promise
+    const saved = JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)
+    saved.push({
+      id: 'later-delete',
+      userId: 1,
+      deadline: Date.now() + 8_000,
+      transaction: row(22)
+    })
+    localStorage.setItem('porkex_scheduled_deletes', JSON.stringify(saved))
+  })
+  await acquired.promise
+  const undo = undoDeletes()
+  release.resolve()
+  await holder
+  await undo
+  expect(hiddenTransactionIds.value.has(21)).toBe(false)
+  expect(hiddenTransactionIds.value.has(22)).toBe(true)
+})
+
+it('does not undo a deletion when the click itself is already past the deadline', async () => {
+  await scheduleDelete(row(23))
+  stop?.()
+  vi.setSystemTime(Date.now() + 8_001)
+  await undoDeletes()
+  expect(hiddenTransactionIds.value.has(23)).toBe(true)
+})
+
+it('keeps the scheduled deletion if Undo persistence fails and allows a retry', async () => {
+  await scheduleDelete(row(24))
+  stop?.()
+  const original = Storage.prototype.setItem
+  const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+    this: Storage,
+    key,
+    value
+  ) {
+    if (key === 'porkex_scheduled_deletes') throw new DOMException('Full', 'QuotaExceededError')
+    original.call(this, key, value)
+  })
+  await expect(undoDeletes()).rejects.toThrow('Could not save Undo')
+  expect(hiddenTransactionIds.value.has(24)).toBe(true)
+  storage.mockRestore()
+  await undoDeletes()
+  expect(hiddenTransactionIds.value.has(24)).toBe(false)
 })

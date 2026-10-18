@@ -508,6 +508,17 @@ test('undo survives navigation and an expired deletion survives reload', async (
     window.dispatchEvent(new PopStateEvent('popstate'))
   })
   await page.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  // Clicking starts an async Web Lock request. A server row count is not an
+  // acknowledgement: the DELETE is deliberately delayed for eight seconds.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('porkex_scheduled_deletes') || '[]').length
+      )
+    )
+    .toBe(0)
+  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).not.toBeVisible()
+  await expect(page.getByText('Undo me', { exact: true }).first()).toBeVisible()
   expect((await state(page)).rows).toHaveLength(1)
   await page.goto('/transactions')
   await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
@@ -678,6 +689,76 @@ test('another tab can undo the same scheduled deletion before it is sent', async
   await expect(other.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
   await other.getByRole('button', { name: 'Deshacer', exact: true }).click()
   await expect(page.getByText('Shared undo', { exact: true })).toBeVisible()
+  const saved = await state(page)
+  expect(saved.rows).toHaveLength(1)
+  expect(
+    saved.requests.filter((request: { method: string }) => request.method === 'DELETE')
+  ).toHaveLength(0)
+})
+
+test('Undo acknowledges durable cancellation before reload when another tab holds the lock', async ({
+  page,
+  context
+}) => {
+  const date = new Date().toISOString()
+  await state(page, {
+    rows: [
+      {
+        id: 1,
+        type: 'EXPENSE',
+        amount: 10,
+        description: 'Locked undo',
+        categoryId: 1,
+        category: { name: 'Food', color: '#EA4335' },
+        date,
+        createdAt: date
+      }
+    ]
+  })
+  await page.goto('/transactions')
+  const other = await context.newPage()
+  await other.goto('/transactions')
+  await expect(other.getByRole('button', { name: 'Delete Locked undo', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Delete Locked undo', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+  const undo = page.getByRole('button', { name: 'Deshacer', exact: true })
+  await expect(undo).toBeVisible()
+  await other.evaluate(() => {
+    const control = window as Window & { undoLockHeld?: boolean; releaseUndoLock?: () => void }
+    void navigator.locks.request('porkex-scheduled-deletes', async () => {
+      control.undoLockHeld = true
+      await new Promise<void>(resolve => {
+        control.releaseUndoLock = resolve
+      })
+      control.undoLockHeld = false
+    })
+  })
+  await expect
+    .poll(() => other.evaluate(() => (window as Window & { undoLockHeld?: boolean }).undoLockHeld))
+    .toBe(true)
+  try {
+    await undo.click()
+    await expect(undo).toBeDisabled()
+    expect(
+      await page.evaluate(
+        () => JSON.parse(localStorage.getItem('porkex_scheduled_deletes') || '[]').length
+      )
+    ).toBe(1)
+  } finally {
+    await other.evaluate(() =>
+      (window as Window & { releaseUndoLock?: () => void }).releaseUndoLock?.()
+    )
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('porkex_scheduled_deletes') || '[]').length
+      )
+    )
+    .toBe(0)
+  await expect(undo).not.toBeVisible()
+  await page.goto('/transactions')
+  await expect(page.getByRole('button', { name: 'Delete Locked undo', exact: true })).toBeVisible()
   const saved = await state(page)
   expect(saved.rows).toHaveLength(1)
   expect(

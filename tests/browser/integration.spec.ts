@@ -95,6 +95,14 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   await row.getByRole('button', { name: /^Delete/ }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
   await page.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('porkex_scheduled_deletes') || '[]').length
+      )
+    )
+    .toBe(0)
+  await expect(row).toBeVisible()
   expect(
     (await (await page.request.get('/api/transactions', { headers })).json()).items.some(
       (item: { id: number }) => item.id === movement.id

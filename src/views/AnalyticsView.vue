@@ -33,7 +33,6 @@
     </template>
 
     <template v-else>
-      <ComparisonPanel />
       <v-row class="mb-4">
         <v-col cols="12">
           <h1 class="text-h4 font-weight-bold text-on-surface">Analytics</h1>
@@ -248,77 +247,7 @@
         </v-col>
 
         <v-col cols="12" md="7">
-          <v-card color="surface" elevation="1" class="rounded-xl fill-height">
-            <v-card-title class="px-6 py-4 border-b border-outline-variant">
-              <span class="font-weight-medium text-subtitle-1">Category comparison</span>
-              <span class="text-caption text-on-surface-variant ml-2">(This month vs last)</span>
-            </v-card-title>
-            <v-card-text class="pa-0">
-              <div
-                v-if="!categoryComparison.length"
-                class="text-center text-on-surface-variant pa-8"
-              >
-                No spending data to compare yet
-              </div>
-              <div v-else class="overflow-x-auto">
-                <v-table theme="dark" class="bg-surface">
-                  <thead>
-                    <tr>
-                      <th class="text-left font-weight-bold">Category</th>
-                      <th class="text-right font-weight-bold">This month</th>
-                      <th class="text-right font-weight-bold d-none d-sm-table-cell">Last month</th>
-                      <th class="text-right font-weight-bold">Change</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="c in categoryComparison" :key="c.name" class="hover-row">
-                      <td>
-                        <div class="d-flex align-center">
-                          <div
-                            class="rounded-circle mr-2"
-                            :style="`width: 10px; height: 10px; background-color: ${c.color}`"
-                          ></div>
-                          <span class="font-weight-medium">{{ c.name }}</span>
-                        </div>
-                      </td>
-                      <td class="text-right font-weight-bold text-on-surface">
-                        {{ cs }}{{ formatMoney(c.current) }}
-                      </td>
-                      <td class="text-right text-on-surface-variant d-none d-sm-table-cell">
-                        {{ cs }}{{ formatMoney(c.previous) }}
-                      </td>
-                      <td class="text-right">
-                        <v-chip
-                          size="x-small"
-                          variant="tonal"
-                          :color="
-                            c.changePercent > 0
-                              ? 'error'
-                              : c.changePercent < 0
-                                ? 'success'
-                                : 'on-surface-variant'
-                          "
-                        >
-                          <v-icon
-                            start
-                            size="12"
-                            :icon="
-                              c.changePercent > 0
-                                ? mdiTrendingUp
-                                : c.changePercent < 0
-                                  ? mdiTrendingDown
-                                  : mdiMinus
-                            "
-                          ></v-icon>
-                          {{ c.changePercent > 0 ? '+' : '' }}{{ c.changePercent }}%
-                        </v-chip>
-                      </td>
-                    </tr>
-                  </tbody>
-                </v-table>
-              </div>
-            </v-card-text>
-          </v-card>
+          <CategoryComparison />
         </v-col>
       </v-row>
     </template>
@@ -330,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import ComparisonPanel from '@/components/ComparisonPanel.vue'
+import CategoryComparison from '@/components/CategoryComparison.vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
@@ -354,7 +283,7 @@ import type { AnalyticsResponse } from '@/types'
 import { currencySymbol, formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { themeColors } from '@/utils/color'
 import { useTheme } from 'vuetify'
-import { mdiChartPie, mdiMinus, mdiTrendingDown, mdiTrendingUp } from '@mdi/js'
+import { mdiChartPie, mdiTrendingDown, mdiTrendingUp } from '@mdi/js'
 import { todayInput } from '@/utils/date'
 import type { ChartData } from 'chart.js'
 
@@ -428,7 +357,6 @@ const {
 const monthlyData = computed(() => analytics.value.monthlyData)
 const trendData = computed(() => analytics.value.trendData)
 const topCategories = computed(() => analytics.value.topCategories)
-const categoryComparison = computed(() => analytics.value.categoryComparison)
 const insights = computed(() => analytics.value.insights)
 
 // Chart tooltips show the raw numbers unless a formatter is provided. The

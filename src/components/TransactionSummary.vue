@@ -20,7 +20,7 @@
         ><TagChips :tags="transaction.tags" compact />
       </div>
     </div>
-    <div v-if="comment" class="summary-comment text-caption" :title="comment">{{ comment }}</div>
+    <div class="summary-comment text-caption" :title="comment">{{ comment }}</div>
     <div
       class="summary-amount"
       :class="transaction.type === 'INCOME' ? 'text-success' : 'text-error'"
@@ -43,7 +43,8 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
 </script>
 <style scoped>
 .summary-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(96px, 1fr) minmax(0, 1fr) 126px;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -52,8 +53,7 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
 .summary-meta {
   container-type: inline-size;
   container-name: summary-meta;
-  flex: 1 1 110px;
-  min-width: 96px;
+  min-width: 0;
 }
 .summary-date {
   display: flex;
@@ -66,7 +66,6 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
   white-space: nowrap;
 }
 .summary-comment {
-  flex: 1 1 80px;
   min-width: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -75,10 +74,22 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
   overflow-wrap: anywhere;
 }
 .summary-amount {
-  flex: 0 0 auto;
   text-align: right;
   font-weight: bold;
   font-size: 13px;
+}
+@media (max-width: 599px) {
+  .summary-row {
+    grid-template-columns: 32px 96px minmax(0, 1fr) 100px;
+    gap: 8px;
+  }
+  .summary-row :deep(.v-avatar) {
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .summary-amount {
+    font-size: 12px;
+  }
 }
 @media (max-width: 359px) {
   .summary-row :deep(.v-avatar) {
@@ -86,13 +97,8 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
     height: 28px !important;
   }
   .summary-row {
+    grid-template-columns: 28px 76px minmax(0, 1fr) 96px;
     gap: 6px;
-  }
-  .summary-meta {
-    flex-basis: 96px;
-  }
-  .summary-comment {
-    flex-basis: 45px;
   }
   .summary-amount {
     font-size: 12px;

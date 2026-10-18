@@ -349,21 +349,53 @@ test('analytics history restores missing ranges to defaults', async ({ page }) =
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
 })
 
-test('comparison controls keep existing Analytics ranges and restore browser history', async ({
+test('category comparison selector keeps Analytics ranges and restores browser history', async ({
   page
-}) => {
-  await page.goto('/analytics?months=9&days=60&comparison=week&anchor=2024-01-03')
-  await expect(page.getByLabel('Comparison week', { exact: true })).toHaveValue('2024-01-03')
+}, info) => {
+  await state(page, {
+    topCategories: ['Food', 'Transport', 'Housing', 'Health', 'Shopping'].map((name, index) => ({
+      name,
+      color: '#34A853',
+      value: 50 - index * 5,
+      percent: 20
+    })),
+    categoryComparisons: {
+      month: [{ name: 'Food', color: '#34A853', current: 12, previous: 10, changePercent: 20 }],
+      week: [{ name: 'Transport', color: '#FBBC04', current: 7, previous: 14, changePercent: -50 }],
+      year: [{ name: 'Housing', color: '#5F6368', current: 120, previous: 0, changePercent: null }]
+    }
+  })
+  await page.goto('/analytics?months=9&days=60&comparison=week')
+  const card = page.getByRole('region', { name: 'Category comparison', exact: true })
+  const spending = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Where your money went', { exact: true }) })
+  for (const name of ['Food', 'Transport', 'Housing', 'Health', 'Shopping'])
+    await expect(spending.getByText(name, { exact: true })).toBeVisible()
+  const selector = card.locator('.comparison-selector')
+  await expect(card.getByRole('columnheader', { name: 'This week', exact: true })).toBeVisible()
+  await expect(card.getByText('Transport', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
-  await page.getByRole('button', { name: 'Year vs year', exact: true }).click()
-  await page.getByLabel('Comparison year', { exact: true }).fill('2023')
-  await page.getByLabel('Comparison year', { exact: true }).press('Enter')
-  await expect(page).toHaveURL(/anchor=2023-01-01/)
+  await selector.click()
+  await page.getByRole('option', { name: 'Year vs year', exact: true }).click()
+  await expect(page).toHaveURL(/comparison=year/)
+  await expect(card.getByText('Housing', { exact: true })).toBeVisible()
+  await expect(card.getByText('New', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Days', { exact: true })).toHaveValue('60')
+  await expect(page.getByText('Period comparison', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Comparison year', { exact: true })).toHaveCount(0)
+  await card.screenshot({
+    path: info.outputPath('category-comparison.png'),
+    animations: 'disabled'
+  })
   await page.goBack()
+  await expect(card.getByText('Transport', { exact: true })).toBeVisible()
+  await selector.click()
+  await page.getByRole('option', { name: 'Month vs month', exact: true }).click()
+  await expect(card.getByText('Food', { exact: true })).toBeVisible()
+  await expect(card.getByRole('columnheader', { name: 'This month', exact: true })).toBeVisible()
   await page.goBack()
-  await expect(page.getByLabel('Comparison week', { exact: true })).toHaveValue('2024-01-03')
-  await expect(page.getByText('No movements in these periods.', { exact: true })).toBeVisible()
+  await expect(card.getByText('Transport', { exact: true })).toBeVisible()
 })
 
 test('tag manager creates, renames, reorders and globally deletes without losing the movement draft', async ({
@@ -599,7 +631,7 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
     ]
   })
   await page.goto('/transactions')
-  for (const width of [320, 360, 390, 768, 1280]) {
+  for (const width of [320, 360, 390, 768, 960, 1024, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
     const bounds = await page.locator('.transaction-filters').evaluate(element => {
@@ -617,6 +649,24 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
       )
     })
     expect(bounds).toBe(true)
+    if (width >= 960) {
+      const layout = await page.locator('.transaction-filters').evaluate(element => {
+        const controls = Array.from(element.children).map(child => child.getBoundingClientRect())
+        return {
+          centers: controls.map(rect => rect.top + rect.height / 2),
+          widths: controls.map(rect => rect.width)
+        }
+      })
+      expect(Math.max(...layout.centers) - Math.min(...layout.centers)).toBeLessThan(1)
+      expect(layout.widths[4]).toBeLessThan(layout.widths[1])
+      expect(layout.widths[5]).toBeLessThan(layout.widths[2])
+      const rightGap = await page.locator('.transaction-period').evaluate(element => {
+        const period = element.getBoundingClientRect()
+        const navigation = element.querySelector('.period-navigation')!.getBoundingClientRect()
+        return Math.abs(period.right - navigation.right)
+      })
+      expect(rightGap).toBeLessThan(2)
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true)
@@ -660,6 +710,60 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
     )
   })
   await page.screenshot({ path: info.outputPath('movement-dialog-320.png'), fullPage: true })
+})
+
+test('recent transaction comments and amounts align in fixed columns', async ({ page }, info) => {
+  const date = new Date().toISOString()
+  await state(page, {
+    rows: [
+      {
+        id: 1,
+        amount: 4.75,
+        description: 'Morning coffee',
+        category: { name: 'Food', color: '#EA4335' }
+      },
+      {
+        id: 2,
+        amount: 161.03,
+        description: 'Kitchenware',
+        category: { name: 'Shopping', color: '#E8710A' }
+      },
+      {
+        id: 3,
+        amount: 24.17,
+        description: 'Metro card',
+        category: { name: 'Transport', color: '#FBBC04' }
+      },
+      { id: 4, amount: 10000000, description: '', category: { name: 'Food', color: '#EA4335' } }
+    ].map(row => ({ ...row, type: 'EXPENSE', categoryId: 1, date, createdAt: date }))
+  })
+  await page.goto('/')
+  await expect(page.getByText('Morning coffee', { exact: true })).toBeVisible()
+  const card = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Recent Transactions', { exact: true }) })
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    const columns = await card.locator('.summary-row').evaluateAll(rows =>
+      rows.map(row => {
+        const comment = row.querySelector('.summary-comment')!.getBoundingClientRect()
+        const amount = row.querySelector('.summary-amount')!.getBoundingClientRect()
+        return { comment: comment.left, amount: amount.right }
+      })
+    )
+    expect(columns).toHaveLength(4)
+    for (const key of ['comment', 'amount'] as const)
+      expect(
+        Math.max(...columns.map(row => row[key])) - Math.min(...columns.map(row => row[key]))
+      ).toBeLessThan(1)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+    await card.screenshot({
+      path: info.outputPath(`recent-transactions-${width}.png`),
+      animations: 'disabled'
+    })
+  }
 })
 
 test('another tab can undo the same scheduled deletion before it is sent', async ({

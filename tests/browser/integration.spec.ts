@@ -1,4 +1,23 @@
 import { test, expect } from '@playwright/test'
+
+test('enabled registration exposes Sign Up and creates an account through the real API', async ({
+  page
+}, info) => {
+  await page.goto('/login')
+  await page.getByRole('tab', { name: 'Sign Up', exact: true }).click()
+  const email = `new-${info.project.name}@example.test`
+  await page.getByLabel('Full Name', { exact: true }).fill('New Owner')
+  await page.getByLabel('Email', { exact: true }).fill(email)
+  await page.getByLabel('Password (min 6 chars)', { exact: true }).fill('secret123')
+  await page.getByRole('button', { name: 'Create Account', exact: true }).click()
+  await expect(page).toHaveURL('/')
+  const token = await page.evaluate(() => localStorage.getItem('porkex_token'))
+  const response = await page.request.get('/api/profile', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  expect(response.status()).toBe(200)
+  expect((await response.json()).email).toBe(email)
+})
 test('real API and temporary SQLite confirm a replay exactly once', async ({
   page,
   context
@@ -149,7 +168,12 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
     )
     .toBe('2090-01-02T00:00:00.000Z')
   await page.goto('/analytics')
+  const comparison = page.getByRole('region', { name: 'Category comparison', exact: true })
+  await comparison.locator('.comparison-selector').click()
+  await page.getByRole('option', { name: 'Year vs year', exact: true }).click()
   await expect(
-    page.getByRole('img', { name: 'Expenses: year versus previous year', exact: true })
+    comparison.getByRole('columnheader', { name: 'This year', exact: true })
   ).toBeVisible()
+  await expect(comparison.getByText('Food', { exact: true })).toBeVisible()
+  await expect(page.getByText('Period comparison', { exact: true })).toHaveCount(0)
 })

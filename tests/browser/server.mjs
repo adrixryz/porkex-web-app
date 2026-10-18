@@ -22,6 +22,8 @@ function state(key) {
       rows: [],
       tags: [],
       rules: [],
+      categoryComparisons: {},
+      topCategories: [],
       requests: [],
       failure: 0,
       recurring: 'ready',
@@ -162,6 +164,19 @@ const server = createServer(async (req, res) => {
           }
         return json(res, { success: true }, 200, headers)
       }
+      if (url.pathname === '/api/analytics/category-comparison') {
+        const mode = url.searchParams.get('mode') || 'month'
+        return json(
+          res,
+          {
+            mode,
+            partial: mode !== 'month',
+            categoryComparison: db.categoryComparisons[mode] ?? []
+          },
+          200,
+          headers
+        )
+      }
       if (url.pathname === '/api/analytics/comparison') {
         const mode = url.searchParams.get('mode') || 'year'
         const anchor = url.searchParams.get('anchor') || new Date().toISOString().slice(0, 10)
@@ -208,7 +223,7 @@ const server = createServer(async (req, res) => {
             },
             monthlyData: [],
             trendData: [],
-            topCategories: [],
+            topCategories: db.topCategories,
             categoryComparison: [],
             insights: {
               currentMonthIncome: 0,

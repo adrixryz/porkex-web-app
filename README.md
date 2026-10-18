@@ -164,8 +164,8 @@ black background in `pwa-assets.config.ts`).
 - Icons are inline SVG from `@mdi/js`, not an icon font. To add one, import it
   and pass it as `:icon="mdiFoo"`. Vuetify's own internal icons come from the
   alias table in `plugins/mdiSvg.ts`.
-Registration is closed by default on the API. Login reads `/auth/config` and
-shows Sign Up only when explicitly enabled; an unavailable configuration keeps
+Registration is enabled by default on the API and can be closed with
+`ALLOW_REGISTRATION=false`. Login reads `/auth/config`; an unavailable configuration keeps
 signup hidden without preventing an existing account from logging in.
 
 ## Reliability verification
@@ -218,6 +218,6 @@ before full navigation: an unchanged server row alone cannot acknowledge Undo.
 
 Recurring rules offer Skip next and Edit next for an exact scheduled date. The next-only editor reuses the movement fields with a read-only date and 0–5 tags. A conflict stays visible rather than silently affecting a later date; ordinary edits retain the rule schedule and base values.
 
-Analytics includes Year vs year and Week vs week comparisons, using equal elapsed calendar portions for the current period. Income, expenses and balance have paired totals/deltas and a two-series chart. Comparison controls preserve months/days URL parameters and browser history, respect week-start preference, and show zero-base/no-data states explicitly.
+Category comparison contains a single Month vs month / Week vs week / Year vs year selector. It compares expenses per category in the existing table, preserving the other Analytics charts and months/days controls. Weekly and annual comparisons use equal elapsed calendar portions; monthly comparison preserves month-to-date versus the full previous month. URL history, local calendar days, week-start preference and zero-base/no-data states remain supported. There is no separate Period comparison panel.
 
 La matriz de las nuevas funcionalidades, pruebas, commits y límites de validación está en [FEATURES_REVIEW.md](FEATURES_REVIEW.md).

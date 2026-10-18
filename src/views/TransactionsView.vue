@@ -67,7 +67,7 @@
       <v-row class="mb-4">
         <v-col cols="12">
           <v-card color="surface" elevation="1" class="rounded-xl pa-4">
-            <div class="d-flex flex-column flex-md-row align-center justify-md-start ga-4">
+            <div class="transaction-period d-flex flex-column flex-md-row align-center ga-4">
               <div class="d-flex justify-center w-100 w-md-auto shrink-0 pb-1">
                 <v-btn-toggle
                   v-model="periodMode"
@@ -89,7 +89,7 @@
 
               <div
                 v-if="periodMode !== 'custom'"
-                class="d-flex align-center justify-space-between w-100 w-md-auto ga-2"
+                class="period-navigation d-flex align-center justify-space-between w-100 w-md-auto ga-2"
               >
                 <v-btn
                   :icon="mdiChevronLeft"
@@ -113,7 +113,7 @@
               </div>
               <div
                 v-else
-                class="d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3 w-100 w-md-auto"
+                class="period-navigation d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3 w-100 w-md-auto"
               >
                 <v-text-field
                   v-model="customFrom"
@@ -157,8 +157,6 @@
                 <v-btn value="EXPENSE">Expense</v-btn>
                 <v-btn value="INCOME">Income</v-btn>
               </v-btn-toggle>
-
-              <v-spacer class="d-none d-md-block"></v-spacer>
 
               <v-select
                 v-model="filterCategory"
@@ -1082,6 +1080,24 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: 12px;
   align-items: center;
+}
+@media (min-width: 960px) {
+  .transaction-period {
+    justify-content: space-between;
+  }
+  .period-navigation {
+    margin-left: auto;
+  }
+  .transaction-filters {
+    grid-template-columns:
+      minmax(210px, 1fr) minmax(110px, 1.15fr) minmax(140px, 1.15fr)
+      110px 90px 90px;
+    gap: 10px;
+  }
+  .transaction-filters :deep(.v-field) {
+    --v-field-padding-start: 12px;
+    --v-field-padding-end: 8px;
+  }
 }
 .transaction-filters > * {
   min-width: 0;

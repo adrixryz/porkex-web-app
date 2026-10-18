@@ -22,6 +22,8 @@ const error = ref('')
 const needsReload = ref(false)
 let requested = false
 let registration: ServiceWorkerRegistration | undefined
+let handledWorker: ServiceWorker | undefined
+let stopWatchingActivation = () => {}
 let lastCheck = 0
 const canUpdate = computed(
   () => !hasUnsavedChanges.value && !hasBusyForms.value && activeWrites.value === 0
@@ -32,19 +34,30 @@ const { needRefresh, updateServiceWorker } = useRegisterSW({
     registration = value
   },
   onNeedReload() {
-    // The waiting worker is active now. A subsequent click must reload rather
-    // than send SKIP_WAITING to a worker that is no longer waiting.
-    needRefresh.value = false
-    // Another tab can activate a worker too. Never reload an unfinished form.
-    if (requested && canUpdate.value) window.location.reload()
-    else {
-      needsReload.value = true
-      dismissed.value = false
-      updating.value = false
-      requested = false
-    }
+    completeActivation(registration?.active ?? undefined)
   }
 })
+function completeActivation(worker?: ServiceWorker) {
+  if (worker && handledWorker === worker) return
+  handledWorker = worker
+  stopWatchingActivation()
+  // Workbox may omit onNeedReload when it saw no controller at registration.
+  // Observe the accepted worker itself, then apply the same draft/write guard.
+  needRefresh.value = false
+  if (requested && canUpdate.value) window.location.reload()
+  else {
+    needsReload.value = true
+    dismissed.value = false
+    updating.value = false
+    requested = false
+  }
+}
+function activationFailed() {
+  stopWatchingActivation()
+  error.value = 'Could not download the update. Please retry when connected.'
+  updating.value = false
+  requested = false
+}
 const available = computed(() => needRefresh.value || needsReload.value)
 watch(needRefresh, value => {
   if (value) dismissed.value = false
@@ -56,12 +69,31 @@ async function applyUpdate() {
   updating.value = true
   error.value = ''
   try {
-    if (needRefresh.value) await updateServiceWorker(true)
-    else window.location.reload()
+    if (needRefresh.value) {
+      const worker = registration?.waiting
+      if (worker) {
+        const onStateChange = () => {
+          if (worker.state === 'activated') completeActivation(worker)
+          else if (worker.state === 'redundant') activationFailed()
+        }
+        stopWatchingActivation()
+        worker.addEventListener('statechange', onStateChange)
+        stopWatchingActivation = () => {
+          worker.removeEventListener('statechange', onStateChange)
+          stopWatchingActivation = () => {}
+        }
+      } else if (registration?.active?.state === 'activated') {
+        // Another tab may have activated it between showing the prompt and
+        // this click. No waiting worker remains to receive SKIP_WAITING.
+        completeActivation(registration.active)
+        return
+      }
+      await updateServiceWorker(true)
+      // Activation can finish before the register helper resolves.
+      if (worker?.state === 'activated') completeActivation(worker)
+    } else window.location.reload()
   } catch {
-    error.value = 'Could not download the update. Please retry when connected.'
-    updating.value = false
-    requested = false
+    activationFailed()
   }
 }
 const preloadError = (event: Event) => {
@@ -80,6 +112,7 @@ window.addEventListener('vite:preloadError', preloadError)
 window.addEventListener('focus', checkUpdate)
 document.addEventListener('visibilitychange', checkUpdate)
 onUnmounted(() => {
+  stopWatchingActivation()
   window.removeEventListener('vite:preloadError', preloadError)
   window.removeEventListener('focus', checkUpdate)
   document.removeEventListener('visibilitychange', checkUpdate)

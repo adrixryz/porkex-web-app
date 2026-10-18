@@ -85,9 +85,7 @@ test('URL filters restore absent defaults on Back and Forward', async ({ page })
   await page.goBack()
   await expect(page.getByLabel('Search transactions', { exact: true })).toHaveValue('')
 })
-test('real waiting service worker protects a modified form until explicit update', async ({
-  page
-}) => {
+async function verifySafeWorkerUpdate(page: Page) {
   await page.goto('/transactions')
   await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
   await page.evaluate(async () => {
@@ -121,6 +119,22 @@ test('real waiting service worker protects a modified form until explicit update
   await update.click()
   await navigation
   await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+}
+test('real waiting service worker protects a modified form until explicit update', async ({
+  page
+}) => {
+  await verifySafeWorkerUpdate(page)
+})
+test('explicit update completes when registration starts without a controller', async ({
+  page
+}) => {
+  // Reproduce Workbox's initial-registration classification even though a real
+  // worker later becomes active. Its controlling callback omits onNeedReload
+  // in this case; worker installation/activation is still the real browser API.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.serviceWorker, 'controller', { get: () => null })
+  })
+  await verifySafeWorkerUpdate(page)
 })
 test('stale bundle errors offer an update and preserve the draft', async ({ page }) => {
   await page.goto('/transactions')

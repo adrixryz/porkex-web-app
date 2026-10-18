@@ -75,6 +75,28 @@ function dirtyForm() {
 const updateButton = () => notice!.findAll('button').find(button => button.text() === 'Update')!
 const laterButton = () => notice!.findAll('button').find(button => button.text() === 'Later')!
 
+function waitingRegistration() {
+  let state: ServiceWorkerState = 'installed'
+  const worker = new EventTarget() as ServiceWorker
+  Object.defineProperty(worker, 'state', { get: () => state })
+  const registration = {
+    waiting: worker as ServiceWorker | null,
+    active: null as ServiceWorker | null
+  }
+  sw.options!.onRegisteredSW('/sw.js', registration as ServiceWorkerRegistration)
+  return {
+    worker,
+    advance(next: ServiceWorkerState) {
+      state = next
+      if (next === 'activated') {
+        registration.active = worker
+        registration.waiting = null
+      }
+      worker.dispatchEvent(new Event('statechange'))
+    }
+  }
+}
+
 describe('safe update prompts', () => {
   it('waits for explicit acceptance rather than activating a waiting worker', async () => {
     await renderAvailable()
@@ -140,6 +162,59 @@ describe('safe update prompts', () => {
     expect(updateButton().attributes('disabled')).toBeUndefined()
     await updateButton().trigger('click')
     expect(sw.update).toHaveBeenCalledTimes(2)
+  })
+
+  it('observes activation without the Workbox reload callback and preserves a new draft', async () => {
+    const form = dirtyForm()
+    await renderAvailable()
+    const registration = waitingRegistration()
+    const remove = vi.spyOn(registration.worker, 'removeEventListener')
+    await updateButton().trigger('click')
+    form.dirty.value = true
+    registration.advance('activated')
+    await flushPromises()
+    expect(sw.needRefresh!.value).toBe(false)
+    expect(notice!.text()).toContain('Finish or clear your form')
+    expect(updateButton().attributes('disabled')).toBeDefined()
+    expect(remove).toHaveBeenCalledOnce()
+    sw.options!.onNeedReload()
+    expect(remove).toHaveBeenCalledOnce()
+    expect(sw.update).toHaveBeenCalledOnce()
+  })
+
+  it('protects writes that start while the accepted worker is activating', async () => {
+    await renderAvailable()
+    const registration = waitingRegistration()
+    await updateButton().trigger('click')
+    activeWrites.value = 1
+    registration.advance('activated')
+    await flushPromises()
+    expect(sw.needRefresh!.value).toBe(false)
+    expect(updateButton().attributes('disabled')).toBeDefined()
+    activeWrites.value = 0
+    await flushPromises()
+    expect(updateButton().attributes('disabled')).toBeUndefined()
+    expect(sw.update).toHaveBeenCalledOnce()
+  })
+
+  it('reports a redundant accepted worker instead of remaining busy indefinitely', async () => {
+    await renderAvailable()
+    const registration = waitingRegistration()
+    await updateButton().trigger('click')
+    registration.advance('redundant')
+    await flushPromises()
+    expect(notice!.text()).toContain('Could not download')
+    expect(updateButton().attributes('disabled')).toBeUndefined()
+  })
+
+  it('removes the activation listener if the update component unmounts', async () => {
+    await renderAvailable()
+    const registration = waitingRegistration()
+    const remove = vi.spyOn(registration.worker, 'removeEventListener')
+    await updateButton().trigger('click')
+    notice!.unmount()
+    notice = undefined
+    expect(remove).toHaveBeenCalledOnce()
   })
 
   it('handles missing chunks with a prompt while retaining unfinished drafts', async () => {

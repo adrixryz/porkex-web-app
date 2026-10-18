@@ -188,6 +188,12 @@ reload/replay, storage quota, rejected changes, slow writes from two tabs, URL
 history, registration and a real waiting service worker. Failure traces are
 kept under test-results (ignored by Git). No production API is contacted.
 
+Accepted PWA updates also observe the waiting worker's activation directly:
+Workbox can omit its reload callback when registration started without a
+controller. The regression exercises that classification with a real worker;
+drafts and active writes still block reload, and duplicate activation callbacks
+are handled once.
+
 With the backend checked out beside this repository and its dependencies
 installed, run npm run test:integration. PORKEX_BACKEND_DIR may override that
 path. The backend harness forces an isolated temporary SQLite database and

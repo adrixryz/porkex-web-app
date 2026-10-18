@@ -28,7 +28,7 @@ let lastCheck = 0
 const canUpdate = computed(
   () => !hasUnsavedChanges.value && !hasBusyForms.value && activeWrites.value === 0
 )
-const { needRefresh, updateServiceWorker } = useRegisterSW({
+const { needRefresh } = useRegisterSW({
   immediate: true,
   onRegisteredSW(_url, value) {
     registration = value
@@ -70,7 +70,8 @@ async function applyUpdate() {
   error.value = ''
   try {
     if (needRefresh.value) {
-      const worker = registration?.waiting
+      const currentRegistration = registration ?? (await navigator.serviceWorker.getRegistration())
+      const worker = currentRegistration?.waiting
       if (worker) {
         const onStateChange = () => {
           if (worker.state === 'activated') completeActivation(worker)
@@ -82,15 +83,17 @@ async function applyUpdate() {
           worker.removeEventListener('statechange', onStateChange)
           stopWatchingActivation = () => {}
         }
-      } else if (registration?.active?.state === 'activated') {
+      } else if (currentRegistration?.active?.state === 'activated') {
         // Another tab may have activated it between showing the prompt and
         // this click. No waiting worker remains to receive SKIP_WAITING.
-        completeActivation(registration.active)
+        completeActivation(currentRegistration.active)
         return
       }
-      await updateServiceWorker(true)
-      // Activation can finish before the register helper resolves.
-      if (worker?.state === 'activated') completeActivation(worker)
+      if (!worker) throw new Error('No update is waiting.')
+      // Activate the exact worker we observe. The register helper can silently
+      // skip its message when its registration no longer exposes a waiting SW.
+      worker.postMessage({ type: 'SKIP_WAITING' })
+      if (worker.state === 'activated') completeActivation(worker)
     } else window.location.reload()
   } catch {
     activationFailed()

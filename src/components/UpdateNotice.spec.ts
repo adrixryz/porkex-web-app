@@ -13,6 +13,7 @@ const sw = vi.hoisted(() => ({
         onNeedReload: () => void
       },
   update: vi.fn(),
+  helper: vi.fn(),
   needRefresh: undefined as undefined | { value: boolean }
 }))
 vi.mock('virtual:pwa-register/vue', async () => {
@@ -21,7 +22,7 @@ vi.mock('virtual:pwa-register/vue', async () => {
     useRegisterSW: (options: NonNullable<typeof sw.options>) => {
       sw.options = options
       sw.needRefresh = ref(false)
-      return { needRefresh: sw.needRefresh, updateServiceWorker: sw.update }
+      return { needRefresh: sw.needRefresh, updateServiceWorker: sw.helper }
     }
   }
 })
@@ -38,7 +39,8 @@ const forms: VueWrapper[] = []
 beforeEach(() => {
   vi.clearAllMocks()
   activeWrites.value = 0
-  sw.update.mockResolvedValue(undefined)
+  sw.update.mockReset()
+  sw.update.mockImplementation(() => undefined)
 })
 afterEach(() => {
   notice?.unmount()
@@ -50,6 +52,7 @@ afterEach(() => {
 
 async function renderAvailable() {
   notice = mount(UpdateNotice, { global: { stubs } })
+  waitingRegistration()
   sw.needRefresh!.value = true
   await flushPromises()
   return notice
@@ -79,6 +82,7 @@ function waitingRegistration() {
   let state: ServiceWorkerState = 'installed'
   const worker = new EventTarget() as ServiceWorker
   Object.defineProperty(worker, 'state', { get: () => state })
+  Object.defineProperty(worker, 'postMessage', { value: sw.update })
   const registration = {
     waiting: worker as ServiceWorker | null,
     active: null as ServiceWorker | null
@@ -98,6 +102,13 @@ function waitingRegistration() {
 }
 
 describe('safe update prompts', () => {
+  it('messages the observed worker without waiting for the registration helper', async () => {
+    sw.helper.mockImplementationOnce(() => new Promise(() => {}))
+    await renderAvailable()
+    await updateButton().trigger('click')
+    expect(sw.update).toHaveBeenCalledExactlyOnceWith({ type: 'SKIP_WAITING' })
+    expect(sw.helper).not.toHaveBeenCalled()
+  })
   it('waits for explicit acceptance rather than activating a waiting worker', async () => {
     await renderAvailable()
     expect(notice!.text()).toContain('A new version')
@@ -126,7 +137,7 @@ describe('safe update prompts', () => {
     activeWrites.value = 0
     await flushPromises()
     await updateButton().trigger('click')
-    expect(sw.update).toHaveBeenCalledExactlyOnceWith(true)
+    expect(sw.update).toHaveBeenCalledExactlyOnceWith({ type: 'SKIP_WAITING' })
   })
 
   it('keeps a form typed during activation and requires a new explicit reload', async () => {
@@ -154,7 +165,9 @@ describe('safe update prompts', () => {
   })
 
   it('reports activation failures and lets the user retry', async () => {
-    sw.update.mockRejectedValueOnce(new TypeError('Offline'))
+    sw.update.mockImplementationOnce(() => {
+      throw new TypeError('Offline')
+    })
     await renderAvailable()
     await updateButton().trigger('click')
     await flushPromises()

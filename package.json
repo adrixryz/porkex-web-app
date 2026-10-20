@@ -3,21 +3,23 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "npm@12.0.2",
   "engines": {
-    "node": ">=24"
+    "node": "^24.11.0 || >=26.0.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "dev": "vp dev",
+    "build": "vue-tsc -b && vp build",
+    "preview": "vp preview",
+    "test": "vp test",
+    "test:watch": "vp test watch",
+    "test:coverage": "vp test --coverage",
     "typecheck": "vue-tsc -b --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"src/**/*.{ts,vue}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,vue}\"",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
+    "check": "vp check",
+    "format": "vp fmt",
+    "format:check": "vp fmt --check",
     "icons": "pwa-assets-generator",
     "test:browser": "playwright test",
     "test:integration": "node tests/browser/integration.mjs"
@@ -32,25 +34,23 @@
     "vuetify": "^4.0.4"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
     "@types/node": "^24.12.0",
     "@vite-pwa/assets-generator": "^2.0.0",
     "@vitejs/plugin-vue": "^6.0.5",
-    "@vitest/coverage-v8": "^5.0.4",
+    "@vitest/coverage-v8": "5.0.5",
     "@vue/test-utils": "^2.5.1",
     "@vue/tsconfig": "^0.9.0",
-    "eslint": "^10.12.0",
-    "eslint-plugin-vue": "^10.11.1",
-    "globals": "^17.13.0",
     "jsdom": "^30.1.2",
-    "prettier": "^3.9.10",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.71.2",
-    "vite": "^8.0.1",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.3.0",
     "vite-plugin-pwa": "^2.0.0",
-    "vitest": "^5.0.4",
-    "vue-eslint-parser": "^10.4.1",
+    "vite-plus": "1.3.0",
+    "vitest": "5.0.5",
     "vue-tsc": "^3.2.5"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.3.0",
+    "vitest": "5.0.5"
   }
 }

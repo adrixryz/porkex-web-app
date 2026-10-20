@@ -4,7 +4,7 @@ Personal finance tracker UI: Vue 3 (`<script setup>` + TypeScript), Vuetify 4, v
 
 ## Requirements
 
-- Node 24+ (Vitest 5 and jsdom's undici need it)
+- Node `^24.11` or `>=26` (Vite+ 1.3; Node 24 LTS is what CI uses)
 - The backend running on `http://localhost:3000` (see `../porkex-backend`, a sibling folder)
 
 ## Getting started
@@ -16,20 +16,43 @@ npm run dev
 
 The dev server runs on `http://localhost:5173` and proxies `/api` and `/auth` to the backend (see `vite.config.ts`).
 
+## Toolchain
+
+The project uses [Vite+](https://viteplus.dev/) (`vp`), which provides Vite 8 +
+Rolldown, Vitest 5, Oxlint and Oxfmt behind a single CLI. The local CLI is
+installed with the project dependencies, so `npm run <script>` works after
+`npm install`.
+
+To use `vp` directly, either install the global CLI:
+
+```powershell
+# Windows
+irm https://vite.plus/ps1 | iex
+```
+
+or prefix commands with `npm exec --`, for example `npm exec -- vp check`.
+
+`vue-tsc` remains in the project on purpose: Oxlint's current type-checking path
+does not understand Vue SFCs or templates. Oxlint also lints only the `<script>`
+blocks of `.vue` files, so template-only rules are not covered.
+
 ## Scripts
 
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Dev server with hot reload |
-| `npm run build` | Type-checks (`vue-tsc`) and builds to `dist/` |
-| `npm run preview` | Serves the production build locally |
-| `npm test` | Unit tests (`vitest run`) |
-| `npm run test:watch` | Vitest in watch mode |
-| `npm run test:coverage` | Unit tests with a coverage report |
-| `npm run typecheck` | `vue-tsc --noEmit` |
-| `npm run lint` | ESLint |
-| `npm run format` | Prettier |
-| `npm run icons` | Regenerates the PWA icons from `public/porkex-icon.svg` |
+| Script                  | What it does                                               |
+| ----------------------- | ---------------------------------------------------------- |
+| `npm run dev`           | Vite+ dev server with hot reload (`vp dev`)                |
+| `npm run build`         | Type-checks (`vue-tsc`) and builds to `dist/` (`vp build`) |
+| `npm run preview`       | Serves the production build locally (`vp preview`)         |
+| `npm test`              | Unit tests (`vp test`, runs once)                          |
+| `npm run test:watch`    | Unit tests in watch mode (`vp test watch`)                 |
+| `npm run test:coverage` | Unit tests with a coverage report (`vp test --coverage`)   |
+| `npm run typecheck`     | `vue-tsc --noEmit`                                         |
+| `npm run lint`          | Oxlint (`vp lint`)                                         |
+| `npm run lint:fix`      | Oxlint with autofixes                                      |
+| `npm run check`         | Format and lint checks (`vp check`)                        |
+| `npm run format`        | Oxfmt over the repository (`vp fmt`)                       |
+| `npm run format:check`  | Oxfmt check (`vp fmt --check`)                             |
+| `npm run icons`         | Regenerates the PWA icons from `public/porkex-icon.svg`    |
 
 ## Structure
 
@@ -164,6 +187,7 @@ black background in `pwa-assets.config.ts`).
 - Icons are inline SVG from `@mdi/js`, not an icon font. To add one, import it
   and pass it as `:icon="mdiFoo"`. Vuetify's own internal icons come from the
   alias table in `plugins/mdiSvg.ts`.
+
 Registration is enabled by default on the API and can be closed with
 `ALLOW_REGISTRATION=false`. Login reads `/auth/config`; an unavailable configuration keeps
 signup hidden without preventing an existing account from logging in.
@@ -172,15 +196,17 @@ signup hidden without preventing an existing account from logging in.
 
 Use Node 24 (the CI runtime), then run:
 
-~~~sh
+```sh
 npm ci
-npm run lint
-npm run typecheck
-npm test
-npm run build
-npx playwright install chromium
-npm run test:browser
-~~~
+vp check
+vp run typecheck
+vp test
+vp run build
+vp exec playwright install chromium
+vp run test:browser
+```
+
+Without the global CLI, replace `vp` with `npm exec -- vp` in those commands.
 
 Browser tests build a production PWA with an empty API origin and a controlled
 local server. They cover desktop Chromium and Pixel 7 Android emulation, offline
@@ -195,7 +221,7 @@ drafts and active writes still block reload, and duplicate activation callbacks
 are handled once.
 
 With the backend checked out beside this repository and its dependencies
-installed, run npm run test:integration. PORKEX_BACKEND_DIR may override that
+installed, run `vp run test:integration`. PORKEX_BACKEND_DIR may override that
 path. The backend harness forces an isolated temporary SQLite database and
 clears inherited Turso credentials. The browser server only proxies an explicit
 localhost API, verifies one offline replay against real persisted data, and
@@ -219,5 +245,3 @@ before full navigation: an unchanged server row alone cannot acknowledge Undo.
 Recurring rules offer Skip next and Edit next for an exact scheduled date. The next-only editor reuses the movement fields with a read-only date and 0–5 tags. A conflict stays visible rather than silently affecting a later date; ordinary edits retain the rule schedule and base values.
 
 Category comparison contains a single Month vs month / Week vs week / Year vs year selector. It compares expenses per category in the existing table, preserving the other Analytics charts and months/days controls. Weekly and annual comparisons use equal elapsed calendar portions; monthly comparison preserves month-to-date versus the full previous month. URL history, local calendar days, week-start preference and zero-base/no-data states remain supported. There is no separate Period comparison panel.
-
-La matriz de las nuevas funcionalidades, pruebas, commits y límites de validación está en [FEATURES_REVIEW.md](FEATURES_REVIEW.md).

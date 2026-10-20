@@ -179,7 +179,8 @@ export async function drainOutbox(
   let sent = 0
   while (canSend()) {
     const item = readAll().find(mutation => mutation.userId === userId) as
-      QueuedMutation | undefined
+      | QueuedMutation
+      | undefined
     if (!item) {
       lastFlushError.value = ''
       return { sent, stopped: 'empty' }

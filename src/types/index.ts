@@ -7,7 +7,13 @@ export type TxType = 'INCOME' | 'EXPENSE'
 export type PeriodFilter = 'day' | 'week' | 'month' | 'year'
 
 export type WeekDay =
-  'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
+  | 'MONDAY'
+  | 'TUESDAY'
+  | 'WEDNESDAY'
+  | 'THURSDAY'
+  | 'FRIDAY'
+  | 'SATURDAY'
+  | 'SUNDAY'
 
 export type DecimalSeparator = '.' | ','
 
@@ -182,7 +188,13 @@ export interface BudgetsResponse {
 export type RecurringFrequency = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'
 
 export interface RecurringRule {
-  nextException?: { date: string; amount: number; comment: string; categoryId: number; tags: Tag[] } | null
+  nextException?: {
+    date: string
+    amount: number
+    comment: string
+    categoryId: number
+    tags: Tag[]
+  } | null
   id: number
   userId: number
   categoryId: number

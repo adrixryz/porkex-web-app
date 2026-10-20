@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import LoginView from './LoginView.vue'
 import { hasBusyForms, hasUnsavedChanges } from '@/composables/useUnsavedChanges'

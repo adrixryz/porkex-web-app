@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test'
 import { clearAuth, setToken, setUser } from './api'
 import { deferred, installTestLocks } from './locks.test-helper'
 import {

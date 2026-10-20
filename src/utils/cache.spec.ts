@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { readCache, writeCache, invalidateCache, clearCache, formatAge } from './cache'
 
 beforeEach(() => {

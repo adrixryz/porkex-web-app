@@ -1,17 +1,34 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import TagPicker from './TagPicker.vue'
-const catalog = vi.hoisted(() => ({ value: [] as { id: string; name: string; position: number }[] }))
-vi.mock('@/composables/useTags', () => ({ useTags: () => ({ tags: ref(catalog.value), error: ref('') }) }))
-const render = (selected: string[]) => mount(TagPicker, {
-  props: { modelValue: selected }, global: { stubs: {
-    TagManagerDialog: true,
-    'v-chip': { props: ['disabled'], template: '<button :disabled="disabled"><slot /></button>' },
-    'v-btn': { template: '<button><slot /></button>' }
-  } }
+const catalog = vi.hoisted(() => ({
+  value: [] as { id: string; name: string; position: number }[]
+}))
+vi.mock('@/composables/useTags', () => ({
+  useTags: () => ({ tags: ref(catalog.value), error: ref('') })
+}))
+const render = (selected: string[]) =>
+  mount(TagPicker, {
+    props: { modelValue: selected },
+    global: {
+      stubs: {
+        TagManagerDialog: true,
+        'v-chip': {
+          props: ['disabled'],
+          template: '<button :disabled="disabled"><slot /></button>'
+        },
+        'v-btn': { template: '<button><slot /></button>' }
+      }
+    }
+  })
+beforeEach(() => {
+  catalog.value = Array.from({ length: 6 }, (_, i) => ({
+    id: String(i),
+    name: `Tag ${i}`,
+    position: i
+  }))
 })
-beforeEach(() => { catalog.value = Array.from({ length: 6 }, (_, i) => ({ id: String(i), name: `Tag ${i}`, position: i })) })
 describe('tag selection', () => {
   it('selects and deselects using stable IDs without delete controls', async () => {
     const wrapper = render([])

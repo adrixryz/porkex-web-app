@@ -463,7 +463,7 @@ test('tag manager creates, renames, reorders and globally deletes without losing
   await expect(dialog).not.toBeVisible()
   if (info.project.name === 'android') {
     await page.getByRole('button', { name: 'Show 1 tags', exact: true }).click()
-    await expect(page.getByRole('listitem').filter({ hasText: 'Renamed' })).toBeVisible()
+    await expect(page.getByRole('listitem').filter({ hasText: /^Renamed$/ })).toBeVisible()
     await page.keyboard.press('Escape')
   } else await expect(page.getByText('Renamed', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Expense', exact: true }).first().click()

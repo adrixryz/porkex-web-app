@@ -1,6 +1,6 @@
 import { installTestLocks } from '@/utils/locks.test-helper'
 import { setToken, setUser } from '@/utils/api'
-import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi, afterEach } from 'vite-plus/test'
 import { flushPromises, mount, enableAutoUnmount } from '@vue/test-utils'
 import TransactionDialog from './TransactionDialog.vue'
 import { writeCache } from '@/utils/cache'

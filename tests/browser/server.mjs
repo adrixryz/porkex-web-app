@@ -9,7 +9,8 @@ const root = process.cwd()
 const upstream = process.env.PORKEX_TEST_API_ORIGIN
 if (upstream && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(upstream))
   throw new Error('Integration tests only accept a local API')
-const build = spawnSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], {
+const vp = resolve(root, 'node_modules/vite-plus/bin/vp')
+const build = spawnSync(process.execPath, [vp, 'build'], {
   stdio: 'inherit',
   env: { ...process.env, VITE_API_BASE: '' }
 })

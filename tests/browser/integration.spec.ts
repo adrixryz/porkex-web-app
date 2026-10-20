@@ -102,7 +102,9 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   await expect(row).toBeVisible()
   if (!(await row.getByText(tagName, { exact: true }).isVisible())) {
     await row.getByRole('button', { name: 'Show 1 tags', exact: true }).click()
-    await expect(page.getByRole('listitem').filter({ hasText: tagName })).toBeVisible()
+    await expect(
+      page.getByRole('listitem').filter({ hasText: new RegExp(`^${tagName}$`) })
+    ).toBeVisible()
     await page.keyboard.press('Escape')
   } else await expect(page.getByText(tagName, { exact: true }).first()).toBeVisible()
   const movements = await (await page.request.get('/api/transactions', { headers })).json()

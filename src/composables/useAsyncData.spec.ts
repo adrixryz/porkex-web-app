@@ -1,6 +1,6 @@
 import { requestRevalidation } from '@/utils/revalidation'
 import { setToken } from '@/utils/api'
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vite-plus/test'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { defineComponent, h, nextTick } from 'vue'
 import { useAsyncData } from './useAsyncData'

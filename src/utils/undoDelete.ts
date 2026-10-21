@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Transaction } from '@/types'
 import { activeWrites, getUser, isAuthenticated, syncPendingWrites, USER_CHANGE_EVENT } from './api'
 import { enqueue, outboxRevision, ownedPending, withOutboxLock, withSendLock } from './outbox'
@@ -25,7 +25,6 @@ const entries = ref<ScheduledDelete[]>([])
 const revision = ref(0)
 const clock = ref(Date.now())
 export const deleteError = ref('')
-let nextAttempt = 0
 let transferring: Promise<void> | undefined
 function read(): ScheduledDelete[] {
   const value: unknown = JSON.parse(localStorage.getItem(KEY) || '[]')
@@ -169,29 +168,64 @@ export async function publishScheduledDeletes() {
 }
 export function startUndoRecovery() {
   refresh()
+  let nextAttempt = 0
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let stopped = false
+  let publishing = false
+  const schedule = () => {
+    clearTimeout(timer)
+    timer = undefined
+    clock.value = Date.now()
+    if (stopped || publishing || document.visibilityState === 'hidden' || !isAuthenticated()) return
+    const mine = entries.value.filter(item => item.userId === getUser()?.id)
+    if (!mine.length) return
+    const deadline = Math.min(...mine.map(item => item.deadline))
+    timer = setTimeout(
+      update,
+      Math.min(2_147_483_647, Math.max(0, deadline - Date.now(), nextAttempt - Date.now()))
+    )
+  }
   const update = () => {
     clock.value = Date.now()
-    if (document.visibilityState === 'hidden' || Date.now() < nextAttempt) return
+    if (stopped || publishing || document.visibilityState === 'hidden') return schedule()
     const userId = getUser()?.id
     if (
       isAuthenticated() &&
+      Date.now() >= nextAttempt &&
       entries.value.some(item => item.userId === userId && item.deadline <= Date.now())
     ) {
+      publishing = true
       nextAttempt = Date.now() + 5_000
       void publishScheduledDeletes()
         .then(() => syncPendingWrites())
         .catch(error => {
           deleteError.value = (error as Error).message
         })
+        .finally(() => {
+          publishing = false
+          schedule()
+        })
+    } else {
+      schedule()
     }
   }
-  const timer = setInterval(update, 250)
-  window.addEventListener('storage', refresh)
-  window.addEventListener(USER_CHANGE_EVENT, refresh)
+  const resume = () => {
+    refresh()
+    update()
+  }
+  const stopWatching = watch(entries, schedule, { flush: 'sync' })
+  window.addEventListener('storage', resume)
+  window.addEventListener(USER_CHANGE_EVENT, resume)
+  window.addEventListener('focus', resume)
+  document.addEventListener('visibilitychange', resume)
   update()
   return () => {
-    clearInterval(timer)
-    window.removeEventListener('storage', refresh)
-    window.removeEventListener(USER_CHANGE_EVENT, refresh)
+    stopped = true
+    clearTimeout(timer)
+    stopWatching()
+    window.removeEventListener('storage', resume)
+    window.removeEventListener(USER_CHANGE_EVENT, resume)
+    window.removeEventListener('focus', resume)
+    document.removeEventListener('visibilitychange', resume)
   }
 }

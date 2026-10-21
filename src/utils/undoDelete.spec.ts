@@ -36,6 +36,37 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
+it('has no idle timer and cancels the only deadline timer on Undo', async () => {
+  expect(vi.getTimerCount()).toBe(0)
+  await scheduleDelete(row(40))
+  expect(vi.getTimerCount()).toBe(1)
+  await undoDeletes()
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it('suspends its deadline timer while hidden and publishes on resume', async () => {
+  setUser({ id: 41, name: 'Visibility owner', email: 'visibility@example.com' })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}'))
+  )
+  try {
+    await scheduleDelete(row(41))
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(vi.getTimerCount()).toBe(0)
+    await vi.advanceTimersByTimeAsync(9_000)
+    expect(JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)).toHaveLength(1)
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)).toEqual([])
+    )
+    await vi.waitFor(() => expect(vi.getTimerCount()).toBe(0))
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
 it('persists before hiding and Undo cancels the original movement deletion', async () => {
   await scheduleDelete(row(1))
   expect(hiddenTransactionIds.value.has(1)).toBe(true)
@@ -43,6 +74,36 @@ it('persists before hiding and Undo cancels the original movement deletion', asy
   await undoDeletes()
   expect(hiddenTransactionIds.value.has(1)).toBe(false)
   expect(JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)).toEqual([])
+})
+
+it('retries a failed expired publication after five seconds and returns to idle', async () => {
+  setUser({ id: 42, name: 'Retry owner', email: 'retry@example.com' })
+  const send = vi.fn(async () => new Response('{}'))
+  vi.stubGlobal('fetch', send)
+  const original = Storage.prototype.setItem
+  const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+    this: Storage,
+    key,
+    value
+  ) {
+    if (key === 'porkex_outbox') throw new DOMException('Full', 'QuotaExceededError')
+    original.call(this, key, value)
+  })
+  try {
+    await scheduleDelete(row(42))
+    await vi.advanceTimersByTimeAsync(8_000)
+    expect(JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)).toHaveLength(1)
+    expect(vi.getTimerCount()).toBe(1)
+    storage.mockRestore()
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(send).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(JSON.parse(localStorage.getItem('porkex_scheduled_deletes')!)).toEqual([])
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
 it('groups several removals and never publishes before their deadline', async () => {
   await scheduleDelete(row(1))

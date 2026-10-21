@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { mutationError } from './validation'
 import { showSnack } from '@/composables/useSnackbar'
 import type { User } from '@/types'
 import { clearCache, invalidateCache } from './cache'
@@ -295,6 +296,10 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
   const method = (options.method ?? 'GET').toUpperCase()
   const isRead = method === 'GET' || method === 'HEAD'
   const body = withClientId(method, path, options.body ?? null)
+  if (!isRead && (typeof body === 'string' || body === null)) {
+    const error = mutationError(path, method, body)
+    if (error) throw new Error(error)
+  }
 
   if (isRead) {
     const response = handleResponse(

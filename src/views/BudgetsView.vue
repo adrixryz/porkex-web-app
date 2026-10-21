@@ -208,6 +208,11 @@
           label="Limit"
           type="number"
           inputmode="decimal"
+          :error-messages="
+            form.amount && !validAmount(form.amount)
+              ? 'Use up to two decimals, from 0.01 to 10,000,000.'
+              : []
+          "
           :prefix="cs"
           min="0.01"
           step="0.01"
@@ -272,6 +277,7 @@
 </template>
 
 <script setup lang="ts">
+import { validAmount } from '@/utils/validation'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
@@ -410,7 +416,7 @@ watch(
   }
 )
 
-const isValid = computed(() => Number(form.value.amount) > 0 && form.value.categoryId !== null)
+const isValid = computed(() => validAmount(form.value.amount) && form.value.categoryId !== null)
 
 const openDialog = (budget?: Budget) => {
   clientId.value = crypto.randomUUID()

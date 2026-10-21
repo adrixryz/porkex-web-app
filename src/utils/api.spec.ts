@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import {
   activeWrites,
-  api,
+  api as transportApi,
   clearAuth,
   getSessionIdentity,
   isQueuedResponse,
@@ -14,6 +14,29 @@ import { enqueue, flushOutbox, pendingCount, setOutboxUser, type QueuedMutation 
 import { writeCache } from './cache'
 import { DATA_REVALIDATE_EVENT } from './revalidation'
 import { deferred, installTestLocks } from './locks.test-helper'
+
+// Transport fixtures are complete domain payloads; validation has its own negative tests.
+function api(path: string, options: RequestInit = {}) {
+  if (typeof options.body === 'string') {
+    const defaults = path.startsWith('/transactions')
+      ? { amount: 10, type: 'EXPENSE', categoryId: 1 }
+      : path.startsWith('/recurring')
+        ? {
+            amount: 10,
+            type: 'EXPENSE',
+            categoryId: 1,
+            frequency: 'MONTH',
+            startDate: '2020-01-01'
+          }
+        : path.startsWith('/budgets')
+          ? { amount: 50, categoryId: 4, period: 'MONTH' }
+          : path.startsWith('/categories')
+            ? { name: 'Food', type: 'EXPENSE' }
+            : {}
+    options = { ...options, body: JSON.stringify({ ...defaults, ...JSON.parse(options.body) }) }
+  }
+  return transportApi(path, options)
+}
 
 const TOKEN = 'test-token'
 
@@ -234,7 +257,7 @@ describe('the idempotency key', () => {
     await flushOutbox(send)
 
     const body = (send.mock.calls[0][0] as QueuedMutation).body!
-    expect(JSON.parse(body)).toEqual({ name: 'Food' })
+    expect(JSON.parse(body)).toMatchObject({ name: 'Food' })
     vi.unstubAllGlobals()
   })
 
@@ -247,7 +270,8 @@ describe('the idempotency key', () => {
     await flushOutbox(send)
 
     const body = (send.mock.calls[0][0] as QueuedMutation).body!
-    expect(JSON.parse(body)).toEqual({ amount: 5 })
+    expect(JSON.parse(body)).toMatchObject({ amount: 5 })
+    expect(JSON.parse(body).clientId).toBeUndefined()
     vi.unstubAllGlobals()
   })
 

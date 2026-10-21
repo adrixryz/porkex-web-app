@@ -17,6 +17,11 @@
             aria-label="Amount"
             type="number"
             inputmode="decimal"
+            :error-messages="
+              form.amount && !validAmount(form.amount)
+                ? 'Use up to two decimals, from 0.01 to 10,000,000.'
+                : []
+            "
             :prefix="cs"
             min="0.01"
             step="0.01"
@@ -123,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import { validAmount } from '@/utils/validation'
 import { ref, computed, watch } from 'vue'
 import { createEditStamp } from '@/utils/editStamp'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
@@ -210,10 +216,7 @@ const allCategories = computed(() =>
 const categoryOptions = computed(() => allCategories.value.filter(c => c.type === props.type))
 
 const isValid = computed(() => {
-  const amount = Number(form.value.amount)
-  return (
-    Number.isFinite(amount) && amount > 0 && !!form.value.date && form.value.categoryId !== null
-  )
+  return validAmount(form.value.amount) && !!form.value.date && form.value.categoryId !== null
 })
 
 const reset = () => {

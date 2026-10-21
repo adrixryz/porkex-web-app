@@ -24,6 +24,10 @@ const TOKEN_KEY = 'porkex_token'
 const USER_KEY = 'porkex_user'
 export const USER_CHANGE_EVENT = 'porkex-user-change'
 export const activeWrites = ref(0)
+export const activeProfileChanges = new Map<
+  string,
+  { userId: number; patch: Record<string, unknown> }
+>()
 export const recurringState = ref<'ready' | 'pending' | 'failed'>('ready')
 let sessionGeneration = 0
 
@@ -326,6 +330,10 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
     throw new Error('This change cannot be safely stored for synchronization.')
   }
   const timeZone = browserTimeZone()
+  const profileWrite =
+    path === '/profile' && method === 'PUT' && typeof body === 'string' ? crypto.randomUUID() : null
+  if (profileWrite)
+    activeProfileChanges.set(profileWrite, { userId, patch: JSON.parse(body as string) })
   const savePending = async (alreadyAttempted = false) => {
     if (!alreadyAttempted) assertCurrent(session)
     await enqueue({
@@ -376,6 +384,7 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
       return handled
     })
   } finally {
+    if (profileWrite) activeProfileChanges.delete(profileWrite)
     activeWrites.value -= 1
   }
 }

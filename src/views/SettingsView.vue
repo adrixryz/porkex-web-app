@@ -207,7 +207,8 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 const { showSnack } = useSnackbar()
 import { useRouter } from 'vue-router'
-import { api, fetchJson, clearAuth, setUser, getUser } from '@/utils/api'
+import { api, clearAuth, setUser, getUser } from '@/utils/api'
+import { protectProfileChanges, refreshAccountProfile } from '@/utils/profile'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { CurrencyOption, DecimalSeparator, PeriodFilter, Profile, WeekDay } from '@/types'
 import { CURRENCIES, getCurrency, setCurrency, setCurrencyByCode } from '@/utils/currency'
@@ -311,7 +312,7 @@ const {
   loading,
   error: profileError,
   run: fetchProfile
-} = useAsyncData<Profile>(signal => fetchJson<Profile>('/profile', { signal }), EMPTY_PROFILE, {
+} = useAsyncData<Profile>(() => refreshAccountProfile(), EMPTY_PROFILE, {
   cacheKey: '/profile'
 })
 
@@ -332,14 +333,13 @@ function applyProfile(data: Profile) {
 
 const loadProfile = async () => {
   const data = await fetchProfile()
-  if (data && pendingCount.value === 0) applyProfile(data)
-  else if (data) editName.value = getUser()?.name ?? data.name
-  else if (profileError.value) showSnack(profileError.value, 'error')
+  if (!data && profileError.value) showSnack(profileError.value, 'error')
 }
 
 // Background refresh must not replace an unfinished edit or an offline choice.
 watch(profile, (data, previous) => {
-  if (!data.id || pendingCount.value > 0) return
+  if (!data.id) return
+  data = protectProfileChanges(data)
   if (!editName.value || editName.value === previous.name) editName.value = data.name
   if (!savingCurrency.value && !savingPreferences.value) {
     setCurrencyByCode(data.currency)

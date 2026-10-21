@@ -2,6 +2,7 @@ import { isAuthenticated, recurringState, syncPendingWrites, USER_CHANGE_EVENT }
 import { firstBlockedMutation, pendingCount } from './outbox'
 import { requestRevalidation } from './revalidation'
 import { hasStaleData } from './connection'
+import { refreshAccountProfile } from './profile'
 
 const RETRY_DELAYS = [5_000, 15_000, 30_000, 60_000]
 
@@ -48,6 +49,8 @@ export function startRecovery(): () => void {
     running = true
     try {
       await syncPendingWrites()
+      if (stopped || !visible() || !isAuthenticated()) return
+      await refreshAccountProfile()
       if (stopped || !visible() || !isAuthenticated()) return
       requestRevalidation()
       if (

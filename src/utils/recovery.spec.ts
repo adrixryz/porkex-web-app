@@ -12,6 +12,7 @@ vi.mock('./api', () => ({
   USER_CHANGE_EVENT: 'porkex-user-change'
 }))
 const refresh = vi.hoisted(() => vi.fn())
+vi.mock('./profile', () => ({ refreshAccountProfile: vi.fn().mockResolvedValue({}) }))
 vi.mock('./revalidation', () => ({ requestRevalidation: refresh }))
 let stop: (() => void) | undefined
 beforeEach(() => {

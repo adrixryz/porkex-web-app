@@ -10,15 +10,19 @@ const { withServer, createTestUser } = await import(
 await withServer('frontend-integration', async ctx => {
   const { user } = await createTestUser(ctx)
   const status = await new Promise((done, reject) => {
-    const child = spawn(process.execPath, ['node_modules/@playwright/test/cli.js', 'test'], {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        PORKEX_TEST_API_ORIGIN: ctx.base,
-        PORKEX_TEST_TOKEN: ctx.state.token,
-        PORKEX_TEST_USER: JSON.stringify(user)
+    const child = spawn(
+      process.execPath,
+      ['node_modules/@playwright/test/cli.js', 'test', ...process.argv.slice(2)],
+      {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          PORKEX_TEST_API_ORIGIN: ctx.base,
+          PORKEX_TEST_TOKEN: ctx.state.token,
+          PORKEX_TEST_USER: JSON.stringify(user)
+        }
       }
-    })
+    )
     child.once('error', reject)
     child.once('exit', code => done(code))
   })

@@ -278,6 +278,9 @@
 
 <script setup lang="ts">
 import { validAmount } from '@/utils/validation'
+import { occupiedBudgetCategories } from '@/utils/budgetCategories'
+import { ownedPending, outboxRevision } from '@/utils/outbox'
+import { getUser } from '@/utils/api'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
@@ -327,18 +330,17 @@ const {
   run: fetchBudgets
 } = useAsyncData<BudgetsResponse>(
   signal =>
-    fetchJson<BudgetsResponse>(
-      `/budgets?period=${period.value}&today=${todayInput()}&weekStart=${getFirstDayOfWeek()}`,
-      { signal }
-    ),
+    fetchJson<BudgetsResponse>(`/budgets?today=${todayInput()}&weekStart=${getFirstDayOfWeek()}`, {
+      signal
+    }),
   EMPTY_BUDGETS,
   // `today` is only in the request, not the cache key: yesterday's numbers are
   // still worth showing offline, under the stale banner. The week start does
   // change the numbers, so it stays in the key.
-  { cacheKey: () => `/budgets?period=${period.value}&weekStart=${getFirstDayOfWeek()}` }
+  { cacheKey: () => `/budgets?weekStart=${getFirstDayOfWeek()}` }
 )
 
-const budgets = computed(() => data.value.budgets)
+const budgets = computed(() => data.value.budgets.filter(b => b.period === period.value))
 const totals = computed(() => data.value.totals.find(t => t.period === period.value) ?? null)
 const remainingTotal = computed(() =>
   totals.value ? round2(totals.value.amount - totals.value.spent) : 0
@@ -396,10 +398,18 @@ const isEditing = computed(() => editingBudget.value !== null)
 // The budget being edited is left out of that count: its own category has to stay
 // in the list or the select would show the raw id instead of the name.
 const availableCategories = computed(() => {
-  const used = new Set(
-    budgets.value
-      .filter(b => b.period === form.value.period && b.id !== editingBudget.value?.id)
-      .map(b => b.categoryId)
+  void outboxRevision.value
+  let pending = [] as ReturnType<typeof ownedPending>
+  try {
+    pending = ownedPending(getUser()?.id ?? 0)
+  } catch {
+    /* Outbox warning preserves damaged data. */
+  }
+  const used = occupiedBudgetCategories(
+    data.value.budgets,
+    pending,
+    form.value.period,
+    editingBudget.value?.id
   )
   return (categories.value ?? []).filter(c => !used.has(c.id))
 })

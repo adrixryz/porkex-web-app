@@ -162,6 +162,16 @@
           <!-- DANGER ZONE -->
           <AppCard class="pa-6" border style="border-color: rgb(var(--v-theme-error))">
             <div class="text-subtitle-1 font-weight-medium text-error mb-4">Danger Zone</div>
+            <div class="mb-4">
+              <AppButton
+                color="error"
+                variant="outlined"
+                :disabled="revokingSessions"
+                @click="revokeDialog = true"
+              >
+                Log Out All Sessions
+              </AppButton>
+            </div>
             <AppButton
               color="error"
               variant="outlined"
@@ -176,6 +186,16 @@
     </v-row>
 
     <!-- LOG OUT CONFIRM -->
+    <AppConfirmDialog
+      v-model="revokeDialog"
+      title="Log out all other sessions?"
+      confirm-label="Confirm"
+      :loading="revokingSessions"
+      @confirm="revokeSessions"
+    >
+      All other devices will need to sign in again. This browser will stay signed in. Pending
+      changes on those devices will remain saved there until you sign in to the same account.
+    </AppConfirmDialog>
     <AppConfirmDialog
       v-model="logoutDialog"
       title="Log out?"
@@ -207,7 +227,7 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 const { showSnack } = useSnackbar()
 import { useRouter } from 'vue-router'
-import { api, clearAuth, setUser, getUser } from '@/utils/api'
+import { api, securityApi, clearAuth, setUser, getUser } from '@/utils/api'
 import { protectProfileChanges, refreshAccountProfile } from '@/utils/profile'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { CurrencyOption, DecimalSeparator, PeriodFilter, Profile, WeekDay } from '@/types'
@@ -493,30 +513,54 @@ const updatePassword = async () => {
   if (!canSavePassword.value) return
   savingPassword.value = true
   try {
-    const res = await api('/password', {
-      method: 'PUT',
-      body: JSON.stringify({
-        currentPassword: currentPassword.value,
-        newPassword: newPassword.value
-      })
+    const res = await securityApi('/password', {
+      currentPassword: currentPassword.value,
+      newPassword: newPassword.value
     })
     if (res.ok) {
       currentPassword.value = ''
       newPassword.value = ''
       confirmPassword.value = ''
-      showSnack('Password updated!', 'success')
+      showSnack('Password updated. Other sessions have been logged out.', 'success')
     } else {
       const data = await res.json().catch(() => null)
       showSnack(data?.error || 'Could not update the password.', 'error')
     }
   } catch (e) {
     console.error(e)
-    showSnack('Connection error. The password was not changed.', 'error')
+    showSnack(
+      e instanceof Error
+        ? e.message
+        : 'Could not confirm the password change. Sign in again if necessary.',
+      'error'
+    )
   }
   savingPassword.value = false
 }
 
 const logoutDialog = ref(false)
+const revokeDialog = ref(false)
+const revokingSessions = ref(false)
+const revokeSessions = async () => {
+  if (revokingSessions.value) return
+  revokingSessions.value = true
+  try {
+    const response = await securityApi('/sessions/revoke')
+    if (!response.ok) {
+      const data = await response.json().catch(() => null)
+      throw new Error(data?.error || 'Could not revoke other sessions.')
+    }
+    revokeDialog.value = false
+    showSnack('Other sessions logged out. This browser is still signed in.', 'success')
+  } catch (error) {
+    showSnack(
+      error instanceof Error ? error.message : 'Could not confirm session revocation.',
+      'error'
+    )
+  } finally {
+    revokingSessions.value = false
+  }
+}
 
 const logout = () => {
   if (!canLeaveForms()) return
@@ -531,7 +575,12 @@ useUnsavedChanges(
     !!currentPassword.value ||
     !!newPassword.value ||
     !!confirmPassword.value,
-  () => saving.value || savingCurrency.value || savingPreferences.value || savingPassword.value
+  () =>
+    saving.value ||
+    savingCurrency.value ||
+    savingPreferences.value ||
+    savingPassword.value ||
+    revokingSessions.value
 )
 onMounted(loadProfile)
 </script>

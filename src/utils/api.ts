@@ -22,6 +22,7 @@ const API_BASE = `${API_ORIGIN}/api`
 const AUTH_BASE = `${API_ORIGIN}/auth`
 const TOKEN_KEY = 'porkex_token'
 const USER_KEY = 'porkex_user'
+const ROTATION_KEY = 'porkex_security_rotation'
 export const USER_CHANGE_EVENT = 'porkex-user-change'
 export const activeWrites = ref(0)
 export const activeProfileChanges = new Map<
@@ -123,6 +124,20 @@ function recordRecurringState(response: Response, session: Session) {
 function handleResponse(response: Response, session: Session): Response {
   assertCurrent(session)
   if (response.status === 401) {
+    let rotating = false
+    try {
+      const rotation = JSON.parse(localStorage.getItem(ROTATION_KEY) || 'null')
+      const claim = session.token?.split('.')[1] ?? session.token
+      rotating =
+        rotation?.userId === session.userId &&
+        rotation?.claim === claim &&
+        Number.isFinite(rotation.expires) &&
+        rotation.expires > Date.now() &&
+        rotation.expires - Date.now() <= WRITE_TIMEOUT_MS + 5_000
+    } catch {
+      /* Ignore a damaged or unavailable rotation marker. */
+    }
+    if (rotating) throw new Error('Session renewal is in progress. Retry shortly.')
     expireSession(session)
     throw new Error('Session expired')
   }
@@ -300,6 +315,11 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
   const method = (options.method ?? 'GET').toUpperCase()
   const isRead = method === 'GET' || method === 'HEAD'
   const body = withClientId(method, path, options.body ?? null)
+  if (
+    (path === '/password' && method === 'PUT') ||
+    (path === '/sessions/revoke' && method === 'POST')
+  )
+    return securityApi(path, typeof body === 'string' ? JSON.parse(body) : undefined)
   if (!isRead && (typeof body === 'string' || body === null)) {
     const error = mutationError(path, method, body)
     if (error) throw new Error(error)
@@ -390,6 +410,68 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
 }
 
 let synchronizing: Promise<void> | null = null
+
+/** Security actions bypass the offline queue, including blocked changes. */
+export async function securityApi(
+  path: '/password' | '/sessions/revoke',
+  body?: unknown
+): Promise<Response> {
+  const session = captureSession()
+  if (!session.token || session.userId === null)
+    throw new Error('Sign in before changing security settings.')
+  activeWrites.value++
+  try {
+    return await withSendLock(session.userId, async () => {
+      assertCurrent(session)
+      const rotationId = crypto.randomUUID()
+      localStorage.setItem(
+        ROTATION_KEY,
+        JSON.stringify({
+          id: rotationId,
+          userId: session.userId,
+          claim: session.token?.split('.')[1] ?? session.token,
+          expires: Date.now() + WRITE_TIMEOUT_MS + 5_000
+        })
+      )
+      try {
+        let response: Response
+        try {
+          response = await fetch(`${API_BASE}${path}`, {
+            method: path === '/password' ? 'PUT' : 'POST',
+            headers: requestHeaders(session),
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+            signal: withTimeout(undefined, WRITE_TIMEOUT_MS)
+          })
+        } catch {
+          throw new Error('Could not confirm the security change. Sign in again if necessary.')
+        }
+        if (response.status === 401) localStorage.removeItem(ROTATION_KEY)
+        handleResponse(response, session)
+        if (response.ok) {
+          const data = await response
+            .clone()
+            .json()
+            .catch(() => null)
+          assertCurrent(session)
+          if (typeof data?.token !== 'string' || !data.token)
+            throw new Error('Could not renew this session. Sign in again.')
+          setToken(data.token)
+          announceSession()
+        }
+        return response
+      } finally {
+        try {
+          if (JSON.parse(localStorage.getItem(ROTATION_KEY) || 'null')?.id === rotationId)
+            localStorage.removeItem(ROTATION_KEY)
+        } catch {
+          /* A failed storage cleanup must not mask the security response. */
+        }
+      }
+    })
+  } finally {
+    activeWrites.value--
+  }
+}
 
 export function syncPendingWrites(): Promise<void> {
   if (synchronizing) return synchronizing

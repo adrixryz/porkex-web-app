@@ -1,6 +1,159 @@
 import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 
+test('Danger Zone confirmation revokes the phone session and preserves its offline changes', async ({
+  page,
+  browser
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Session owner',
+      email: `sessions-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  const { token, user } = await registration.json()
+  const init = ({ token, user }: { token: string; user: object }) => {
+    if (sessionStorage.getItem('sessions-initialized')) return
+    sessionStorage.setItem('sessions-initialized', 'yes')
+    localStorage.setItem('porkex_token', token)
+    localStorage.setItem('porkex_user', JSON.stringify(user))
+  }
+  await page.addInitScript(init, { token, user })
+  const phone = await browser.newContext({ timezoneId: 'America/Lima' })
+  try {
+    await phone.addInitScript(init, { token, user })
+    const mobile = await phone.newPage()
+    await mobile.goto('http://localhost:4178/transactions')
+    await mobile.getByRole('button', { name: 'Expense', exact: true }).first().click()
+    const draft = mobile.getByRole('dialog')
+    await draft.getByLabel('Amount', { exact: true }).fill('13')
+    await draft.getByLabel('Comment (optional)', { exact: true }).fill('Offline phone change')
+    await draft.locator('.v-select').click()
+    await mobile.getByRole('option', { name: 'Food', exact: true }).click()
+    await phone.setOffline(true)
+    await draft.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(draft).not.toBeVisible()
+    await expect
+      .poll(() =>
+        mobile.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+      )
+      .toBe(1)
+    await page.goto('/settings')
+    await page.getByLabel('Display Name', { exact: true }).fill('Unsaved display name')
+    const button = page.getByRole('button', { name: 'Log Out All Sessions', exact: true })
+    const logout = page.getByRole('button', { name: 'Log Out', exact: true })
+    await expect(button).toBeVisible()
+    expect((await button.boundingBox())!.y).toBeLessThan((await logout.boundingBox())!.y)
+    let revocations = 0
+    page.on('request', request => {
+      if (request.url().endsWith('/api/sessions/revoke')) revocations++
+    })
+    await button.click()
+    const modal = page.getByRole('dialog', { name: 'Log out all other sessions?', exact: true })
+    await expect(modal.getByText(/This browser will stay signed in/)).toBeVisible()
+    await modal.getByRole('button', { name: 'Cancel', exact: true }).click()
+    expect(revocations).toBe(0)
+    await button.click()
+    await modal.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await expect(modal).not.toBeVisible()
+    await expect(page.getByLabel('Display Name', { exact: true })).toHaveValue(
+      'Unsaved display name'
+    )
+    expect(revocations).toBe(1)
+    const replacement = await page.evaluate(() => localStorage.getItem('porkex_token'))
+    expect(replacement).not.toBe(token)
+    expect(
+      (
+        await page.request.get('/api/profile', {
+          headers: { Authorization: `Bearer ${replacement}` }
+        })
+      ).status()
+    ).toBe(200)
+    expect(
+      (
+        await page.request.get('/api/profile', { headers: { Authorization: `Bearer ${token}` } })
+      ).status()
+    ).toBe(401)
+    await phone.setOffline(false)
+    await mobile.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect(mobile).toHaveURL(/\/login/)
+    expect(
+      await mobile.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    ).toBe(1)
+    // Sign in through the real API and let this device resume its own saved queue.
+    const login = await page.request.post('/auth/login', {
+      data: { email: user.email, password: 'secret123' }
+    })
+    const signedIn = await login.json()
+    await mobile.evaluate(
+      ({ token, user }) => {
+        localStorage.setItem('porkex_token', token)
+        localStorage.setItem('porkex_user', JSON.stringify(user))
+      },
+      { token: signedIn.token, user }
+    )
+    await mobile.goto('http://localhost:4178/transactions')
+    await mobile.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect
+      .poll(() =>
+        mobile.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+      )
+      .toBe(0)
+    const rows = await (
+      await page.request.get('/api/transactions', {
+        headers: { Authorization: `Bearer ${replacement}` }
+      })
+    ).json()
+    expect(
+      rows.items.filter((row: { comment: string }) => row.comment === 'Offline phone change')
+    ).toHaveLength(1)
+  } finally {
+    await phone.close()
+  }
+})
+
+test('changing the password rotates the token without leaving Settings', async ({ page }, info) => {
+  const registered = await page.request.post('/auth/register', {
+    data: {
+      name: 'Password owner',
+      email: `password-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  const { token, user } = await registered.json()
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/settings')
+  await page.getByLabel('Current Password', { exact: true }).fill('secret123')
+  await page.getByLabel('New Password', { exact: true }).fill('changed123')
+  await page.getByLabel('Confirm New Password', { exact: true }).fill('changed123')
+  await page.getByRole('button', { name: 'Update Password', exact: true }).click()
+  await expect(
+    page.getByText('Password updated. Other sessions have been logged out.', { exact: true })
+  ).toBeVisible()
+  await expect(page).toHaveURL(/\/settings$/)
+  const replacement = await page.evaluate(() => localStorage.getItem('porkex_token'))
+  expect(replacement).not.toBe(token)
+  expect(
+    (
+      await page.request.get('/api/profile', {
+        headers: { Authorization: `Bearer ${replacement}` }
+      })
+    ).status()
+  ).toBe(200)
+  expect(
+    (
+      await page.request.get('/api/profile', { headers: { Authorization: `Bearer ${token}` } })
+    ).status()
+  ).toBe(401)
+})
+
 test('correcting the device clock retries the same edit through the real API', async ({
   page
 }, info) => {

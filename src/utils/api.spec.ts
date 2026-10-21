@@ -614,7 +614,7 @@ describe('confirmed synchronization and response metadata', () => {
     const writing = api('/password', { method: 'PUT', body: '{}' })
     await started.promise
     expect(activeWrites.value).toBe(1)
-    waiting.resolve(new Response('{}', { status: 200 }))
+    waiting.resolve(new Response('{"success":true,"token":"renewed-token"}', { status: 200 }))
     await writing
     expect(activeWrites.value).toBe(0)
     vi.unstubAllGlobals()

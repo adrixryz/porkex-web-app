@@ -388,8 +388,22 @@ const openDialog = (type: 'INCOME' | 'EXPENSE') => {
   dialog.value = true
 }
 
-const onSaved = ({ isEditing, queued }: { isEditing: boolean; queued: boolean }) => {
-  showSnack(...mutationFeedback(queued, isEditing ? 'Transaction updated!' : 'Transaction saved!'))
+const onSaved = ({
+  isEditing,
+  queued,
+  superseded
+}: {
+  isEditing: boolean
+  queued: boolean
+  superseded?: boolean
+}) => {
+  showSnack(
+    ...mutationFeedback(
+      queued,
+      isEditing ? 'Transaction updated!' : 'Transaction saved!',
+      superseded
+    )
+  )
 }
 
 onMounted(loadDashboard)

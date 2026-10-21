@@ -917,8 +917,22 @@ const editTx = (tx: Transaction) => {
   dialog.value = true
 }
 
-const onSaved = async ({ isEditing, queued }: { isEditing: boolean; queued: boolean }) => {
-  showSnack(...mutationFeedback(queued, isEditing ? 'Transaction updated!' : 'Transaction saved!'))
+const onSaved = async ({
+  isEditing,
+  queued,
+  superseded
+}: {
+  isEditing: boolean
+  queued: boolean
+  superseded?: boolean
+}) => {
+  showSnack(
+    ...mutationFeedback(
+      queued,
+      isEditing ? 'Transaction updated!' : 'Transaction saved!',
+      superseded
+    )
+  )
 }
 
 const confirmDelete = (tx: Transaction) => {

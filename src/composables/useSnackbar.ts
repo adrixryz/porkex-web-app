@@ -7,6 +7,12 @@ const snackbar = ref(false)
 const snackMessage = ref('')
 const snackColor = ref('success')
 
+export function showSnack(message: string, color: string = 'success') {
+  snackMessage.value = message
+  snackColor.value = color
+  snackbar.value = true
+}
+
 // Pair it with the single <AppSnackbar> mounted in App.vue.
 export function useSnackbar() {
   // Views only call showSnack; the host in App.vue renders the snackbar.
@@ -15,12 +21,6 @@ export function useSnackbar() {
   onUnmounted(() => {
     snackbar.value = false
   })
-
-  function showSnack(message: string, color: string = 'success') {
-    snackMessage.value = message
-    snackColor.value = color
-    snackbar.value = true
-  }
 
   return { snackbar, snackMessage, snackColor, showSnack }
 }

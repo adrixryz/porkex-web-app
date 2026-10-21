@@ -367,7 +367,11 @@ describe('ordered writes and session boundaries', () => {
     userId: 1,
     method: 'PUT',
     path: '/transactions/7',
-    body: '{"amount":10}',
+    body: JSON.stringify({
+      amount: 10,
+      mutationId: 'pending-edit',
+      editedAt: new Date().toISOString()
+    }),
     ...over
   })
 
@@ -537,7 +541,11 @@ describe('confirmed synchronization and response metadata', () => {
       userId: 1,
       method: 'PUT',
       path: '/transactions/1',
-      body: '{"date":"2026-10-16"}'
+      body: JSON.stringify({
+        date: '2026-10-16',
+        mutationId: 'zone-edit',
+        editedAt: new Date().toISOString()
+      })
     })
     await syncPendingWrites()
     const queuedHeaders = new Headers(send.mock.calls.at(-1)?.[1].headers)
@@ -619,7 +627,7 @@ describe('legacy migration across app upgrades', () => {
     )
   }
 
-  it('verifies the original signed-in account before attaching and replaying old entries', async () => {
+  it('verifies the original account but preserves an unstamped legacy edit for explicit retry', async () => {
     legacy()
     vi.resetModules()
     const upgraded = await import('./api')
@@ -632,8 +640,10 @@ describe('legacy migration across app upgrades', () => {
       })
     )
     await upgraded.syncPendingWrites()
-    expect(calls).toEqual(['/api/profile', '/api/transactions/1'])
-    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toEqual([])
+    expect(calls).toEqual(['/api/profile'])
+    expect(JSON.parse(localStorage.getItem('porkex_outbox')!)).toMatchObject([
+      { userId: 1, status: 'blocked', body: '{}' }
+    ])
     vi.unstubAllGlobals()
   })
 

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { showSnack } from '@/composables/useSnackbar'
 import type { User } from '@/types'
 import { clearCache, invalidateCache } from './cache'
 import { resetConnection } from './connection'
@@ -195,6 +196,18 @@ function confirmedWrite(path: string, notify = true) {
 
 async function sendQueued(mutation: QueuedMutation, session: Session): Promise<Response> {
   assertCurrent(session)
+  if (mutation.method === 'PUT' && /^\/transactions\/\d+$/.test(mutation.path)) {
+    const payload = JSON.parse(mutation.body ?? '{}') as Record<string, unknown>
+    if (!payload.mutationId || !payload.editedAt) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'This older edit has no original save time. Retry explicitly to apply it as a new edit, or discard it.'
+        }),
+        { status: 428 }
+      )
+    }
+  }
   // Older catalog creates did not have a stable create key. Use the saved
   // operation ID, never a fresh UUID on every replay.
   let body = mutation.body
@@ -214,6 +227,14 @@ async function sendQueued(mutation: QueuedMutation, session: Session): Promise<R
     else if (isCurrent(session)) {
       recordRecurringState(response, session)
       if (response.ok || (mutation.method === 'DELETE' && response.status === 404)) {
+        if (mutation.method === 'PUT' && /^\/transactions\/\d+$/.test(mutation.path)) {
+          const data = await response
+            .clone()
+            .json()
+            .catch(() => null)
+          if (data?.syncStatus === 'superseded')
+            showSnack('A newer edit was kept. The movement has been refreshed.', 'info')
+        }
         confirmedWrite(mutation.path, false)
         if (mutation.method === 'DELETE')
           window.dispatchEvent(

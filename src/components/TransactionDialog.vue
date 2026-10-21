@@ -123,6 +123,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { createEditStamp } from '@/utils/editStamp'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import TagPicker from '@/components/TagPicker.vue'
 import AmountStepper from '@/components/AmountStepper.vue'
@@ -155,7 +156,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'saved', payload: { isEditing: boolean; queued: boolean }): void
+  (e: 'saved', payload: { isEditing: boolean; queued: boolean; superseded?: boolean }): void
 }>()
 
 const cs = useCurrencySymbol()
@@ -170,6 +171,7 @@ const form = ref({
 const submitting = ref(false)
 const error = ref('')
 const clientId = ref('')
+let editStamp = createEditStamp()
 const cleanForm = ref('')
 useUnsavedChanges(
   () => props.modelValue && JSON.stringify(form.value) !== cleanForm.value,
@@ -214,6 +216,7 @@ const isValid = computed(() => {
 })
 
 const reset = () => {
+  editStamp = createEditStamp()
   clientId.value = crypto.randomUUID()
   const tx = props.transaction
   form.value = {
@@ -264,11 +267,16 @@ const submit = async () => {
   const method = props.occurrence || isEditing.value ? 'PUT' : 'POST'
 
   try {
+    const stamp =
+      isEditing.value && !props.occurrence
+        ? editStamp(JSON.stringify({ ...form.value, type: props.type }))
+        : {}
     const res = await api(url, {
       method,
       body: JSON.stringify({
         ...(!isEditing.value ? { clientId: clientId.value } : {}),
         ...form.value,
+        ...stamp,
         ...(props.occurrence ? { kind: 'EDIT' } : {}),
         comment: form.value.description.trim(),
         type: props.type,
@@ -277,7 +285,15 @@ const submit = async () => {
     })
 
     if (res.ok) {
-      emit('saved', { isEditing: isEditing.value, queued: isQueuedResponse(res) })
+      const data = await res
+        .clone()
+        .json()
+        .catch(() => null)
+      emit('saved', {
+        isEditing: isEditing.value,
+        queued: isQueuedResponse(res),
+        ...(data?.syncStatus === 'superseded' ? { superseded: true } : {})
+      })
       close()
     } else {
       const data = await res.json().catch(() => null)

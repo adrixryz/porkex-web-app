@@ -43,6 +43,8 @@ export interface Tag {
 }
 
 export interface Transaction {
+  editedAt?: string | null
+  lastEditId?: string | null
   comment?: string
   tags?: Tag[]
   id: number

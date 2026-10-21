@@ -145,7 +145,26 @@ export async function retryFirstBlocked() {
   const item = firstBlockedMutation.value
   if (!item || item.userId !== currentUserId) return
   await withSendLock(item.userId, async () => {
-    await updateItem(item.id, stored => ({ ...stored, status: 'pending', lastError: undefined }))
+    await updateItem(item.id, stored => {
+      let body = stored.body
+      if (stored.method === 'PUT' && /^\/transactions\/\d+$/.test(stored.path) && body) {
+        const payload = JSON.parse(body) as Record<string, unknown>
+        if (!payload.mutationId || !payload.editedAt) {
+          if (
+            !window.confirm(
+              'This older edit has no original save time. Apply it now as a new edit?'
+            )
+          )
+            return stored
+          body = JSON.stringify({
+            ...payload,
+            mutationId: crypto.randomUUID(),
+            editedAt: new Date().toISOString()
+          })
+        }
+      }
+      return { ...stored, body, status: 'pending', lastError: undefined }
+    })
     lastFlushError.value = ''
   })
 }

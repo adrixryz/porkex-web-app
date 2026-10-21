@@ -1,6 +1,128 @@
 import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 
+test('lost catalog responses replay through the real API without blocking the queue', async ({
+  page
+}, info) => {
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token!)
+      localStorage.setItem('porkex_user', user!)
+    },
+    { token: process.env.PORKEX_TEST_TOKEN, user: process.env.PORKEX_TEST_USER }
+  )
+  const headers = { Authorization: `Bearer ${process.env.PORKEX_TEST_TOKEN}` }
+  const keys = new Map<string, string[]>()
+  for (const path of ['categories', 'budgets'])
+    await page.route(`**/api/${path}`, async route => {
+      if (route.request().method() !== 'POST') return route.continue()
+      const sent = keys.get(path) ?? []
+      sent.push(route.request().postDataJSON().clientId)
+      keys.set(path, sent)
+      if (sent.length === 1) {
+        const response = await route.fetch()
+        expect(response.status()).toBe(201)
+        return route.abort('failed')
+      }
+      return route.continue()
+    })
+  const name = `Replay ${info.project.name}`
+  await page.goto('/categories')
+  await page.getByRole('button', { name: 'New Category', exact: true }).click()
+  let dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Name', { exact: true }).fill(name)
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    )
+    .toBe(0)
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const matching = categories.filter((category: { name: string }) => category.name === name)
+  expect(matching).toHaveLength(1)
+  await page.goto('/budgets')
+  await page.getByRole('button', { name: 'New Budget', exact: true }).click()
+  dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Limit', { exact: true }).fill('50')
+  await dialog.locator('.v-select').first().click()
+  await page.getByRole('option', { name, exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    )
+    .toBe(0)
+  const result = await (await page.request.get('/api/budgets', { headers })).json()
+  expect(
+    result.budgets.filter((budget: { categoryId: number }) => budget.categoryId === matching[0].id)
+  ).toHaveLength(1)
+  for (const sent of keys.values()) {
+    expect(sent.length).toBeGreaterThanOrEqual(2)
+    expect(new Set(sent).size).toBe(1)
+  }
+})
+
+test('delayed phone edit keeps a newer server edit and drains the real queue', async ({
+  page,
+  context
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Sync owner',
+      email: `sync-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const categoryId = categories.find((item: { type: string }) => item.type === 'EXPENSE').id
+  const payload = { amount: 10, type: 'EXPENSE', categoryId, comment: 'Device edit order' }
+  const movement = await (
+    await page.request.post('/api/transactions', { headers, data: payload })
+  ).json()
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/transactions')
+  await page.getByRole('button', { name: 'Edit Device edit order', exact: true }).click()
+  await context.setOffline(true)
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Amount', { exact: true }).fill('20')
+  await dialog.getByRole('button', { name: 'Update', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  const newer = await page.request.put(`/api/transactions/${movement.id}`, {
+    headers,
+    data: {
+      ...payload,
+      amount: 30,
+      mutationId: `pc-${info.project.name}`,
+      editedAt: new Date(Date.now() + 2000).toISOString()
+    }
+  })
+  expect(newer.status()).toBe(200)
+  await context.setOffline(false)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    )
+    .toBe(0)
+  const rows = await (await page.request.get('/api/transactions', { headers })).json()
+  expect(rows.items[0].amount).toBe(30)
+  await expect(
+    page.getByText('A newer edit was kept. The movement has been refreshed.', { exact: true })
+  ).toBeVisible()
+})
+
 test('real analytics totals, net results and averages reach the income and expense chart', async ({
   page
 }, info) => {

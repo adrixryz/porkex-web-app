@@ -1,112 +1,104 @@
 <template>
-  <v-dialog
+  <AppDialog
     :model-value="modelValue"
+    title="Edit tags"
     max-width="480"
     :persistent="busy || dragging !== null"
+    :closable="false"
+    content-class="pa-4"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <v-card class="rounded-xl" title="Edit tags">
-      <v-card-text>
-        <p class="text-caption mb-3">
-          Names, order and deletions apply to all your transactions. Hold the handle to drag; use
-          arrow keys when focused.
-        </p>
-        <v-alert v-if="message" class="mb-3" :type="messageType" density="compact">{{
-          message
-        }}</v-alert>
-        <div ref="list" class="tag-list">
-          <div
-            v-for="(tag, index) in ordered"
-            :key="tag.id"
-            :data-tag-id="tag.id"
-            class="tag-row"
-            :class="{ dragging: dragging === tag.id }"
-          >
-            <v-btn
-              type="button"
-              class="drag-handle"
-              variant="text"
-              size="small"
-              :icon="mdiDragVertical"
-              :disabled="busy"
-              :aria-label="`Reorder ${tag.name}; arrow keys move it`"
-              @pointerdown="startDrag($event, tag.id)"
-              @pointermove="moveDrag"
-              @pointerup="finishDrag"
-              @pointercancel="cancelDrag"
-              @keydown.up.prevent="move(index, -1)"
-              @keydown.down.prevent="move(index, 1)"
-              @keydown.esc="cancelDrag"
-            />
-            <v-text-field
-              v-model="names[tag.id]"
-              :aria-label="`Tag name ${tag.name}`"
-              density="compact"
-              hide-details
-              :disabled="busy"
-              @keydown.enter.prevent.stop="rename(tag)"
-            />
-            <v-btn
-              type="button"
-              size="small"
-              variant="text"
-              :icon="mdiCheck"
-              :disabled="busy || names[tag.id] === tag.name"
-              :aria-label="`Save name ${tag.name}`"
-              @click="rename(tag)"
-            />
-            <v-btn
-              type="button"
-              size="small"
-              variant="text"
-              color="error"
-              :icon="mdiDeleteOutline"
-              :disabled="busy"
-              :aria-label="`Delete tag ${tag.name}`"
-              @click="deleting = tag"
-            />
-          </div>
-        </div>
-        <div class="d-flex ga-2 mt-4 align-center">
-          <v-text-field
-            v-model="newName"
-            label="New tag name"
-            density="compact"
-            hide-details
-            enterkeyhint="done"
-            :disabled="busy"
-            @keydown.enter.prevent.stop="create"
-          />
-          <v-btn type="button" :disabled="busy || !newName.trim()" @click="create">Add</v-btn>
-        </div>
-      </v-card-text>
-      <v-card-actions
-        ><v-spacer /><v-btn type="button" :disabled="busy" @click="emit('update:modelValue', false)"
-          >Done</v-btn
-        ></v-card-actions
+    <p class="text-caption mb-3">
+      Names, order and deletions apply to all your transactions. Hold the handle to drag; use arrow
+      keys when focused.
+    </p>
+    <v-alert v-if="message" class="mb-3" :type="messageType" density="compact">{{
+      message
+    }}</v-alert>
+    <div ref="list" class="tag-list">
+      <div
+        v-for="(tag, index) in ordered"
+        :key="tag.id"
+        :data-tag-id="tag.id"
+        class="tag-row"
+        :class="{ dragging: dragging === tag.id }"
       >
-    </v-card>
-    <v-dialog
-      :model-value="!!deleting"
-      max-width="380"
-      :persistent="busy"
-      @update:model-value="deleting = null"
-    >
-      <v-card
-        title="Delete tag?"
-        :text="`Delete “${deleting?.name}” from all transactions? Your transactions and comments will be kept.`"
-      >
-        <v-card-actions
-          ><v-btn :disabled="busy" @click="deleting = null">Cancel</v-btn
-          ><v-btn color="error" :loading="busy" @click="remove">Delete</v-btn></v-card-actions
-        >
-      </v-card>
-    </v-dialog>
-  </v-dialog>
+        <AppIconButton
+          :icon="mdiDragVertical"
+          :label="`Reorder ${tag.name}; arrow keys move it`"
+          class="drag-handle"
+          :disabled="busy"
+          @pointerdown="startDrag($event, tag.id)"
+          @pointermove="moveDrag"
+          @pointerup="finishDrag"
+          @pointercancel="cancelDrag"
+          @keydown.up.prevent="move(index, -1)"
+          @keydown.down.prevent="move(index, 1)"
+          @keydown.esc="cancelDrag"
+        />
+        <AppTextField
+          v-model="names[tag.id]"
+          :aria-label="`Tag name ${tag.name}`"
+          density="compact"
+          hide-details
+          :disabled="busy"
+          @keydown.enter.prevent.stop="rename(tag)"
+        />
+        <AppIconButton
+          :icon="mdiCheck"
+          :label="`Save name ${tag.name}`"
+          :disabled="busy || names[tag.id] === tag.name"
+          @click="rename(tag)"
+        />
+        <AppIconButton
+          :icon="mdiDeleteOutline"
+          :label="`Delete tag ${tag.name}`"
+          color="error"
+          :disabled="busy"
+          @click="deleting = tag"
+        />
+      </div>
+    </div>
+    <div class="d-flex ga-2 mt-4 align-center">
+      <AppTextField
+        v-model="newName"
+        label="New tag name"
+        density="compact"
+        hide-details
+        enterkeyhint="done"
+        :disabled="busy"
+        @keydown.enter.prevent.stop="create"
+      />
+      <AppButton type="button" :disabled="busy || !newName.trim()" @click="create">Add</AppButton>
+    </div>
+    <template #actions>
+      <v-spacer></v-spacer>
+      <AppButton type="button" :disabled="busy" @click="emit('update:modelValue', false)">
+        Done
+      </AppButton>
+    </template>
+  </AppDialog>
+  <AppConfirmDialog
+    :model-value="!!deleting"
+    title="Delete tag?"
+    confirm-label="Delete"
+    :loading="busy"
+    :persistent="busy"
+    @update:model-value="deleting = null"
+    @confirm="remove"
+  >
+    Delete “{{ deleting?.name }}” from all transactions? Your transactions and comments will be
+    kept.
+  </AppConfirmDialog>
 </template>
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
 import { mdiCheck, mdiDeleteOutline, mdiDragVertical } from '@mdi/js'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppDialog from '@/components/ui/AppDialog.vue'
+import AppIconButton from '@/components/ui/AppIconButton.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
 import type { Tag } from '@/types'
 import { useTags } from '@/composables/useTags'
 import { api, isQueuedResponse } from '@/utils/api'

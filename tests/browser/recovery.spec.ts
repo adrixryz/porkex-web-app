@@ -50,11 +50,20 @@ test('offline shell, durable write, reconnection and visible refresh', async ({
   await expect(
     page.getByText('Change saved on this device; waiting to sync.', { exact: true })
   ).toBeVisible()
+  const offlineSnackbar = page
+    .locator('.v-snackbar__wrapper')
+    .filter({ hasText: 'Change saved on this device; waiting to sync.' })
+  await expect(offlineSnackbar).toHaveCSS('border-radius', '12px')
   expect(
     await page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
   ).toBe(1)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+  const staleAlert = page
+    .locator('.v-alert')
+    .filter({ hasText: 'No connection. Showing the last saved copy.' })
+  await expect(staleAlert).toBeVisible()
+  await expect(staleAlert).toHaveCSS('border-radius', '12px')
   await context.setOffline(false)
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await expect(page.getByText('Offline lunch', { exact: true }).first()).toBeVisible()
@@ -84,6 +93,161 @@ test('URL filters restore absent defaults on Back and Forward', async ({ page })
   await expect(page).toHaveURL(/search=needle/)
   await page.goBack()
   await expect(page.getByLabel('Search transactions', { exact: true })).toHaveValue('')
+})
+test('the period arrows stop at the current one and never look ahead', async ({ page }) => {
+  await page.goto('/transactions?period=month&offset=3')
+  await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+
+  const next = page.getByRole('button', { name: 'Next period' })
+  // A bookmarked offset is clamped to the current month and dropped from the URL.
+  await expect(page).not.toHaveURL(/offset=/)
+  await expect(next).toBeDisabled()
+
+  await page.getByRole('button', { name: 'Previous period' }).click()
+  await expect(page).toHaveURL(/offset=-1/)
+  await expect(next).toBeEnabled()
+
+  await next.click()
+  await expect(page).not.toHaveURL(/offset=/)
+  await expect(next).toBeDisabled()
+})
+test('the custom period caps both bounds at today', async ({ page }) => {
+  await page.goto('/transactions?period=custom&from=2099-01-01&to=2099-01-02')
+  await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+
+  const today = await page.evaluate(() => {
+    const d = new Date()
+    const pad = (value: number) => (value < 10 ? `0${value}` : String(value))
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  })
+
+  const from = page.getByLabel('From', { exact: true })
+  const to = page.getByLabel('To', { exact: true })
+  await expect(from).toHaveAttribute('max', today)
+  await expect(to).toHaveAttribute('max', today)
+  // A bookmarked future range snaps back to today, in the box and in the URL.
+  await expect(from).toHaveValue(today)
+  await expect(to).toHaveValue(today)
+  await expect(page).not.toHaveURL(/2099/)
+
+  // So does a future date typed straight into the box.
+  await to.fill('2099-12-31')
+  await expect(to).toHaveValue(today)
+})
+test('the period picker reads as a dark segmented control with an accent pill', async ({
+  page
+}) => {
+  await page.goto('/transactions?period=month')
+  await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+
+  // Match the outlined type filter while keeping every period in one track.
+  const toggle = page.locator('.compact-toggle')
+  await expect(toggle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(toggle).toHaveCSS('border-top-color', 'rgba(255, 255, 255, 0.12)')
+  await expect(toggle).toHaveCSS('border-radius', '999px')
+
+  const active = toggle.locator('.v-btn--active')
+  await expect(active).toHaveCount(1)
+  await expect(active).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(active).toHaveCSS('color', 'rgb(0, 112, 243)')
+  await expect(active).toHaveCSS('border-radius', '999px')
+  // Vuetify's always-on "activated" overlay would wash that pill out.
+  await expect(active.locator('.v-btn__overlay')).toHaveCSS('opacity', '0')
+  const thumb = toggle.locator('.compact-toggle__thumb')
+  await expect(thumb).toHaveCSS('background-color', 'rgba(0, 112, 243, 0.12)')
+  await expect(thumb).toHaveCSS('border-top-color', 'rgb(0, 112, 243)')
+
+  const idle = toggle.locator('.v-btn:not(.v-btn--active)').first()
+  await expect(idle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(idle).toHaveCSS('color', 'rgb(161, 161, 161)')
+
+  // The track itself never scrolls or clips its own segments.
+  const overflow = await toggle.evaluate(track => track.scrollWidth - track.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(1)
+})
+test('period selection stays mounted during loading and fits mobile without stretching', async ({
+  page
+}) => {
+  await page.goto('/transactions?period=month')
+  const toggle = page.locator('.compact-toggle')
+  await expect(toggle).toBeVisible()
+  const original = await toggle.elementHandle()
+  const thumb = toggle.locator('.compact-toggle__thumb')
+  const startingWidth = (await thumb.boundingBox())!.width
+
+  // Keep the response pending: controls must respond while only results load.
+  let release!: () => void
+  const pending = new Promise<void>(resolve => {
+    release = resolve
+  })
+  await page.route('**/api/transactions?**', async route => {
+    await pending
+    await route.continue().catch(() => {})
+  })
+  try {
+    await toggle.getByRole('button', { name: 'Year', exact: true }).click()
+    await expect(page.locator('.v-card[aria-busy="true"]')).toBeVisible()
+    await expect(toggle.getByRole('button', { name: 'Year', exact: true })).toHaveClass(
+      /v-btn--active/
+    )
+    expect(await toggle.evaluate((current, previous) => current === previous, original)).toBe(true)
+    expect(Math.abs((await thumb.boundingBox())!.width - startingWidth)).toBeLessThan(1)
+    await toggle.getByRole('button', { name: 'Week', exact: true }).click()
+    await expect(toggle.getByRole('button', { name: 'Week', exact: true })).toHaveClass(
+      /v-btn--active/
+    )
+  } finally {
+    release()
+  }
+  await expect(page.locator('.v-card[aria-busy="true"]')).toHaveCount(0)
+
+  for (const width of [1280, 600, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect
+      .poll(() =>
+        toggle.evaluate(track => {
+          const active = track.querySelector('.v-btn--active')!.getBoundingClientRect()
+          const pill = track.querySelector('.compact-toggle__thumb')!.getBoundingClientRect()
+          return Math.max(Math.abs(active.x - pill.x), Math.abs(active.width - pill.width))
+        })
+      )
+      .toBeLessThan(1)
+    const layout = await toggle.evaluate(track => {
+      const bounds = track.getBoundingClientRect()
+      return Array.from(track.querySelectorAll('.v-btn')).map(button => {
+        const box = button.getBoundingClientRect()
+        const label = button.querySelector('.v-btn__content')!.getBoundingClientRect()
+        return {
+          height: box.height,
+          inside: box.left >= bounds.left && box.right <= bounds.right,
+          labelFits: label.width <= box.width
+        }
+      })
+    })
+    expect(layout).toHaveLength(5)
+    for (const button of layout) {
+      expect(button.height).toBeGreaterThanOrEqual(width <= 600 ? 44 : 40)
+      expect(button.inside && button.labelFits).toBe(true)
+    }
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(thumb).toHaveCSS('transition-duration', '0s')
+  await original?.dispose()
+})
+
+test('the transaction list always requests 15 rows per page', async ({ page }) => {
+  await page.goto('/transactions?perPage=50')
+  await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+  await expect(page).not.toHaveURL(/perPage=/)
+
+  const saved = await state(page)
+  const listRequests = saved.requests.filter((request: { path: string }) =>
+    request.path.startsWith('/api/transactions?')
+  )
+  expect(listRequests.length).toBeGreaterThan(0)
+  expect(new URL(listRequests.at(-1).path, 'http://localhost').searchParams.get('perPage')).toBe(
+    '15'
+  )
 })
 async function verifySafeWorkerUpdate(page: Page) {
   await page.goto('/transactions')
@@ -349,6 +513,24 @@ test('analytics history restores missing ranges to defaults', async ({ page }) =
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
 })
 
+test('analytics spending title wraps inside its card on narrow screens', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 })
+  await page.goto('/analytics')
+  const title = page.locator('.analytics-card-title')
+  await expect(title).toBeVisible()
+  await expect(title.getByText('Where your money went this month', { exact: true })).toBeVisible()
+  expect(
+    await title.evaluate(element => ({
+      fits: element.scrollWidth <= element.clientWidth + 1,
+      inside: (() => {
+        const card = element.closest('.v-card')!.getBoundingClientRect()
+        const rect = element.getBoundingClientRect()
+        return rect.left >= card.left && rect.right <= card.right + 1
+      })()
+    }))
+  ).toEqual({ fits: true, inside: true })
+})
+
 test('category comparison selector keeps Analytics ranges and restores browser history', async ({
   page
 }, info) => {
@@ -369,7 +551,7 @@ test('category comparison selector keeps Analytics ranges and restores browser h
   const card = page.getByRole('region', { name: 'Category comparison', exact: true })
   const spending = page
     .locator('.v-card')
-    .filter({ has: page.getByText('Where your money went', { exact: true }) })
+    .filter({ has: page.getByText('Where your money went this month', { exact: true }) })
   for (const name of ['Food', 'Transport', 'Housing', 'Health', 'Shopping'])
     await expect(spending.getByText(name, { exact: true })).toBeVisible()
   const selector = card.locator('.comparison-selector')
@@ -463,7 +645,14 @@ test('tag manager creates, renames, reorders and globally deletes without losing
   await expect(dialog).not.toBeVisible()
   if (info.project.name === 'android') {
     await page.getByRole('button', { name: 'Show 1 tags', exact: true }).click()
-    await expect(page.getByRole('listitem').filter({ hasText: /^Renamed$/ })).toBeVisible()
+    const tagMenu = page.locator('.v-menu > .v-overlay__content')
+    await expect(tagMenu).toBeVisible()
+    await expect(tagMenu).toHaveCSS('border-radius', '12px')
+    await expect(tagMenu).toHaveCSS('border-top-width', '1px')
+    await expect(tagMenu).toHaveCSS('background-color', 'rgb(10, 10, 10)')
+    const tagItem = page.getByRole('listitem').filter({ hasText: /^Renamed$/ })
+    await expect(tagItem).toBeVisible()
+    await expect(tagItem).toHaveCSS('border-radius', '8px')
     await page.keyboard.press('Escape')
   } else await expect(page.getByText('Renamed', { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
@@ -535,6 +724,10 @@ test('undo survives navigation and an expired deletion survives reload', async (
   await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  const undoSnackbar = page
+    .locator('.v-snackbar__wrapper')
+    .filter({ has: page.getByRole('button', { name: 'Deshacer', exact: true }) })
+  await expect(undoSnackbar).toHaveCSS('border-radius', '12px')
   await page.evaluate(() => {
     history.pushState({}, '', '/')
     window.dispatchEvent(new PopStateEvent('popstate'))
@@ -586,6 +779,12 @@ test('next-only edit and skip preserve the rule base and target exact dates', as
     ]
   })
   await page.goto('/recurring')
+  await expect(page.getByRole('button', { name: 'Skip next', exact: true })).toHaveClass(
+    /v-btn--variant-tonal/
+  )
+  await expect(page.getByRole('button', { name: 'Edit next', exact: true })).toHaveClass(
+    /v-btn--variant-tonal/
+  )
   await page.getByRole('button', { name: 'Edit next', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel('Date', { exact: true })).toHaveAttribute('readonly', '')
@@ -631,7 +830,8 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
     ]
   })
   await page.goto('/transactions')
-  for (const width of [320, 360, 390, 768, 960, 1024, 1280]) {
+  await expect(page.getByLabel('Per page', { exact: true })).toHaveCount(0)
+  for (const width of [320, 360, 390, 768, 900, 960, 1024, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
     const bounds = await page.locator('.transaction-filters').evaluate(element => {
@@ -649,24 +849,95 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
       )
     })
     expect(bounds).toBe(true)
+    // All/Expense/Income always keep a real horizontal padding: the label must
+    // not eat the pill's own breathing room on any width.
+    const typeButtons = await page
+      .locator('.transaction-filters .v-btn-group')
+      .first()
+      .evaluate(group =>
+        Array.from(group.querySelectorAll('.v-btn')).map(button => {
+          const style = getComputedStyle(button)
+          const content = button.querySelector('.v-btn__content')!.getBoundingClientRect()
+          return {
+            padding: parseFloat(style.paddingLeft),
+            fits:
+              content.width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 2 <=
+              button.getBoundingClientRect().width + 0.5
+          }
+        })
+      )
+    expect(typeButtons).toHaveLength(3)
+    for (const button of typeButtons) {
+      expect(button.padding).toBeGreaterThanOrEqual(12)
+      expect(button.fits).toBe(true)
+    }
     if (width >= 960) {
       const layout = await page.locator('.transaction-filters').evaluate(element => {
         const controls = Array.from(element.children).map(child => child.getBoundingClientRect())
+        const fields = Array.from(element.querySelectorAll('.amount-range > *')).map(node =>
+          node.getBoundingClientRect()
+        )
         return {
           centers: controls.map(rect => rect.top + rect.height / 2),
-          widths: controls.map(rect => rect.width)
+          widths: controls.map(rect => rect.width),
+          fields: fields.map(rect => ({
+            width: rect.width,
+            top: rect.top,
+            left: rect.left,
+            right: rect.right
+          }))
         }
       })
       expect(Math.max(...layout.centers) - Math.min(...layout.centers)).toBeLessThan(1)
-      expect(layout.widths[4]).toBeLessThan(layout.widths[1])
-      expect(layout.widths[5]).toBeLessThan(layout.widths[2])
-      const rightGap = await page.locator('.transaction-period').evaluate(element => {
-        const period = element.getBoundingClientRect()
-        const navigation = element.querySelector('.period-navigation')!.getBoundingClientRect()
-        return Math.abs(period.right - navigation.right)
+      expect(layout.widths).toHaveLength(4)
+      // The joined pair spans exactly its two 120px columns plus the 10px gap:
+      // it keeps its own size instead of stretching with the flexible ones.
+      expect(Math.round(layout.widths[3])).toBe(250)
+      // At full width Min and Max keep their own size: 120px each, wide enough
+      // for the currency symbol and the number.
+      expect(layout.fields).toHaveLength(2)
+      for (const field of layout.fields) expect(Math.round(field.width)).toBe(120)
+      expect(Math.abs(layout.fields[0].top - layout.fields[1].top)).toBeLessThan(1)
+      expect(layout.fields[0].right).toBeLessThanOrEqual(layout.fields[1].left + 1)
+    } else {
+      const joined = await page.locator('.transaction-filters').evaluate(element => {
+        const controls = Array.from(element.children).map(child => child.getBoundingClientRect())
+        const range = element.querySelector('.amount-range')!.getBoundingClientRect()
+        const fields = Array.from(element.querySelectorAll('.amount-range > *')).map(node =>
+          node.getBoundingClientRect()
+        )
+        return {
+          category: controls[1].width,
+          range: range.width,
+          fields: fields.map(rect => ({
+            width: rect.width,
+            top: rect.top,
+            left: rect.left,
+            right: rect.right
+          }))
+        }
       })
-      expect(rightGap).toBeLessThan(2)
+      // Responsive: Min/Max share one cell as wide as Category or Sort by.
+      expect(Math.abs(joined.category - joined.range)).toBeLessThan(1)
+      expect(joined.fields).toHaveLength(2)
+      expect(Math.abs(joined.fields[0].width - joined.fields[1].width)).toBeLessThan(1)
+      expect(Math.abs(joined.fields[0].top - joined.fields[1].top)).toBeLessThan(1)
+      expect(joined.fields[0].right).toBeLessThanOrEqual(joined.fields[1].left + 1)
     }
+    // The ‹ date › group goes back to the right edge as soon as the period row
+    // is horizontal again (Vuetify's md utilities start at 840px); while it
+    // stacks below that, it stays centered.
+    const navGaps = await page.locator('.transaction-period').evaluate(element => {
+      const period = element.getBoundingClientRect()
+      const navigation = element.querySelector('.period-navigation')!
+      const previous = navigation
+        .querySelector('[aria-label="Previous period"]')!
+        .getBoundingClientRect()
+      const next = navigation.querySelector('[aria-label="Next period"]')!.getBoundingClientRect()
+      return { left: previous.left - period.left, right: period.right - next.right }
+    })
+    if (width >= 840) expect(Math.abs(navGaps.right)).toBeLessThan(2)
+    else expect(Math.abs(navGaps.left - navGaps.right)).toBeLessThan(2)
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true)
@@ -710,6 +981,101 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
     )
   })
   await page.screenshot({ path: info.outputPath('movement-dialog-320.png'), fullPage: true })
+})
+
+test('the min/max filter steppers walk back down to an empty box', async ({ page }) => {
+  await page.goto('/transactions')
+  await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+
+  const min = page.getByLabel('Min', { exact: true })
+  const max = page.getByLabel('Max', { exact: true })
+  const currency = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('porkex_currency') ?? '{"symbol":"$"}').symbol as string
+  )
+
+  // Empty counts as 0, so the first click lands on 1 and the second one empties
+  // the box again: no bare 0 left behind pretending to be a bound.
+  await page.getByRole('button', { name: 'Increase minimum amount' }).click()
+  await expect(min).toHaveValue('1')
+  // Min/Max carry the currency symbol inside the box, exactly like Amount does:
+  // it shows up as soon as the field is active.
+  expect(
+    await page.locator('.transaction-filters .v-text-field__prefix__text').allTextContents()
+  ).toEqual([currency, currency])
+  expect(
+    await page
+      .locator('.amount-filter')
+      .first()
+      .locator('.v-text-field__prefix')
+      .evaluate(node => getComputedStyle(node).opacity)
+  ).toBe('1')
+  await page.getByRole('button', { name: 'Decrease minimum amount' }).click()
+  await expect(min).toHaveValue('')
+
+  await page.getByRole('button', { name: 'Increase maximum amount' }).click()
+  await page.getByRole('button', { name: 'Increase maximum amount' }).click()
+  await expect(max).toHaveValue('2')
+  await page.getByRole('button', { name: 'Decrease maximum amount' }).click()
+  await page.getByRole('button', { name: 'Decrease maximum amount' }).click()
+  await expect(max).toHaveValue('')
+})
+
+test('the dialog amount stepper walks back down to an empty box', async ({ page }) => {
+  await page.goto('/transactions')
+  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  const dialog = page.getByRole('dialog')
+  const amount = dialog.getByLabel('Amount', { exact: true })
+
+  // Pressing plus on an empty amount gives 1, and pressing minus from there
+  // clears the field instead of parking it on the 0.01 minimum.
+  await dialog.getByRole('button', { name: 'Increase expense amount' }).click()
+  await expect(amount).toHaveValue('1')
+  await dialog.getByRole('button', { name: 'Decrease expense amount' }).click()
+  await expect(amount).toHaveValue('')
+})
+
+test('category cards render as surface cards', async ({ page }) => {
+  await page.goto('/categories')
+  await expect(page.getByRole('heading', { name: 'Categories', exact: true })).toBeVisible()
+
+  const card = page.locator('.cat-card').first()
+  await expect(card).toHaveClass(/v-card/)
+  const background = await card.evaluate(element => getComputedStyle(element).backgroundColor)
+  expect(background).not.toBe('rgba(0, 0, 0, 0)')
+})
+
+test('category selects show the color of each category', async ({ page }) => {
+  await page.goto('/transactions')
+  await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
+
+  const filter = page.locator('.category-filter')
+  await filter.locator('.v-field').click()
+  const menu = page.locator('.v-select__content')
+  await expect(menu).toBeVisible()
+  await expect(menu).toHaveCSS('border-radius', '12px')
+  await expect(menu).toHaveCSS('border-top-width', '1px')
+  await expect(menu).toHaveCSS('background-color', 'rgb(10, 10, 10)')
+  const food = page.getByRole('option', { name: 'Food', exact: true })
+  await expect(food).toHaveCSS('border-radius', '8px')
+  const foodDot = food.locator('.category-dot')
+  await expect(foodDot).toBeVisible()
+  expect(await foodDot.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(
+    'rgb(234, 67, 53)'
+  )
+  await food.click()
+  await expect(filter.locator('.v-select__selection .category-dot')).toBeVisible()
+
+  await page.goto('/budgets')
+  await expect(page.getByRole('heading', { name: 'Budgets', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'New Budget', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.locator('.v-select').first().click()
+  const budgetFood = page.getByRole('option', { name: 'Food', exact: true })
+  const budgetDot = budgetFood.locator('.category-dot')
+  await expect(budgetDot).toBeVisible()
+  expect(await budgetDot.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(
+    'rgb(234, 67, 53)'
+  )
 })
 
 test('recent transaction comments and amounts align in fixed columns', async ({ page }, info) => {

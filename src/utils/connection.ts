@@ -4,8 +4,10 @@ import { ref } from 'vue'
 // any view rendering cached data has to be able to raise it. Same pattern as
 // useSnackbar.
 
-// True while at least one view is rendering data that came from the cache
-// instead of a live response.
+// True while at least one view is still rendering data that came from the
+// cache with no live response to replace it: the refresh failed, or it is
+// taking well past the grace period before a slow one counts (that grace is
+// what keeps ordinary navigation from flashing the banner).
 export const hasStaleData = ref(false)
 
 // When the cached copy currently on screen was stored, for the banner text.

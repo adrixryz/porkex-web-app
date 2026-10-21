@@ -180,3 +180,28 @@ it('edits the pinned next occurrence through its own endpoint', async () => {
     vi.unstubAllGlobals()
   }
 })
+
+it('walks the amount stepper back to empty instead of parking it on 0.01', async () => {
+  vi.stubGlobal('fetch', networkDown())
+  try {
+    const wrapper = await openDialog()
+    const vm = wrapper.vm as unknown as { form: Record<string, unknown> }
+    const increase = wrapper.find('button[aria-label="Increase expense amount"]')
+    const decrease = wrapper.find('button[aria-label="Decrease expense amount"]')
+
+    await increase.trigger('click')
+    expect(vm.form.amount).toBe('1')
+
+    // 1 → 0 clears the box: no 0.01 left behind, the amount is simply missing.
+    await decrease.trigger('click')
+    expect(vm.form.amount).toBe('')
+    await decrease.trigger('click')
+    expect(vm.form.amount).toBe('')
+
+    vm.form.amount = '2.5'
+    await decrease.trigger('click')
+    expect(vm.form.amount).toBe('1.5')
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})

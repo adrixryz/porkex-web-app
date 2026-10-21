@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-8 px-md-8 max-w-1200" fluid>
+  <AppPage>
     <!-- LOADING SKELETON -->
     <template v-if="loading">
       <v-row class="mb-4">
@@ -19,7 +19,7 @@
       </v-row>
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4" v-for="n in 3" :key="n">
-          <v-card class="pa-4 rounded-xl" elevation="1" color="surface">
+          <AppCard class="pa-4">
             <div class="d-flex align-center">
               <v-skeleton-loader type="avatar" class="mr-4"></v-skeleton-loader>
               <div>
@@ -27,12 +27,12 @@
                 <v-skeleton-loader type="text" width="140"></v-skeleton-loader>
               </div>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
       <v-row>
         <v-col cols="12" md="8">
-          <v-card elevation="1" class="rounded-xl" color="surface">
+          <AppCard>
             <v-card-title class="px-6 py-4"
               ><v-skeleton-loader type="text" width="180"></v-skeleton-loader
             ></v-card-title>
@@ -51,17 +51,17 @@
                 <v-skeleton-loader type="text" width="80"></v-skeleton-loader>
               </div>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
         <v-col cols="12" md="4">
-          <v-card elevation="1" class="rounded-xl" color="surface">
+          <AppCard>
             <v-card-title class="px-6 py-4"
               ><v-skeleton-loader type="text" width="160"></v-skeleton-loader
             ></v-card-title>
             <v-card-text class="pa-6 d-flex justify-center">
               <v-skeleton-loader type="ossein" width="200" height="200"></v-skeleton-loader>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
@@ -69,135 +69,97 @@
     <!-- ACTUAL CONTENT -->
     <template v-else>
       <!-- HEADER -->
-      <v-row>
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-sm-space-between align-start align-sm-center ga-4"
-        >
-          <div>
-            <div class="text-overline text-on-surface-variant mb-1 d-flex align-center ga-2">
-              Global Balance
-              <v-chip size="x-small" variant="tonal">All time</v-chip>
-            </div>
-            <h1
-              class="text-h3 font-weight-bold"
-              :class="db.globalBalance < 0 ? 'text-error' : 'text-on-surface'"
-            >
-              {{ cs }}{{ formatMoney(db.globalBalance) }}
-            </h1>
+      <AppPageHeader>
+        <template #title>
+          <div class="text-overline text-on-surface-variant mb-1 d-flex align-center ga-2">
+            Global Balance
+            <v-chip size="x-small" variant="tonal">All time</v-chip>
           </div>
-          <div>
-            <v-btn
-              color="error"
-              elevation="0"
-              :prepend-icon="mdiMinus"
-              rounded="pill"
-              @click="openDialog('EXPENSE')"
-              class="mr-3"
-              >Expense</v-btn
-            >
-            <v-btn
-              color="success"
-              elevation="0"
-              :prepend-icon="mdiPlus"
-              rounded="pill"
-              @click="openDialog('INCOME')"
-              >Income</v-btn
-            >
-          </div>
-        </v-col>
-      </v-row>
+          <h1
+            class="text-h3 font-weight-bold"
+            :class="db.globalBalance < 0 ? 'text-error' : 'text-on-surface'"
+          >
+            {{ cs }}{{ formatMoney(db.globalBalance) }}
+          </h1>
+        </template>
+        <template #actions>
+          <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('EXPENSE')">
+            Expense
+          </AppButton>
+          <AppButton color="success" :prepend-icon="mdiPlus" @click="openDialog('INCOME')">
+            Income
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- KPI CARDS -->
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4">
-          <v-card class="pa-4 rounded-xl d-flex align-center" elevation="1" color="surface">
-            <v-avatar color="success" class="mr-4" size="56" variant="tonal">
-              <v-icon :icon="mdiArrowUpCircleOutline" size="32"></v-icon>
-            </v-avatar>
-            <div>
-              <div class="text-subtitle-2 text-on-surface-variant font-weight-medium">
-                Total Income
-              </div>
-              <div class="text-h5 font-weight-bold text-success">
-                +{{ cs }}{{ formatMoney(db.totalIncome) }}
-              </div>
-            </div>
-          </v-card>
+          <AppStatCard
+            label="Total Income"
+            :value="`+${cs}${formatMoney(db.totalIncome)}`"
+            :icon="mdiArrowUpCircleOutline"
+            color="success"
+            value-class="text-success"
+          />
         </v-col>
         <v-col cols="12" sm="6" md="4">
-          <v-card class="pa-4 rounded-xl d-flex align-center" elevation="1" color="surface">
-            <v-avatar color="error" class="mr-4" size="56" variant="tonal">
-              <v-icon :icon="mdiArrowDownCircleOutline" size="32"></v-icon>
-            </v-avatar>
-            <div>
-              <div class="text-subtitle-2 text-on-surface-variant font-weight-medium">
-                Total Expenses
-              </div>
-              <div class="text-h5 font-weight-bold text-error">
-                -{{ cs }}{{ formatMoney(db.totalExpense) }}
-              </div>
-            </div>
-          </v-card>
+          <AppStatCard
+            label="Total Expenses"
+            :value="`-${cs}${formatMoney(db.totalExpense)}`"
+            :icon="mdiArrowDownCircleOutline"
+            color="error"
+            value-class="text-error"
+          />
         </v-col>
         <v-col cols="12" sm="12" md="4">
-          <v-card class="pa-4 rounded-xl d-flex align-center" elevation="1" color="surface">
-            <v-avatar color="primary" class="mr-4" size="56" variant="tonal">
-              <v-icon :icon="mdiReceiptTextOutline" size="32"></v-icon>
-            </v-avatar>
-            <div>
-              <div class="text-subtitle-2 text-on-surface-variant font-weight-medium">
-                Transactions
-              </div>
-              <div class="text-h5 font-weight-bold text-on-surface">{{ db.transactionCount }}</div>
-            </div>
-          </v-card>
+          <AppStatCard
+            label="Transactions"
+            :value="db.transactionCount"
+            :icon="mdiReceiptTextOutline"
+            color="primary"
+            value-class="text-on-surface"
+          />
         </v-col>
       </v-row>
 
       <!-- MAIN TWO COLUMNS -->
       <v-row>
         <v-col cols="12" md="8">
-          <v-card elevation="1" class="rounded-xl overflow-hidden fill-height" color="surface">
-            <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
-              <span class="font-weight-medium text-subtitle-1">Recent Transactions</span>
-              <v-spacer></v-spacer>
-              <v-btn variant="text" size="small" color="primary" to="/transactions">View All</v-btn>
-            </v-card-title>
+          <AppCard title="Recent Transactions" class="overflow-hidden fill-height">
+            <template #header-actions>
+              <AppButton variant="text" size="small" color="primary" to="/transactions">
+                View All
+              </AppButton>
+            </template>
             <v-card-text class="pa-0">
               <v-list lines="two" bg-color="transparent" class="py-0">
-                <div
+                <AppEmptyState
                   v-if="db.recentTransactions.length === 0"
-                  class="text-center pa-10 text-on-surface-variant"
+                  :icon="mdiReceiptTextClockOutline"
+                  title="No transactions yet"
+                  description="Add your first movement to start tracking your balance."
+                  padding="10"
                 >
-                  <v-icon
-                    :icon="mdiReceiptTextClockOutline"
-                    size="72"
-                    class="mb-4 opacity-40"
-                  ></v-icon>
-                  <p class="text-h6 font-weight-medium mb-1">No transactions yet</p>
-                  <p class="text-body-2 mb-6">
-                    Add your first movement to start tracking your balance.
-                  </p>
-                  <div class="d-flex flex-wrap justify-center ga-3">
-                    <v-btn
+                  <template #actions>
+                    <AppButton
                       color="error"
                       variant="outlined"
                       :prepend-icon="mdiMinus"
-                      rounded="pill"
                       @click="openDialog('EXPENSE')"
-                      >Add expense</v-btn
                     >
-                    <v-btn
+                      Add expense
+                    </AppButton>
+                    <AppButton
                       color="success"
                       variant="outlined"
                       :prepend-icon="mdiPlus"
-                      rounded="pill"
                       @click="openDialog('INCOME')"
-                      >Add income</v-btn
                     >
-                  </div>
-                </div>
+                      Add income
+                    </AppButton>
+                  </template>
+                </AppEmptyState>
                 <template v-for="(tx, i) in visibleRecent" :key="tx.id">
                   <v-list-item class="px-6 py-3 hover-item">
                     <TransactionSummary :transaction="tx" />
@@ -209,15 +171,12 @@
                 </template>
               </v-list>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
 
         <!-- PIE CHART -->
         <v-col cols="12" md="4">
-          <v-card elevation="1" class="rounded-xl fill-height" color="surface">
-            <v-card-title class="px-6 py-4 border-b border-outline-variant">
-              <span class="font-weight-medium text-subtitle-1">Expense Breakdown</span>
-            </v-card-title>
+          <AppCard title="Expense Breakdown" class="fill-height">
             <v-card-text class="pa-6 d-flex flex-column align-center justify-center">
               <div
                 v-if="chartData.labels.length === 0"
@@ -253,18 +212,18 @@
                 </div>
               </div>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
       <!-- BUDGETS AT A GLANCE -->
       <v-row v-if="!loading && monthBudgets.length">
         <v-col cols="12">
-          <v-card elevation="1" class="rounded-xl overflow-hidden" color="surface">
-            <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
-              <span class="font-weight-medium text-subtitle-1">This month's budgets</span>
-              <v-spacer></v-spacer>
-              <v-btn variant="text" size="small" color="primary" to="/budgets">Manage</v-btn>
-            </v-card-title>
+          <AppCard title="This month's budgets" class="overflow-hidden">
+            <template #header-actions>
+              <AppButton variant="text" size="small" color="primary" to="/budgets">
+                Manage
+              </AppButton>
+            </template>
             <v-card-text class="pa-6">
               <div class="d-flex flex-column ga-5">
                 <div v-for="b in monthBudgets" :key="b.id">
@@ -298,17 +257,13 @@
                 </div>
               </div>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
 
     <TransactionDialog v-model="dialog" :type="dialogType" @saved="onSaved"></TransactionDialog>
-
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
-      snackMessage
-    }}</v-snackbar>
-  </v-container>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -317,7 +272,12 @@ import { ref, onMounted, computed } from 'vue'
 import { hiddenTransactionIds } from '@/utils/undoDelete'
 import TransactionSummary from '@/components/TransactionSummary.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
-const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppEmptyState from '@/components/ui/AppEmptyState.vue'
+import AppPage from '@/components/ui/AppPage.vue'
+import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppStatCard from '@/components/ui/AppStatCard.vue'
 import { Chart as ChartJS, ArcElement, Tooltip } from 'chart.js'
 import type { TooltipItem } from 'chart.js'
 import { Pie } from 'vue-chartjs'
@@ -346,6 +306,7 @@ const colors = computed(() =>
   themeColors((name: string) => theme.themes.value.dark?.colors?.[name])
 )
 const cs = useCurrencySymbol()
+const { showSnack } = useSnackbar()
 
 const dialog = ref(false)
 const dialogType = ref<'INCOME' | 'EXPENSE'>('EXPENSE')

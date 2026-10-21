@@ -1,7 +1,7 @@
 <template>
-  <v-container class="py-8 px-md-8 max-w-1200" fluid>
+  <AppPage>
     <!-- LOADING SKELETON -->
-    <template v-if="loading">
+    <template v-if="loading && !initialLoadComplete">
       <v-row class="mb-2">
         <v-col
           cols="12"
@@ -16,57 +16,40 @@
       </v-row>
       <v-row class="mb-4">
         <v-col cols="12">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4">
+          <AppCard class="pa-4">
             <v-skeleton-loader type="text" width="360"></v-skeleton-loader>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
       <v-row>
         <v-col cols="12">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4">
+          <AppCard class="pa-4">
             <div v-for="n in 6" :key="n" class="d-flex align-center py-3 ga-4">
               <v-skeleton-loader type="text" width="100"></v-skeleton-loader>
               <v-skeleton-loader type="text" width="180" class="flex-grow-1"></v-skeleton-loader>
               <v-skeleton-loader type="chip" width="80"></v-skeleton-loader>
               <v-skeleton-loader type="text" width="90"></v-skeleton-loader>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
     <template v-else>
-      <v-row class="mb-2">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
-        >
-          <h1 class="text-h4 font-weight-bold text-on-surface">Transactions</h1>
-          <div>
-            <v-btn
-              color="error"
-              elevation="0"
-              :prepend-icon="mdiMinus"
-              rounded="pill"
-              @click="openDialog('EXPENSE')"
-              class="mr-3"
-              >Expense</v-btn
-            >
-            <v-btn
-              color="success"
-              elevation="0"
-              :prepend-icon="mdiPlus"
-              rounded="pill"
-              @click="openDialog('INCOME')"
-              >Income</v-btn
-            >
-          </div>
-        </v-col>
-      </v-row>
+      <AppPageHeader title="Transactions">
+        <template #actions>
+          <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('EXPENSE')">
+            Expense
+          </AppButton>
+          <AppButton color="success" :prepend-icon="mdiPlus" @click="openDialog('INCOME')">
+            Income
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- DATE FILTER + SEARCH + FILTERS -->
       <v-row class="mb-4">
         <v-col cols="12">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4">
+          <AppCard class="pa-4">
             <div class="transaction-period d-flex flex-column flex-md-row align-center ga-4">
               <div class="d-flex justify-center w-100 w-md-auto shrink-0 pb-1">
                 <v-btn-toggle
@@ -75,10 +58,17 @@
                   color="primary"
                   density="compact"
                   rounded="pill"
-                  variant="outlined"
+                  variant="flat"
                   class="compact-toggle"
                   aria-label="Select period"
                 >
+                  <!-- The buttons stay flat: this pill carries the selection
+                       and slides from one period to the next. -->
+                  <span
+                    aria-hidden="true"
+                    class="compact-toggle__thumb"
+                    :style="periodThumbStyle"
+                  ></span>
                   <v-btn value="day">Day</v-btn>
                   <v-btn value="week">Week</v-btn>
                   <v-btn value="month">Month</v-btn>
@@ -89,56 +79,50 @@
 
               <div
                 v-if="periodMode !== 'custom'"
-                class="period-navigation d-flex align-center justify-space-between w-100 w-md-auto ga-2"
+                class="period-navigation d-flex align-center justify-center w-100 w-md-auto ga-2"
               >
-                <v-btn
+                <AppIconButton
                   :icon="mdiChevronLeft"
-                  variant="text"
-                  size="small"
-                  aria-label="Previous period"
+                  label="Previous period"
                   @click="navigate(-1)"
-                ></v-btn>
+                />
                 <span
                   class="text-body-1 font-weight-medium text-on-surface"
                   style="min-width: 140px; text-align: center"
                   >{{ periodLabel }}</span
                 >
-                <v-btn
+                <AppIconButton
                   :icon="mdiChevronRight"
-                  variant="text"
-                  size="small"
-                  aria-label="Next period"
+                  label="Next period"
+                  :disabled="!canGoForward"
                   @click="navigate(1)"
-                ></v-btn>
+                />
               </div>
               <div
                 v-else
                 class="period-navigation d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3 w-100 w-md-auto"
               >
-                <v-text-field
+                <AppTextField
                   v-model="customFrom"
                   label="From"
                   type="date"
+                  :max="todayInput()"
                   density="compact"
                   hide-details
                   class="flex-grow-1"
-                ></v-text-field>
-                <v-text-field
+                ></AppTextField>
+                <AppTextField
                   v-model="customTo"
                   label="To"
                   type="date"
+                  :max="todayInput()"
                   density="compact"
                   hide-details
                   class="flex-grow-1"
-                ></v-text-field>
-                <v-btn
-                  color="primary"
-                  elevation="0"
-                  rounded="pill"
-                  @click="reload"
-                  class="flex-grow-1 flex-sm-grow-0"
-                  >Apply</v-btn
-                >
+                ></AppTextField>
+                <AppButton color="primary" @click="reload" class="flex-grow-1 flex-sm-grow-0">
+                  Apply
+                </AppButton>
               </div>
             </div>
 
@@ -158,87 +142,83 @@
                 <v-btn value="INCOME">Income</v-btn>
               </v-btn-toggle>
 
-              <v-select
+              <AppSelect
                 v-model="filterCategory"
                 :items="categoryOptions"
                 item-title="title"
                 item-value="value"
-                density="compact"
-                hide-details
-                variant="outlined"
-                rounded="xl"
                 label="Category"
                 clearable
+                density="compact"
+                hide-details
                 class="category-filter"
-              ></v-select>
+              >
+                <template #selection="{ item }">
+                  <CategoryDot :color="item.color" />{{ item.title }}
+                </template>
+                <template #item="{ props: option, item }">
+                  <v-list-item v-bind="option">
+                    <template #prepend>
+                      <CategoryDot :color="item.color" />
+                    </template>
+                  </v-list-item>
+                </template>
+              </AppSelect>
 
-              <v-select
+              <AppSelect
                 v-model="sortOption"
                 :items="sortOptions"
                 item-title="title"
                 item-value="value"
-                density="compact"
-                hide-details
-                variant="outlined"
-                rounded="xl"
                 label="Sort by"
+                density="compact"
+                hide-details
                 class="sort-filter"
-              ></v-select>
+              ></AppSelect>
 
-              <v-select
-                v-model="perPage"
-                :items="perPageOptions"
-                density="compact"
-                hide-details
-                variant="outlined"
-                rounded="xl"
-                label="Per page"
-                class="perpage-filter"
-              ></v-select>
+              <div class="amount-range">
+                <AppTextField
+                  v-model="minAmount"
+                  label="Min"
+                  type="number"
+                  inputmode="decimal"
+                  :prefix="cs"
+                  min="0"
+                  step="1"
+                  density="compact"
+                  hide-details
+                  hide-spin-buttons
+                  class="amount-filter"
+                >
+                  <template #append-inner>
+                    <AmountStepper
+                      label="minimum amount"
+                      @step="delta => stepAmount('min', delta)"
+                    ></AmountStepper>
+                  </template>
+                </AppTextField>
 
-              <v-text-field
-                v-model="minAmount"
-                label="Min"
-                type="number"
-                inputmode="decimal"
-                min="0"
-                step="1"
-                hide-spin-buttons
-                density="compact"
-                hide-details
-                variant="outlined"
-                rounded="xl"
-                class="amount-filter"
-              >
-                <template #append-inner>
-                  <AmountStepper
-                    label="minimum amount"
-                    @step="delta => stepAmount('min', delta)"
-                  ></AmountStepper>
-                </template>
-              </v-text-field>
-
-              <v-text-field
-                v-model="maxAmount"
-                label="Max"
-                type="number"
-                inputmode="decimal"
-                min="0"
-                step="1"
-                hide-spin-buttons
-                density="compact"
-                hide-details
-                variant="outlined"
-                rounded="xl"
-                class="amount-filter"
-              >
-                <template #append-inner>
-                  <AmountStepper
-                    label="maximum amount"
-                    @step="delta => stepAmount('max', delta)"
-                  ></AmountStepper>
-                </template>
-              </v-text-field>
+                <AppTextField
+                  v-model="maxAmount"
+                  label="Max"
+                  type="number"
+                  inputmode="decimal"
+                  :prefix="cs"
+                  min="0"
+                  step="1"
+                  density="compact"
+                  hide-details
+                  hide-spin-buttons
+                  class="amount-filter"
+                >
+                  <template #append-inner>
+                    <AmountStepper
+                      label="maximum amount"
+                      @step="delta => stepAmount('max', delta)"
+                    ></AmountStepper>
+                  </template>
+                </AppTextField>
+              </div>
             </div>
 
             <!-- Active filter summary -->
@@ -279,18 +259,18 @@
               >
                 ≤ {{ cs }}{{ formatMoney(maxBound) }}
               </v-chip>
-              <v-btn variant="text" size="x-small" color="primary" @click="clearFilters"
-                >Clear all</v-btn
-              >
+              <AppButton variant="text" size="x-small" color="primary" @click="clearFilters">
+                Clear all
+              </AppButton>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
 
       <!-- SEARCH (full width, between filters and list) -->
       <v-row class="mb-4">
         <v-col cols="12">
-          <v-text-field
+          <AppTextField
             v-model="searchQuery"
             :prepend-inner-icon="mdiMagnify"
             label="Search transactions"
@@ -299,21 +279,24 @@
             maxlength="100"
             density="comfortable"
             hide-details
-            variant="outlined"
-            rounded="xl"
             clearable
-          ></v-text-field>
+          ></AppTextField>
         </v-col>
       </v-row>
 
       <!-- TABLE -->
       <v-row>
         <v-col cols="12">
-          <v-card color="surface" elevation="1" class="rounded-xl overflow-hidden">
+          <AppCard class="overflow-hidden" :aria-busy="loading">
             <v-card-text class="pa-0">
+              <v-skeleton-loader
+                v-if="loading"
+                type="list-item-two-line@4"
+                class="pa-4"
+              ></v-skeleton-loader>
               <!-- MOBILE LIST -->
               <v-list
-                v-if="mobile && transactions.length > 0"
+                v-else-if="mobile && transactions.length > 0"
                 lines="two"
                 bg-color="transparent"
                 class="py-0"
@@ -323,19 +306,16 @@
                     <TransactionSummary :transaction="tx"
                       ><template #actions
                         ><div class="d-flex justify-end mt-1">
-                          <v-btn
+                          <AppIconButton
                             :icon="mdiPencilOutline"
-                            variant="text"
-                            size="small"
+                            :label="`Edit ${tx.description || tx.category?.name}`"
                             color="primary"
-                            :aria-label="`Edit ${tx.description || tx.category?.name}`"
                             @click="editTx(tx)"
-                          /><v-btn
+                          />
+                          <AppIconButton
                             :icon="mdiDeleteOutline"
-                            variant="text"
-                            size="small"
+                            :label="`Delete ${tx.description || tx.category?.name}`"
                             color="error"
-                            :aria-label="`Delete ${tx.description || tx.category?.name}`"
                             @click="confirmDelete(tx)"
                           /></div></template
                     ></TransactionSummary>
@@ -436,69 +416,64 @@
                         {{ tx.type === 'INCOME' ? '+' : '-' }}{{ cs }}{{ formatMoney(tx.amount) }}
                       </td>
                       <td class="text-center">
-                        <v-btn
+                        <AppIconButton
                           :icon="mdiPencilOutline"
-                          variant="text"
-                          size="small"
+                          :label="`Edit ${tx.comment || tx.description || tx.category?.name}`"
                           color="primary"
-                          :aria-label="`Edit ${tx.comment || tx.description || tx.category?.name}`"
                           @click="editTx(tx)"
-                        ></v-btn>
-                        <v-btn
+                        />
+                        <AppIconButton
                           :icon="mdiDeleteOutline"
-                          variant="text"
-                          size="small"
+                          :label="`Delete ${tx.comment || tx.description || tx.category?.name}`"
                           color="error"
-                          :aria-label="`Delete ${tx.comment || tx.description || tx.category?.name}`"
                           @click="confirmDelete(tx)"
-                        ></v-btn>
+                        />
                       </td>
                     </tr>
                   </tbody>
                 </v-table>
               </div>
-              <div v-else class="text-center pa-12 text-on-surface-variant">
-                <v-icon
-                  :icon="mdiReceiptTextClockOutline"
-                  size="72"
-                  class="mb-4 opacity-40"
-                ></v-icon>
-                <p class="text-h6 font-weight-medium mb-1">No transactions found</p>
-                <p class="text-body-2 mb-6">
-                  {{
-                    hasActiveFilters
-                      ? 'No results match your current filters.'
-                      : 'There is nothing recorded in this period.'
-                  }}
-                </p>
-                <v-btn
-                  v-if="hasActiveFilters"
-                  color="primary"
-                  variant="outlined"
-                  :prepend-icon="mdiFilterOffOutline"
-                  @click="clearFilters"
-                >
-                  Clear filters
-                </v-btn>
-                <div v-else class="d-flex flex-wrap justify-center ga-3">
-                  <v-btn
-                    color="error"
+              <AppEmptyState
+                v-else
+                :icon="mdiReceiptTextClockOutline"
+                title="No transactions found"
+                :description="
+                  hasActiveFilters
+                    ? 'No results match your current filters.'
+                    : 'There is nothing recorded in this period.'
+                "
+                padding="12"
+              >
+                <template #actions>
+                  <AppButton
+                    v-if="hasActiveFilters"
+                    color="primary"
                     variant="outlined"
-                    :prepend-icon="mdiMinus"
-                    rounded="pill"
-                    @click="openDialog('EXPENSE')"
-                    >Add expense</v-btn
+                    :prepend-icon="mdiFilterOffOutline"
+                    @click="clearFilters"
                   >
-                  <v-btn
-                    color="success"
-                    variant="outlined"
-                    :prepend-icon="mdiPlus"
-                    rounded="pill"
-                    @click="openDialog('INCOME')"
-                    >Add income</v-btn
-                  >
-                </div>
-              </div>
+                    Clear filters
+                  </AppButton>
+                  <template v-else>
+                    <AppButton
+                      color="error"
+                      variant="outlined"
+                      :prepend-icon="mdiMinus"
+                      @click="openDialog('EXPENSE')"
+                    >
+                      Add expense
+                    </AppButton>
+                    <AppButton
+                      color="success"
+                      variant="outlined"
+                      :prepend-icon="mdiPlus"
+                      @click="openDialog('INCOME')"
+                    >
+                      Add income
+                    </AppButton>
+                  </template>
+                </template>
+              </AppEmptyState>
             </v-card-text>
 
             <!-- PAGINATION -->
@@ -514,7 +489,7 @@
                 rounded="pill"
               ></v-pagination>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
@@ -529,35 +504,16 @@
     ></TransactionDialog>
 
     <!-- DELETE CONFIRM DIALOG -->
-    <v-dialog v-model="deleteDialog" max-width="380">
-      <v-card class="rounded-xl" color="surface">
-        <v-card-text class="pa-6 text-center">
-          <v-icon :icon="mdiAlertCircleOutline" size="56" color="error" class="mb-4"></v-icon>
-          <p class="text-h6 font-weight-medium mb-2">Delete Transaction?</p>
-          <p class="text-body-2 text-on-surface-variant mb-6">
-            "{{ deletingTx?.description }}" — {{ cs }}{{ formatMoney(deletingTx?.amount ?? 0) }}
-          </p>
-          <div class="d-flex ga-3 justify-center">
-            <v-btn
-              variant="outlined"
-              rounded="pill"
-              :disabled="deleting"
-              @click="deleteDialog = false"
-              >Cancel</v-btn
-            >
-            <v-btn color="error" elevation="0" rounded="pill" :loading="deleting" @click="doDelete"
-              >Delete</v-btn
-            >
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-
-    <!-- SNACKBAR -->
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
-      snackMessage
-    }}</v-snackbar>
-  </v-container>
+    <AppConfirmDialog
+      v-model="deleteDialog"
+      title="Delete Transaction?"
+      confirm-label="Delete"
+      :loading="deleting"
+      @confirm="doDelete"
+    >
+      "{{ deletingTx?.description }}" — {{ cs }}{{ formatMoney(deletingTx?.amount ?? 0) }}
+    </AppConfirmDialog>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -570,16 +526,32 @@ import TransactionSummary from '@/components/TransactionSummary.vue'
 import TagChips from '@/components/TagChips.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AmountStepper from '@/components/AmountStepper.vue'
+import CategoryDot from '@/components/CategoryDot.vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppEmptyState from '@/components/ui/AppEmptyState.vue'
+import AppIconButton from '@/components/ui/AppIconButton.vue'
+import AppPage from '@/components/ui/AppPage.vue'
+import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
 import { fetchJson } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
-import { formatDate, formatDateOnly, parseDateOnly, startOfWeek, toDateOnly } from '@/utils/date'
+import {
+  formatDate,
+  formatDateOnly,
+  parseDateOnly,
+  startOfWeek,
+  toDateOnly,
+  todayInput
+} from '@/utils/date'
 import { getDefaultPeriod } from '@/utils/preferences'
 import { textOn } from '@/utils/color'
 import type { Category, Transaction, TransactionsResponse } from '@/types'
 import { useDisplay } from 'vuetify'
 import {
-  mdiAlertCircleOutline,
   mdiArrowDown,
   mdiArrowUp,
   mdiChevronLeft,
@@ -598,7 +570,7 @@ const route = useRoute()
 const router = useRouter()
 const { mobile } = useDisplay()
 const cs = useCurrencySymbol()
-const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
+const { showSnack } = useSnackbar()
 
 const dialog = ref(false)
 const dialogType = ref<'INCOME' | 'EXPENSE'>('EXPENSE')
@@ -613,14 +585,29 @@ const maxAmount = ref('')
 const sortBy = ref<'date' | 'amount'>('date')
 const order = ref<'asc' | 'desc'>('desc')
 const page = ref(1)
-const DEFAULT_PER_PAGE = 15
-const perPageOptions = [10, 15, 25, 50]
-const perPage = ref(DEFAULT_PER_PAGE)
+// The list is always paginated in chunks of 15; there is no per-page selector.
+const PER_PAGE = 15
 
-const periodMode = ref<'day' | 'week' | 'month' | 'year' | 'custom'>(getDefaultPeriod())
+const PERIODS = ['day', 'week', 'month', 'year', 'custom'] as const
+const periodMode = ref<(typeof PERIODS)[number]>(getDefaultPeriod())
 const offset = ref(0)
 const customFrom = ref('')
 const customTo = ref('')
+
+// Nothing in this view looks ahead of today. The periods walk back from the
+// current one (`offset` is zero or negative) and the custom bounds cap at
+// today: the date inputs use it as their `max`, and anything typed, pasted or
+// bookmarked beyond it snaps back to today.
+const capAtToday = (value: string) => (value > todayInput() ? todayInput() : value)
+watch([customFrom, customTo], () => {
+  customFrom.value = capAtToday(customFrom.value)
+  customTo.value = capAtToday(customTo.value)
+})
+
+// Equal segments let the pill move without measuring the DOM or stretching.
+const periodThumbStyle = computed(() => ({
+  transform: `translateX(${PERIODS.indexOf(periodMode.value) * 100}%)`
+}))
 
 // Delete confirm
 const deleteDialog = ref(false)
@@ -639,7 +626,7 @@ const transactionsUrl = () => {
     from: toDateOnly(from),
     to: toDateOnly(to),
     page: String(page.value),
-    perPage: String(perPage.value),
+    perPage: String(PER_PAGE),
     sortBy: sortBy.value,
     order: order.value
   })
@@ -659,9 +646,10 @@ const {
   run: fetchTransactions
 } = useAsyncData<TransactionsResponse>(
   signal => fetchJson<TransactionsResponse>(transactionsUrl(), { signal }),
-  { items: [], total: 0, page: 1, perPage: DEFAULT_PER_PAGE, totalPages: 1 },
+  { items: [], total: 0, page: 1, perPage: PER_PAGE, totalPages: 1 },
   { cacheKey: transactionsUrl }
 )
+const initialLoadComplete = ref(false)
 
 const { data: categories, run: fetchCategories } = useAsyncData<Category[]>(
   signal => fetchJson<Category[]>('/categories', { signal }),
@@ -675,7 +663,7 @@ const transactions = computed(() =>
 const totalPages = computed(() => list.value?.totalPages ?? 1)
 
 const categoryOptions = computed(() =>
-  (categories.value ?? []).map(c => ({ title: c.name, value: c.id }))
+  (categories.value ?? []).map(c => ({ title: c.name, value: c.id, color: c.color }))
 )
 
 const sortOptions = [
@@ -764,7 +752,6 @@ const periodLabel = computed(() => {
 
 // ── Filters mirrored in the URL ───────────────────────────────────────────
 // They survive a reload, can be bookmarked and the Back button works.
-const PERIODS = ['day', 'week', 'month', 'year', 'custom'] as const
 const TYPES = ['ALL', 'INCOME', 'EXPENSE'] as const
 
 function readRouteQuery() {
@@ -778,7 +765,6 @@ function readRouteQuery() {
   sortBy.value = 'date'
   order.value = 'desc'
   page.value = 1
-  perPage.value = DEFAULT_PER_PAGE
   offset.value = 0
   customFrom.value = ''
   customTo.value = ''
@@ -804,16 +790,13 @@ function readRouteQuery() {
     const p = Number(q.page)
     if (Number.isInteger(p) && p > 0) page.value = p
   }
-  if (typeof q.perPage === 'string') {
-    const n = Number(q.perPage)
-    if (perPageOptions.includes(n)) perPage.value = n
-  }
   if (typeof q.offset === 'string') {
     const o = Number(q.offset)
-    if (Number.isInteger(o)) offset.value = o
+    // A bookmarked or hand-typed link cannot jump ahead of the current period.
+    if (Number.isInteger(o)) offset.value = Math.min(0, o)
   }
-  if (typeof q.from === 'string') customFrom.value = q.from
-  if (typeof q.to === 'string') customTo.value = q.to
+  if (typeof q.from === 'string') customFrom.value = capAtToday(q.from)
+  if (typeof q.to === 'string') customTo.value = capAtToday(q.to)
 }
 
 async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
@@ -825,7 +808,6 @@ async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
   if (maxBound.value !== null) query.max = String(maxBound.value)
   query.sort = `${sortBy.value}:${order.value}`
   if (page.value > 1) query.page = String(page.value)
-  if (perPage.value !== DEFAULT_PER_PAGE) query.perPage = String(perPage.value)
   if (periodMode.value !== 'custom') {
     if (offset.value !== 0) query.offset = String(offset.value)
   } else {
@@ -843,12 +825,14 @@ async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
 }
 
 // Custom steppers (AmountStepper) replace the native number spinner.
-// Empty input counts as 0, the value never goes below zero and decimals are kept exact.
+// Empty input counts as 0, decimals are kept exact, and stepping down to zero
+// or below clears the field: empty means "no min/max", while a literal 0 would
+// be a filter of its own and 0.00 is not a bound anyone types.
 const stepAmount = (which: 'min' | 'max', delta: number) => {
   const current = Number.parseFloat(which === 'min' ? minAmount.value : maxAmount.value)
   const base = Number.isFinite(current) ? current : 0
-  const next = Math.max(0, Math.round((base + delta) * 100) / 100)
-  const value = String(next)
+  const next = Math.round((base + delta) * 100) / 100
+  const value = next > 0 ? String(next) : ''
   if (which === 'min') minAmount.value = value
   else maxAmount.value = value
 }
@@ -866,10 +850,15 @@ const reload = (_event?: unknown, mode: 'push' | 'replace' = 'push', resetPage =
 
 const load = async () => {
   await fetchTransactions()
+  initialLoadComplete.value = true
   if (listError.value) showSnack(listError.value, 'error')
 }
 
+// The arrows walk back through past periods; the current one is the last stop.
+const canGoForward = computed(() => offset.value < 0)
 const navigate = (dir: number) => {
+  // Forward stops at the current period: no positive offset, ever.
+  if (dir > 0 && !canGoForward.value) return
   offset.value += dir
   reload()
 }
@@ -908,9 +897,6 @@ watch([searchQuery, minAmount, maxAmount], () => {
 })
 
 watch([filterType, filterCategory, sortOption], () => reload())
-// A different page size reflows the whole list: reload() sends the current
-// page back to 1 (and refetches) exactly like any other filter change.
-watch(perPage, () => reload())
 watch(page, () => {
   if (!hydrating) reload(undefined, 'push', false)
 })
@@ -1012,9 +998,6 @@ onMounted(async () => {
 .sort-filter {
   max-width: 200px;
 }
-.perpage-filter {
-  max-width: 130px;
-}
 .amount-filter {
   max-width: 122px;
 }
@@ -1051,24 +1034,90 @@ onMounted(async () => {
   text-overflow: ellipsis;
 }
 
+/* Period picker: the tones of the type filter (dark track, hairline border,
+   muted labels, accent only on the chosen one) drawn as a segmented control
+   whose selection pill slides from one segment to the next. */
+.compact-toggle {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: 380px;
+  gap: 0 !important;
+  padding: 5px !important;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  height: auto !important;
+  overflow: hidden;
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 999px !important;
+}
+/* Percentage positioning stays aligned during resize without a second animation. */
+.compact-toggle__thumb {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc((100% - 10px) / 5);
+  pointer-events: none;
+  background: rgba(var(--v-theme-primary), var(--v-activated-opacity));
+  border: 1px solid rgb(var(--v-theme-primary));
+  border-radius: 999px;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
 .compact-toggle :deep(.v-btn) {
-  padding: 0 16px !important;
-  min-width: unset !important;
+  /* Vuetify paints an always-on "activated" overlay on the chosen button,
+     which would tint the dark track; the fill lives on the sliding pill. The
+     value has to be set on the buttons themselves: they carry the theme class
+     that declares it, so inheriting it from the track would not win. */
+  --v-activated-opacity: 0 !important;
+  padding: 10px 12px !important;
+  height: 40px !important;
+  min-width: 0 !important;
   font-size: 0.875rem !important;
+  background: transparent !important;
+  border-radius: 999px !important;
+  color: rgb(var(--v-theme-on-surface-variant)) !important;
+  transition: color 0.16s ease;
+}
+.compact-toggle :deep(.v-btn__overlay) {
+  transition: opacity 0.18s ease;
+}
+.compact-toggle :deep(.v-btn--active) {
+  /* Accent on the label only, like the type filter's chosen pill. */
+  color: rgb(var(--v-theme-primary)) !important;
 }
 
 @media (max-width: 600px) {
+  .compact-toggle {
+    width: 100%;
+  }
   .compact-toggle :deep(.v-btn) {
-    padding: 0 8px !important;
-    font-size: 0.8rem !important;
-    height: 32px !important;
+    flex: 1 1 0;
+    padding: 12px 4px !important;
+    font-size: 0.875rem !important;
+    height: 44px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .compact-toggle :deep(.v-btn) {
+    padding-inline: 2px !important;
+    font-size: 0.8125rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compact-toggle__thumb,
+  .compact-toggle :deep(.v-btn),
+  .compact-toggle :deep(.v-btn__overlay) {
+    transition: none !important;
   }
 }
 
 @media (max-width: 960px) {
   .category-filter,
   .sort-filter,
-  .perpage-filter,
   .amount-filter {
     max-width: none;
     width: 100%;
@@ -1077,22 +1126,36 @@ onMounted(async () => {
 
 .transaction-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  /* 230px is what the All/Expense/Income group needs to keep its own padding
+     (labels + 12px per side + the 8px gaps between pills): with a narrower
+     cell the pills would spill sideways. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
   gap: 12px;
   align-items: center;
+}
+/* Vuetify's md utilities start at 840px, not at the 960px the grid below
+   uses: from 840 the period row is horizontal again, and the ‹ date › group
+   goes back to the right edge. Below that it stacks and stays centered. */
+@media (min-width: 840px) {
+  .period-navigation {
+    margin-left: auto;
+  }
 }
 @media (min-width: 960px) {
   .transaction-period {
     justify-content: space-between;
   }
-  .period-navigation {
-    margin-left: auto;
-  }
   .transaction-filters {
     grid-template-columns:
-      minmax(210px, 1fr) minmax(110px, 1.15fr) minmax(140px, 1.15fr)
-      110px 90px 90px;
+      minmax(230px, 1fr) minmax(110px, 1.15fr) minmax(140px, 1.15fr)
+      120px 120px;
     gap: 10px;
+  }
+  /* The joined Min/Max takes the two 120px columns, so at full width each
+     field is as wide as it was as a separate control, with room for the
+     currency symbol the number now shares the box with. */
+  .amount-range {
+    grid-column: span 2;
   }
   .transaction-filters :deep(.v-field) {
     --v-field-padding-start: 12px;
@@ -1104,13 +1167,27 @@ onMounted(async () => {
   width: 100%;
   max-width: none;
 }
+/* Min and Max travel together: one grid cell in the responsive layout, so the
+   pair matches the width of Category or Sort by instead of stacking. */
+.amount-range {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+.amount-range > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
 .transaction-filters :deep(.v-btn-toggle) {
   flex-shrink: 0;
 }
 .transaction-filters :deep(.v-btn) {
-  min-width: 0;
-  flex: 1;
-  padding-inline: 10px;
+  /* Content, not an equal share: an equal share would squeeze the shorter
+     labels into their own padding. The pill still stretches to fill the cell
+     when there is room, and never shrinks below its label plus the padding. */
+  flex: 1 1 auto;
+  min-width: max-content;
+  padding-inline: 12px;
 }
 .col-tags {
   width: 22%;
@@ -1125,18 +1202,5 @@ onMounted(async () => {
 }
 .tx-table :deep(.description-cell) {
   white-space: nowrap;
-}
-.compact-toggle {
-  max-width: 100%;
-  flex-wrap: wrap;
-  height: auto !important;
-  overflow: visible;
-}
-@media (max-width: 600px) {
-  .compact-toggle :deep(.v-btn) {
-    padding-inline: 6px !important;
-    font-size: 12px !important;
-    min-height: 32px;
-  }
 }
 </style>

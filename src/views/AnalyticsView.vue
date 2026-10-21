@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-8 px-md-8 max-w-1200" fluid>
+  <AppPage>
     <!-- LOADING SKELETON -->
     <template v-if="loading">
       <v-row class="mb-6">
@@ -10,120 +10,111 @@
       </v-row>
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4" v-for="n in 6" :key="n">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4">
+          <AppCard class="pa-4">
             <v-skeleton-loader type="text" width="100" class="mb-2"></v-skeleton-loader>
             <v-skeleton-loader type="heading" width="140"></v-skeleton-loader>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
       <v-row>
         <v-col cols="12" md="7">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-6">
+          <AppCard class="pa-6">
             <v-skeleton-loader type="text" width="200" class="mb-4"></v-skeleton-loader>
             <v-skeleton-loader type="image" height="320"></v-skeleton-loader>
-          </v-card>
+          </AppCard>
         </v-col>
         <v-col cols="12" md="5">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-6">
+          <AppCard class="pa-6">
             <v-skeleton-loader type="text" width="160" class="mb-4"></v-skeleton-loader>
             <v-skeleton-loader type="image" height="320"></v-skeleton-loader>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
 
     <template v-else>
-      <v-row class="mb-4">
-        <v-col cols="12">
-          <h1 class="text-h4 font-weight-bold text-on-surface">Analytics</h1>
-          <p class="text-body-2 text-on-surface-variant mt-1">
-            Track your financial trends and patterns
-          </p>
-        </v-col>
-      </v-row>
+      <AppPageHeader title="Analytics" subtitle="Track your financial trends and patterns" />
 
       <!-- INSIGHT CARDS -->
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              This Month Income
-            </div>
-            <div class="text-h5 font-weight-bold text-success">
-              +{{ cs }}{{ formatMoney(insights.currentMonthIncome) }}
-            </div>
-          </v-card>
+          <AppStatCard
+            label="This Month Income"
+            :value="`+${cs}${formatMoney(insights.currentMonthIncome)}`"
+            value-class="text-success"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          />
         </v-col>
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              This Month Expenses
-            </div>
-            <div class="text-h5 font-weight-bold text-error">
-              -{{ cs }}{{ formatMoney(insights.currentMonthExpense) }}
-            </div>
-          </v-card>
+          <AppStatCard
+            label="This Month Expenses"
+            :value="`-${cs}${formatMoney(insights.currentMonthExpense)}`"
+            value-class="text-error"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          />
         </v-col>
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              Avg Daily Expense
-            </div>
-            <div class="text-h5 font-weight-bold text-on-surface">
-              {{ cs }}{{ formatMoney(insights.avgDailyExpense) }}
-            </div>
-            <div class="text-caption text-on-surface-variant">so far this month</div>
-          </v-card>
+          <AppStatCard
+            label="Avg Daily Expense"
+            :value="`${cs}${formatMoney(insights.avgDailyExpense)}`"
+            caption="so far this month"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          />
         </v-col>
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              Month-over-Month
-            </div>
-            <div
-              class="text-h5 font-weight-bold"
-              :class="insights.expenseChangePercent > 0 ? 'text-error' : 'text-success'"
-            >
+          <AppStatCard
+            label="Month-over-Month"
+            value=""
+            :value-class="insights.expenseChangePercent > 0 ? 'text-error' : 'text-success'"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          >
+            <template #value>
               <v-icon
                 :icon="insights.expenseChangePercent > 0 ? mdiTrendingUp : mdiTrendingDown"
                 size="20"
                 class="mr-1"
               ></v-icon>
               {{ insights.expenseChangePercent > 0 ? '+' : '' }}{{ insights.expenseChangePercent }}%
-            </div>
-            <div class="text-caption text-on-surface-variant">
+            </template>
+            <template #caption>
               was {{ cs }}{{ formatMoney(insights.lastMonthExpense) }} last month
-            </div>
-          </v-card>
+            </template>
+          </AppStatCard>
         </v-col>
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              Savings Rate
-            </div>
-            <div
-              class="text-h5 font-weight-bold"
-              :class="insights.savingsRate >= 0 ? 'text-success' : 'text-error'"
-            >
-              {{ insights.savingsRate > 0 ? '+' : '' }}{{ insights.savingsRate }}%
-            </div>
-            <div class="text-caption text-on-surface-variant">of this month's income kept</div>
-          </v-card>
+          <AppStatCard
+            label="Savings Rate"
+            :value="`${insights.savingsRate > 0 ? '+' : ''}${insights.savingsRate}%`"
+            :value-class="insights.savingsRate >= 0 ? 'text-success' : 'text-error'"
+            caption="of this month's income kept"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          />
         </v-col>
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              Top Category
-            </div>
-            <div v-if="topCategories.length" class="text-h5 font-weight-bold text-on-surface">
-              {{ topCategories[0].name }}
-            </div>
-            <div v-if="topCategories.length" class="text-caption text-on-surface-variant">
+          <AppStatCard
+            label="Top Category"
+            value=""
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          >
+            <template #value>
+              <div v-if="topCategories.length" class="text-h5 font-weight-bold text-on-surface">
+                {{ topCategories[0].name }}
+              </div>
+              <div v-else class="text-body-2 font-weight-regular text-on-surface-variant">
+                No expenses this month
+              </div>
+            </template>
+            <template v-if="topCategories.length" #caption>
               {{ cs }}{{ formatMoney(topCategories[0].value) }} · {{ topCategories[0].percent }}% of
               spending
-            </div>
-            <div v-else class="text-body-2 text-on-surface-variant">No expenses this month</div>
-          </v-card>
+            </template>
+          </AppStatCard>
         </v-col>
       </v-row>
 
@@ -131,12 +122,9 @@
       <v-row class="mb-6">
         <!-- BAR CHART: Income / Expenses / Profit-Loss per month -->
         <v-col cols="12" md="7">
-          <v-card color="surface" elevation="1" class="rounded-xl fill-height">
-            <v-card-title
-              class="px-6 py-4 border-b border-outline-variant d-flex flex-wrap align-center justify-space-between ga-2"
-            >
-              <span class="font-weight-medium text-subtitle-1">Income vs Expenses</span>
-              <v-text-field
+          <AppCard title="Income vs Expenses" class="fill-height">
+            <template #header-actions>
+              <AppTextField
                 v-model="monthsInput"
                 type="number"
                 label="Months"
@@ -154,8 +142,8 @@
                 <template #append-inner>
                   <AmountStepper label="months" @step="stepMonths"></AmountStepper>
                 </template>
-              </v-text-field>
-            </v-card-title>
+              </AppTextField>
+            </template>
             <v-card-text class="pa-6">
               <div
                 style="height: 320px"
@@ -165,17 +153,14 @@
                 <Chart type="bar" v-if="barReady" :data="barChartData" :options="barOptions" />
               </div>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
 
         <!-- LINE CHART: Balance Trend -->
         <v-col cols="12" md="5">
-          <v-card color="surface" elevation="1" class="rounded-xl fill-height">
-            <v-card-title
-              class="px-6 py-4 border-b border-outline-variant d-flex flex-wrap align-center justify-space-between ga-2"
-            >
-              <span class="font-weight-medium text-subtitle-1">Balance Trend</span>
-              <v-text-field
+          <AppCard title="Balance Trend" class="fill-height">
+            <template #header-actions>
+              <AppTextField
                 v-model="daysInput"
                 type="number"
                 label="Days"
@@ -193,8 +178,8 @@
                 <template #append-inner>
                   <AmountStepper label="days" @step="stepDays"></AmountStepper>
                 </template>
-              </v-text-field>
-            </v-card-title>
+              </AppTextField>
+            </template>
             <v-card-text class="pa-6">
               <div
                 style="height: 320px"
@@ -204,18 +189,21 @@
                 <Line v-if="lineReady" :data="lineChartData" :options="lineOptions" />
               </div>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
 
       <!-- TOP CATEGORIES + CATEGORY COMPARISON -->
       <v-row>
         <v-col cols="12" md="5">
-          <v-card color="surface" elevation="1" class="rounded-xl fill-height">
-            <v-card-title class="px-6 py-4 border-b border-outline-variant">
-              <span class="font-weight-medium text-subtitle-1">Where your money went</span>
-              <span class="text-caption text-on-surface-variant ml-2">(This month)</span>
-            </v-card-title>
+          <AppCard class="fill-height">
+            <template #title>
+              <div class="analytics-card-title d-flex flex-wrap align-baseline">
+                <span class="font-weight-medium text-subtitle-1"
+                  >Where your money went this month</span
+                >
+              </div>
+            </template>
             <v-card-text class="pa-6">
               <div v-if="!topCategories.length" class="text-center text-on-surface-variant py-8">
                 <v-icon :icon="mdiChartPie" size="40" class="mb-2 opacity-50"></v-icon>
@@ -243,7 +231,7 @@
                 ></v-progress-linear>
               </div>
             </v-card-text>
-          </v-card>
+          </AppCard>
         </v-col>
 
         <v-col cols="12" md="7">
@@ -251,18 +239,18 @@
         </v-col>
       </v-row>
     </template>
-
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
-      snackMessage
-    }}</v-snackbar>
-  </v-container>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
 import CategoryComparison from '@/components/CategoryComparison.vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
-const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
+import AppCard from '@/components/ui/AppCard.vue'
+import AppPage from '@/components/ui/AppPage.vue'
+import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppStatCard from '@/components/ui/AppStatCard.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -306,6 +294,7 @@ const colors = computed(() =>
   themeColors((name: string) => theme.themes.value.dark?.colors?.[name])
 )
 const cs = useCurrencySymbol()
+const { showSnack } = useSnackbar()
 
 // Editable windows: the backend accepts any whole range inside these bounds.
 const MIN_MONTHS = 3
@@ -571,6 +560,11 @@ onMounted(restoreRange)
 </script>
 
 <style scoped>
+.analytics-card-title {
+  min-width: 0;
+  white-space: normal;
+  gap: 0 8px;
+}
 .hover-row {
   transition: background-color 0.2s;
 }

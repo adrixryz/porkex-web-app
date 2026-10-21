@@ -226,6 +226,29 @@ describe('RecurringDialog form', () => {
     vi.unstubAllGlobals()
   })
 
+  it('walks the amount stepper back to empty instead of parking it on 0.01', async () => {
+    vi.stubGlobal('fetch', fetchMock())
+
+    const wrapper = await openDialog()
+    const vm = wrapper.vm as unknown as { form: { value?: unknown } }
+    const form = unwrap(vm.form) as Record<string, unknown>
+    const increase = wrapper.find('button[aria-label="Increase expense amount"]')
+    const decrease = wrapper.find('button[aria-label="Decrease expense amount"]')
+
+    await increase.trigger('click')
+    expect(form.amount).toBe('1')
+
+    // 1 → 0 clears the box: no 0.01 left behind, the amount is simply missing.
+    await decrease.trigger('click')
+    expect(form.amount).toBe('')
+
+    form.amount = '2.5'
+    await nextTick()
+    await decrease.trigger('click')
+    expect(form.amount).toBe('1.5')
+    vi.unstubAllGlobals()
+  })
+
   it('edits an existing rule against its id, in UTC days', async () => {
     const fetch = fetchMock()
     vi.stubGlobal('fetch', fetch)

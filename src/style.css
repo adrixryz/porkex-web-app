@@ -208,6 +208,32 @@ body {
   margin: 0 auto;
 }
 
+/* ── Dropdown menu panel (selects and the tag overflow list) ─────────── */
+/* Menus are teleported outside the component, so this has to be global.
+   The extra body selector also beats Vuetify's own 4px radius rule. */
+body .v-menu > .v-overlay__content {
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.24);
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+body .v-menu > .v-overlay__content > .v-sheet {
+  background: transparent;
+}
+body .v-menu > .v-overlay__content .v-list {
+  padding: 6px;
+}
+body .v-menu > .v-overlay__content .v-list-item {
+  border-radius: 8px;
+}
+
+/* ── Snackbars, toasts and notice banners ────────────────────────────── */
+body .v-snackbar__wrapper,
+body .v-alert {
+  border-radius: 12px;
+}
+
 /* ── Dialogs: keep long forms scrollable on short viewports ──────────── */
 /* The cap only exists as a safety net for dialogs taller than the window.
    It used to reserve 220px, which made short dialogs (like the category

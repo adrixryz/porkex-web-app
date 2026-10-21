@@ -1,7 +1,7 @@
 <template>
   <div class="bg-background login-wrapper d-flex">
     <v-container class="d-flex align-center justify-center" fluid>
-      <v-card color="surface" class="rounded-xl mx-auto" width="100%" max-width="420" elevation="4">
+      <AppCard class="mx-auto" width="100%" max-width="420" elevation="4">
         <!-- HEADER -->
         <div class="text-center pt-8 pb-4">
           <img
@@ -36,7 +36,7 @@
 
           <v-form @submit.prevent="submit">
             <!-- Name (register only) -->
-            <v-text-field
+            <AppTextField
               v-if="tab === 'register'"
               v-model="form.name"
               label="Full Name"
@@ -44,9 +44,9 @@
               maxlength="80"
               :prepend-inner-icon="mdiAccountOutline"
               class="mb-2"
-            ></v-text-field>
+            ></AppTextField>
 
-            <v-text-field
+            <AppTextField
               v-model="form.email"
               label="Email"
               type="email"
@@ -54,9 +54,9 @@
               :prepend-inner-icon="mdiEmailOutline"
               autofocus
               class="mb-2"
-            ></v-text-field>
+            ></AppTextField>
 
-            <v-text-field
+            <AppTextField
               v-model="form.password"
               :label="tab === 'register' ? 'Password (min 6 chars)' : 'Password'"
               :type="showPass ? 'text' : 'password'"
@@ -65,25 +65,23 @@
               :append-inner-icon="showPass ? mdiEyeOff : mdiEye"
               @click:append-inner="showPass = !showPass"
               class="mb-2"
-            ></v-text-field>
+            ></AppTextField>
 
-            <v-btn
+            <AppButton
               type="submit"
               color="primary"
               size="large"
-              rounded="pill"
               class="w-100 mt-4 font-weight-bold"
-              elevation="0"
               :loading="loading"
               :disabled="
                 !form.email.trim() || !form.password || (tab === 'register' && !form.name.trim())
               "
             >
               {{ tab === 'login' ? 'Log In' : 'Create Account' }}
-            </v-btn>
+            </AppButton>
           </v-form>
         </v-card-text>
-      </v-card>
+      </AppCard>
     </v-container>
   </div>
 </template>
@@ -95,6 +93,9 @@ import { authApi, setToken, setUser } from '@/utils/api'
 import { setCurrencyByCode } from '@/utils/currency'
 import { applyPreferences } from '@/utils/preferences'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
 import type { AuthResponse } from '@/types'
 import { mdiAccountOutline, mdiEmailOutline, mdiEye, mdiEyeOff, mdiLockOutline } from '@mdi/js'
 

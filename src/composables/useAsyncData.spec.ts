@@ -62,18 +62,37 @@ describe('without a cacheKey', () => {
 })
 
 describe('with a cacheKey', () => {
-  it('paints the cached copy instead of the skeleton, and marks it stale', async () => {
+  it('paints the cached copy at once and raises the banner only if the refresh is slow', async () => {
+    vi.useFakeTimers()
+    try {
+      writeCache('/k', { n: 1 })
+      const d = deferred<{ n: number }>()
+
+      const { wrapper, api } = mountUser(() => d.promise, { n: 0 }, { cacheKey: '/k' })
+
+      // Synchronously after mount: no waiting on the network at all.
+      expect(api.data.value).toEqual({ n: 1 })
+      expect(api.loading.value).toBe(false)
+      expect(api.isStale.value).toBe(true)
+      expect(wrapper.text()).toContain('"n":1')
+      // The refresh may still land in time: no banner while it does.
+      expect(hasStaleData.value).toBe(false)
+
+      vi.advanceTimersByTime(1_000)
+      expect(hasStaleData.value).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('never flashes the banner for a refresh that lands quickly', async () => {
     writeCache('/k', { n: 1 })
-    const d = deferred<{ n: number }>()
+    const { api } = mountUser(async () => ({ n: 2 }), { n: 0 }, { cacheKey: '/k' })
+    await nextTick()
+    await nextTick()
 
-    const { wrapper, api } = mountUser(() => d.promise, { n: 0 }, { cacheKey: '/k' })
-
-    // Synchronously after mount: no waiting on the network at all.
-    expect(api.data.value).toEqual({ n: 1 })
-    expect(api.loading.value).toBe(false)
-    expect(api.isStale.value).toBe(true)
-    expect(wrapper.text()).toContain('"n":1')
-    expect(hasStaleData.value).toBe(true)
+    expect(api.isStale.value).toBe(false)
+    expect(hasStaleData.value).toBe(false)
   })
 
   it('replaces the stale copy when the live response arrives', async () => {
@@ -186,42 +205,72 @@ describe('the loading race', () => {
 
 describe('the stale banner is owned per view', () => {
   it('one view going fresh does not hide the banner while another is still stale', async () => {
-    writeCache('/k', { n: 1 })
-    const first = deferred<{ n: number }>()
-    const second = deferred<{ n: number }>()
+    vi.useFakeTimers()
+    try {
+      writeCache('/k', { n: 1 })
+      const first = deferred<{ n: number }>()
+      const second = deferred<{ n: number }>()
 
-    const a = mountUser(() => first.promise, { n: 0 }, { cacheKey: '/k' })
-    const b = mountUser(() => second.promise, { n: 0 }, { cacheKey: '/k' })
-    expect(hasStaleData.value).toBe(true)
+      const a = mountUser(() => first.promise, { n: 0 }, { cacheKey: '/k' })
+      const b = mountUser(() => second.promise, { n: 0 }, { cacheKey: '/k' })
+      // Neither refresh has had its grace period yet.
+      expect(hasStaleData.value).toBe(false)
+      vi.advanceTimersByTime(1_000)
+      expect(hasStaleData.value).toBe(true)
 
-    // The first view answers with fresh data, but the second still shows cache.
-    first.resolve({ n: 2 })
-    await nextTick()
-    await nextTick()
-    expect(a.api.isStale.value).toBe(false)
-    expect(b.api.isStale.value).toBe(true)
-    expect(hasStaleData.value).toBe(true)
+      // The first view answers with fresh data, but the second still shows cache.
+      first.resolve({ n: 2 })
+      await nextTick()
+      await nextTick()
+      expect(a.api.isStale.value).toBe(false)
+      expect(b.api.isStale.value).toBe(true)
+      expect(hasStaleData.value).toBe(true)
 
-    // Only when the last owner is fresh does the banner drop.
-    second.resolve({ n: 3 })
-    await nextTick()
-    await nextTick()
-    expect(hasStaleData.value).toBe(false)
+      // Only when the last owner is fresh does the banner drop.
+      second.resolve({ n: 3 })
+      await nextTick()
+      await nextTick()
+      expect(hasStaleData.value).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('unmounting a stale view keeps the banner for the other stale view', async () => {
-    writeCache('/k', { n: 1 })
-    const never = deferred<{ n: number }>()
+    vi.useFakeTimers()
+    try {
+      writeCache('/k', { n: 1 })
+      const never = deferred<{ n: number }>()
 
-    const a = mountUser(() => never.promise, { n: 0 }, { cacheKey: '/k' })
-    const b = mountUser(() => never.promise, { n: 0 }, { cacheKey: '/k' })
-    expect(hasStaleData.value).toBe(true)
+      const a = mountUser(() => never.promise, { n: 0 }, { cacheKey: '/k' })
+      const b = mountUser(() => never.promise, { n: 0 }, { cacheKey: '/k' })
+      vi.advanceTimersByTime(1_000)
+      expect(hasStaleData.value).toBe(true)
 
-    b.wrapper.unmount()
-    expect(hasStaleData.value).toBe(true)
+      b.wrapper.unmount()
+      expect(hasStaleData.value).toBe(true)
 
-    a.wrapper.unmount()
-    expect(hasStaleData.value).toBe(false)
+      a.wrapper.unmount()
+      expect(hasStaleData.value).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('unmounting during the grace period never raises the banner', async () => {
+    vi.useFakeTimers()
+    try {
+      writeCache('/k', { n: 1 })
+      const never = deferred<{ n: number }>()
+
+      const a = mountUser(() => never.promise, { n: 0 }, { cacheKey: '/k' })
+      a.wrapper.unmount()
+
+      vi.advanceTimersByTime(1_000)
+      expect(hasStaleData.value).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reports a friendly message when the request times out', async () => {

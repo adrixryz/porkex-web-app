@@ -1,12 +1,12 @@
 <template>
-  <v-container class="py-8 px-md-8 max-w-1200" fluid>
+  <AppPage>
     <v-row>
       <v-col cols="12" md="8" lg="6" class="mx-auto">
-        <h1 class="text-h4 font-weight-bold text-on-surface mb-6">Settings & Profile</h1>
+        <AppPageHeader title="Settings & Profile" />
 
         <!-- LOADING SKELETON -->
         <template v-if="loading">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-6 mb-4">
+          <AppCard class="pa-6 mb-4">
             <div class="d-flex align-center">
               <v-skeleton-loader type="avatar" class="mr-5"></v-skeleton-loader>
               <div class="flex-grow-1">
@@ -18,12 +18,12 @@
             <v-divider class="my-6"></v-divider>
             <v-skeleton-loader type="text" width="140" class="mb-4"></v-skeleton-loader>
             <v-skeleton-loader type="text" width="100%"></v-skeleton-loader>
-          </v-card>
+          </AppCard>
         </template>
 
         <template v-else>
           <!-- PROFILE CARD -->
-          <v-card color="surface" elevation="1" class="rounded-xl pa-6 mb-4">
+          <AppCard class="pa-6 mb-4">
             <div class="d-flex align-center mb-6">
               <v-avatar color="primary" variant="tonal" size="64" class="mr-5">
                 <span class="text-h5 font-weight-bold">{{ userInitial }}</span>
@@ -41,40 +41,39 @@
 
             <div class="text-subtitle-1 font-weight-medium mb-4">Edit Profile</div>
             <v-form @submit.prevent="updateProfile">
-              <v-text-field
+              <AppTextField
                 v-model="editName"
                 label="Display Name"
                 maxlength="80"
                 :prepend-inner-icon="mdiAccountOutline"
                 class="mb-2"
-              ></v-text-field>
-              <v-text-field
+              ></AppTextField>
+              <AppTextField
                 :model-value="profile.email"
                 label="Email"
                 :prepend-inner-icon="mdiEmailOutline"
                 disabled
                 hint="Email cannot be changed"
                 persistent-hint
+                hide-details="false"
                 class="mb-2"
-              ></v-text-field>
-              <v-btn
+              ></AppTextField>
+              <AppButton
                 type="submit"
                 color="primary"
-                elevation="0"
-                rounded="pill"
                 :loading="saving"
                 :disabled="!editName.trim() || editName.trim() === profile.name"
                 class="mt-2"
               >
                 Save Changes
-              </v-btn>
+              </AppButton>
             </v-form>
-          </v-card>
+          </AppCard>
 
           <!-- PREFERENCES -->
-          <v-card color="surface" elevation="1" class="rounded-xl pa-6 mb-4">
+          <AppCard class="pa-6 mb-4">
             <div class="text-subtitle-1 font-weight-medium mb-4">Preferences</div>
-            <v-select
+            <AppSelect
               v-model="selectedCurrency"
               :items="CURRENCIES"
               :item-title="(c: CurrencyOption) => `${c.symbol} — ${c.name} (${c.code})`"
@@ -84,8 +83,8 @@
               :loading="savingCurrency"
               @update:model-value="onCurrencyChange"
               class="mb-2"
-            ></v-select>
-            <v-select
+            ></AppSelect>
+            <AppSelect
               v-model="defaultPeriod"
               :items="periodOptions"
               label="Default period"
@@ -93,8 +92,8 @@
               :loading="savingPreferences"
               @update:model-value="onDefaultPeriodChange"
               class="mb-2"
-            ></v-select>
-            <v-select
+            ></AppSelect>
+            <AppSelect
               v-model="weekStart"
               :items="weekDayOptions"
               label="First day of the week"
@@ -102,22 +101,22 @@
               :loading="savingPreferences"
               @update:model-value="onWeekStartChange"
               class="mb-2"
-            ></v-select>
-            <v-select
+            ></AppSelect>
+            <AppSelect
               v-model="decimalSeparator"
               :items="separatorOptions"
               label="Decimal separator"
               :prepend-inner-icon="mdiDecimal"
               :loading="savingPreferences"
               @update:model-value="onDecimalSeparatorChange"
-            ></v-select>
-          </v-card>
+            ></AppSelect>
+          </AppCard>
 
           <!-- SECURITY -->
-          <v-card color="surface" elevation="1" class="rounded-xl pa-6 mb-4">
+          <AppCard class="pa-6 mb-4">
             <div class="text-subtitle-1 font-weight-medium mb-4">Security</div>
             <v-form @submit.prevent="updatePassword">
-              <v-text-field
+              <AppTextField
                 v-model="currentPassword"
                 label="Current Password"
                 :type="showPassword ? 'text' : 'password'"
@@ -126,8 +125,8 @@
                 :append-inner-icon="showPassword ? mdiEyeOff : mdiEye"
                 @click:append-inner="showPassword = !showPassword"
                 class="mb-2"
-              ></v-text-field>
-              <v-text-field
+              ></AppTextField>
+              <AppTextField
                 v-model="newPassword"
                 label="New Password"
                 :type="showPassword ? 'text' : 'password'"
@@ -135,9 +134,10 @@
                 :prepend-inner-icon="mdiLockOutline"
                 hint="At least 6 characters"
                 persistent-hint
+                hide-details="false"
                 class="mb-2"
-              ></v-text-field>
-              <v-text-field
+              ></AppTextField>
+              <AppTextField
                 v-model="confirmPassword"
                 label="Confirm New Password"
                 :type="showPassword ? 'text' : 'password'"
@@ -146,69 +146,51 @@
                 :error="confirmMismatch"
                 :error-messages="confirmMismatch ? 'Passwords do not match' : ''"
                 class="mb-2"
-              ></v-text-field>
-              <v-btn
+              ></AppTextField>
+              <AppButton
                 type="submit"
                 color="primary"
-                elevation="0"
-                rounded="pill"
                 :loading="savingPassword"
                 :disabled="!canSavePassword"
                 class="mt-2"
               >
                 Update Password
-              </v-btn>
+              </AppButton>
             </v-form>
-          </v-card>
+          </AppCard>
 
           <!-- DANGER ZONE -->
-          <v-card
-            color="surface"
-            elevation="1"
-            class="rounded-xl pa-6"
-            border
-            style="border-color: rgb(var(--v-theme-error))"
-          >
+          <AppCard class="pa-6" border style="border-color: rgb(var(--v-theme-error))">
             <div class="text-subtitle-1 font-weight-medium text-error mb-4">Danger Zone</div>
-            <v-btn
+            <AppButton
               color="error"
               variant="outlined"
-              rounded="pill"
               :prepend-icon="mdiLogout"
               @click="logoutDialog = true"
             >
               Log Out
-            </v-btn>
-          </v-card>
+            </AppButton>
+          </AppCard>
         </template>
-
-        <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
-          snackMessage
-        }}</v-snackbar>
       </v-col>
     </v-row>
 
     <!-- LOG OUT CONFIRM -->
-    <v-dialog v-model="logoutDialog" max-width="380">
-      <v-card class="rounded-xl" color="surface">
-        <v-card-text class="pa-6 text-center">
-          <v-icon :icon="mdiLogout" size="56" color="error" class="mb-4"></v-icon>
-          <p class="text-h6 font-weight-medium mb-2">Log out?</p>
-          <p class="text-body-2 text-on-surface-variant mb-6">
-            You'll need to sign in again to see your transactions.
-            <span v-if="pendingCount > 0">
-              Your {{ pendingCount }} pending change(s) will stay on this device and sync when you
-              sign in to the same account.</span
-            >
-          </p>
-          <div class="d-flex ga-3 justify-center">
-            <v-btn variant="outlined" rounded="pill" @click="logoutDialog = false">Cancel</v-btn>
-            <v-btn color="error" elevation="0" rounded="pill" @click="logout">Log out</v-btn>
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-  </v-container>
+    <AppConfirmDialog
+      v-model="logoutDialog"
+      title="Log out?"
+      confirm-label="Log out"
+      :icon="mdiLogout"
+      color="error"
+      @confirm="logout"
+    >
+      You'll need to sign in again to see your transactions.
+      <span v-if="pendingCount > 0">
+        Your {{ pendingCount }} pending change(s) will stay on this device and sync when you sign in
+        to the same account.</span
+      >
+    </AppConfirmDialog>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -216,7 +198,14 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { pendingCount } from '@/utils/outbox'
 import { useSnackbar } from '@/composables/useSnackbar'
-const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppPage from '@/components/ui/AppPage.vue'
+import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
+const { showSnack } = useSnackbar()
 import { useRouter } from 'vue-router'
 import { api, fetchJson, clearAuth, setUser, getUser } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'

@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-8 px-md-8 max-w-1200" fluid>
+  <AppPage>
     <!-- LOADING SKELETON -->
     <template v-if="loading">
       <v-row class="mb-4">
@@ -10,65 +10,49 @@
       </v-row>
       <v-row>
         <v-col cols="12" md="6" v-for="n in 4" :key="n">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-5">
+          <AppCard class="pa-5">
             <v-skeleton-loader type="text" width="140" class="mb-3"></v-skeleton-loader>
             <v-skeleton-loader type="heading" width="160"></v-skeleton-loader>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
 
     <template v-else>
       <!-- HEADER -->
-      <v-row class="mb-4">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
-        >
-          <div>
-            <h1 class="text-h4 font-weight-bold text-on-surface">Recurring</h1>
-            <p class="text-body-2 text-on-surface-variant mt-1">
-              Movements that repeat on a schedule, for income and expenses.
-            </p>
-          </div>
-          <v-btn
-            color="primary"
-            elevation="0"
-            rounded="pill"
-            :prepend-icon="mdiPlus"
-            @click="openDialog()"
-          >
+      <AppPageHeader
+        title="Recurring"
+        subtitle="Movements that repeat on a schedule, for income and expenses."
+      >
+        <template #actions>
+          <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
             New Rule
-          </v-btn>
-        </v-col>
-      </v-row>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- EMPTY STATE -->
       <v-row v-if="rules.length === 0">
         <v-col cols="12">
-          <div class="text-center pa-12 text-on-surface-variant">
-            <v-icon :icon="mdiRepeat" size="72" class="mb-4 opacity-40"></v-icon>
-            <p class="text-h6 font-weight-medium mb-1">No recurring rules yet</p>
-            <p class="text-body-2 mb-6">
-              Recreate the rent, the salary or any movement that comes back on its own.
-            </p>
-            <v-btn
-              color="primary"
-              elevation="0"
-              rounded="pill"
-              :prepend-icon="mdiPlus"
-              @click="openDialog()"
-            >
-              Create your first rule
-            </v-btn>
-          </div>
+          <AppEmptyState
+            :icon="mdiRepeat"
+            title="No recurring rules yet"
+            description="Recreate the rent, the salary or any movement that comes back on its own."
+            padding="12"
+          >
+            <template #actions>
+              <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
+                Create your first rule
+              </AppButton>
+            </template>
+          </AppEmptyState>
         </v-col>
       </v-row>
 
       <!-- RULE LIST -->
       <v-row v-else>
         <v-col cols="12" md="6" v-for="r in rules" :key="r.id">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-5 fill-height">
+          <AppCard class="pa-5 fill-height">
             <div class="d-flex align-center mb-3">
               <v-avatar :color="r.category?.color ?? undefined" size="40" class="mr-3">
                 <v-icon :icon="mdiRepeat" color="white"></v-icon>
@@ -118,8 +102,8 @@
               ></v-alert
             >
             <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-1 mt-2">
-              <v-btn size="small" variant="text" @click="skipRule = r">Skip next</v-btn
-              ><v-btn size="small" variant="text" @click="editNext(r)">Edit next</v-btn>
+              <AppButton size="small" variant="tonal" @click="skipRule = r">Skip next</AppButton>
+              <AppButton size="small" variant="tonal" @click="editNext(r)">Edit next</AppButton>
             </div>
             <div class="d-flex align-center justify-space-between mt-2">
               <span class="text-caption text-on-surface-variant">
@@ -127,34 +111,28 @@
                 <template v-else-if="!r.active && !isEnded(r)">Paused</template>
               </span>
               <div>
-                <v-btn
+                <AppIconButton
                   v-if="!isEnded(r)"
                   :icon="r.active ? mdiPause : mdiPlayOutline"
-                  variant="text"
-                  size="small"
+                  :label="r.active ? `Pause ${r.description}` : `Resume ${r.description}`"
                   :color="r.active ? 'warning' : 'success'"
-                  :aria-label="r.active ? `Pause ${r.description}` : `Resume ${r.description}`"
                   @click="toggleActive(r)"
-                ></v-btn>
-                <v-btn
+                />
+                <AppIconButton
                   :icon="mdiPencilOutline"
-                  variant="text"
-                  size="small"
+                  :label="`Edit ${r.description}`"
                   color="primary"
-                  :aria-label="`Edit ${r.description}`"
                   @click="openDialog(r)"
-                ></v-btn>
-                <v-btn
+                />
+                <AppIconButton
                   :icon="mdiDeleteOutline"
-                  variant="text"
-                  size="small"
+                  :label="`Delete ${r.description}`"
                   color="error"
-                  :aria-label="`Delete ${r.description}`"
                   @click="confirmDelete(r)"
-                ></v-btn>
+                />
               </div>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
@@ -169,52 +147,41 @@
       :occurrence="nextTarget"
       @saved="onNextSaved"
     />
-    <v-dialog
+    <AppDialog
       :model-value="!!skipRule"
+      title="Skip next occurrence?"
       max-width="400"
       :persistent="skipping"
+      :close-disabled="skipping"
       @update:model-value="skipRule = null"
-      ><v-card
-        title="Skip next occurrence?"
-        :text="`Skip ${skipRule ? formatDateOnly(skipRule.nextDate) : ''}? The rule will continue on its following date.`"
-        ><v-card-actions
-          ><v-btn :disabled="skipping" @click="skipRule = null">Cancel</v-btn
-          ><v-btn color="warning" :loading="skipping" @click="skipNext">Skip</v-btn></v-card-actions
-        ></v-card
-      ></v-dialog
     >
+      <p class="text-body-2">
+        Skip {{ skipRule ? formatDateOnly(skipRule.nextDate) : '' }}? The rule will continue on its
+        following date.
+      </p>
+      <template #actions>
+        <AppButton :disabled="skipping" @click="skipRule = null">Cancel</AppButton>
+        <AppButton color="warning" :loading="skipping" @click="skipNext">Skip</AppButton>
+      </template>
+    </AppDialog>
     <!-- DELETE CONFIRM -->
-    <v-dialog v-model="deleteDialog" max-width="420">
-      <v-card class="rounded-xl" color="surface">
-        <v-card-text class="pa-6 text-center">
-          <v-avatar :color="deletingRule?.category?.color ?? undefined" size="56" class="mb-4">
-            <v-icon :icon="mdiRepeat" color="white" size="28"></v-icon>
-          </v-avatar>
-          <p class="text-h6 font-weight-medium mb-2">Delete rule?</p>
-          <p class="text-body-2 text-on-surface-variant mb-6">
-            "{{ deletingRule?.description }}" will stop creating movements. The ones it already
-            created stay in your history.
-          </p>
-          <div class="d-flex ga-3 justify-center">
-            <v-btn
-              variant="outlined"
-              rounded="pill"
-              :disabled="deleting"
-              @click="deleteDialog = false"
-              >Cancel</v-btn
-            >
-            <v-btn color="error" elevation="0" rounded="pill" :loading="deleting" @click="doDelete"
-              >Delete</v-btn
-            >
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
-      snackMessage
-    }}</v-snackbar>
-  </v-container>
+    <AppConfirmDialog
+      v-model="deleteDialog"
+      title="Delete rule?"
+      confirm-label="Delete"
+      :loading="deleting"
+      max-width="420"
+      @confirm="doDelete"
+    >
+      <template #icon>
+        <v-avatar :color="deletingRule?.category?.color ?? undefined" size="56" class="mb-4">
+          <v-icon :icon="mdiRepeat" color="white" size="28"></v-icon>
+        </v-avatar>
+      </template>
+      "{{ deletingRule?.description }}" will stop creating movements. The ones it already created
+      stay in your history.
+    </AppConfirmDialog>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -222,6 +189,14 @@ import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted } from 'vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
 import RecurringDialog from '@/components/RecurringDialog.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppDialog from '@/components/ui/AppDialog.vue'
+import AppEmptyState from '@/components/ui/AppEmptyState.vue'
+import AppIconButton from '@/components/ui/AppIconButton.vue'
+import AppPage from '@/components/ui/AppPage.vue'
+import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useSnackbar } from '@/composables/useSnackbar'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
@@ -239,7 +214,7 @@ import {
 } from '@mdi/js'
 
 const cs = useCurrencySymbol()
-const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
+const { showSnack } = useSnackbar()
 
 const {
   data: rules,

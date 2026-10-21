@@ -16,15 +16,15 @@
         @click="toggle(tag)"
         >{{ tag.name }}</v-chip
       >
-      <v-btn
+      <AppButton
         type="button"
         size="small"
-        rounded="pill"
         variant="text"
         :prepend-icon="mdiPencilOutline"
         @click="editing = true"
-        >Edit tags</v-btn
       >
+        Edit tags
+      </AppButton>
     </div>
     <div v-if="error && !tags.length" class="text-caption text-warning">{{ error }}</div>
     <TagManagerDialog v-model="editing" @removed="remove" />
@@ -34,6 +34,7 @@
 import { ref } from 'vue'
 import { mdiPencilOutline } from '@mdi/js'
 import { useTags } from '@/composables/useTags'
+import AppButton from '@/components/ui/AppButton.vue'
 import type { Tag } from '@/types'
 import TagManagerDialog from './TagManagerDialog.vue'
 const props = defineProps<{ modelValue: string[] }>()

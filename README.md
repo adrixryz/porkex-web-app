@@ -58,17 +58,34 @@ blocks of `.vue` files, so template-only rules are not covered.
 
 ```
 src/
-  components/   TransactionDialog, RecurringDialog, AmountStepper (shared UI)
-  composables/  useAsyncData (fetch state + cache), useSnackbar (shared toast state)
-  plugins/      Vuetify instance (dark theme, component defaults), MDI SVG icon set
-  router/       Routes and the auth guard
-  utils/        api (auth + fetch + write queue), cache, outbox, connection, currency, date, preferences, recurring, color
-  views/        Login, Dashboard, Transactions, Recurring, Categories, Analytics, Budgets, Settings
-  App.vue       Shell: app bar, navigation drawer, page transitions, status banners
-  style.css     Global resets and shared utilities
+  components/      TransactionDialog, RecurringDialog, AmountStepper (domain UI)
+  components/ui/   App* wrappers and the shared snackbar host
+  composables/     useAsyncData (fetch state + cache), useSnackbar (app-wide toast state)
+  plugins/         Vuetify instance (dark theme, component defaults), MDI SVG icon set
+  router/          Routes and the auth guard
+  utils/           api (auth + fetch + write queue), cache, outbox, connection, currency, date, preferences, recurring, color
+  views/           Login, Dashboard, Transactions, Recurring, Categories, Analytics, Budgets, Settings
+  App.vue          Shell: app bar, navigation drawer, page transitions, status banners, snackbar host
+  style.css        Global resets and shared utilities
+docs/
+  ui.md            Wrapper APIs, global defaults and UI conventions
 ```
 
-Unit tests live next to the code they cover, as `*.spec.ts`.
+Unit tests live next to the code they cover, as `*.spec.ts`. Wrapper specs are
+in `src/components/ui/`.
+
+## UI conventions
+
+Visual defaults live in `src/plugins/vuetify.ts`, and repeated composition lives
+in `src/components/ui/App*.vue`. Change the default or the wrapper once and all
+non-overridden usages follow. Domain components keep their public props/emits;
+only their internals use the wrappers.
+
+The full component catalogue, slot/attribute rules and the reason layout
+primitives and `v-btn-toggle` children stay raw are documented in
+[docs/ui.md](docs/ui.md). Transient messages use the single `AppSnackbar` host in
+`App.vue` via `useSnackbar().showSnack()`; `UpdateNotice` and `UndoNotice` remain
+specialised snackbars.
 
 ## Offline behaviour
 
@@ -192,7 +209,7 @@ Registration is enabled by default on the API and can be closed with
 `ALLOW_REGISTRATION=false`. Login reads `/auth/config`; an unavailable configuration keeps
 signup hidden without preventing an existing account from logging in.
 
-## Reliability verification
+## Testing
 
 Use Node 24 (the CI runtime), then run:
 
@@ -206,31 +223,16 @@ vp exec playwright install chromium
 vp run test:browser
 ```
 
-Without the global CLI, replace `vp` with `npm exec -- vp` in those commands.
-
-Browser tests build a production PWA with an empty API origin and a controlled
-local server. They cover desktop Chromium and Pixel 7 Android emulation, offline
-reload/replay, storage quota, rejected changes, slow writes from two tabs, URL
-history, registration and a real waiting service worker. Failure traces are
-kept under test-results (ignored by Git). No production API is contacted.
-
-Accepted PWA updates also observe the waiting worker's activation directly:
-Workbox can omit its reload callback when registration started without a
-controller. The regression exercises that classification with a real worker;
-drafts and active writes still block reload, and duplicate activation callbacks
-are handled once.
+Browser tests run the production PWA on localhost with a controlled API in
+desktop Chromium and Pixel 7 Android emulation. Failure traces are saved in
+`test-results/`, which Git ignores.
 
 With the backend checked out beside this repository and its dependencies
-installed, run `vp run test:integration`. PORKEX_BACKEND_DIR may override that
-path. The backend harness forces an isolated temporary SQLite database and
-clears inherited Turso credentials. The browser server only proxies an explicit
-localhost API, verifies one offline replay against real persisted data, and
-cleans up the API and temporary database after the browser processes exit.
+installed, run `vp run test:integration`. Set `PORKEX_BACKEND_DIR` to use a
+different backend path. Integration tests use a local API and an isolated
+temporary SQLite database.
 
-These local checks do not validate a deployed Render/Turso installation or a
-physical Android device. Those checks remain manual after your review/deploy.
-
-La matriz de los 23 puntos y sus límites de validación está en [RELIABILITY_REVIEW.md](RELIABILITY_REVIEW.md).
+## Additional features
 
 Tags are managed from Edit tags inside movement dialogs: create, rename, confirm global deletion and drag the handle (or use arrow keys) to save manual order. Movements allow 0–5 tags and an optional Comment. The desktop table and shared compact summary render the same catalog; pending catalog operations remain available offline. The API still accepts legacy description payloads.
 

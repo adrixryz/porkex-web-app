@@ -59,23 +59,25 @@ export default createVuetify({
   },
   defaults: {
     VCard: {
-      elevation: 0,
-      rounded: 'lg',
+      color: 'surface',
+      elevation: 1,
+      rounded: 'xl',
       border: true
     },
     VBtn: {
+      elevation: 0,
       style: 'text-transform: none; letter-spacing: normal; font-weight: 500;',
-      rounded: 'lg'
+      rounded: 'pill'
     },
     VTextField: {
       variant: 'outlined',
       color: 'primary',
-      rounded: 'lg'
+      rounded: 'pill'
     },
     VSelect: {
       variant: 'outlined',
       color: 'primary',
-      rounded: 'lg'
+      rounded: 'pill'
     }
   }
 })

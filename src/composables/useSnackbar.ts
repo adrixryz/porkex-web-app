@@ -7,9 +7,9 @@ const snackbar = ref(false)
 const snackMessage = ref('')
 const snackColor = ref('success')
 
-// Pair it with <v-snackbar v-model="snackbar" :color="snackColor">.
+// Pair it with the single <AppSnackbar> mounted in App.vue.
 export function useSnackbar() {
-  // Each view renders its own <v-snackbar>, but they all read the refs above.
+  // Views only call showSnack; the host in App.vue renders the snackbar.
   // Without this reset, leaving a view while its message is still on screen
   // would make the next view mount already showing the previous message.
   onUnmounted(() => {

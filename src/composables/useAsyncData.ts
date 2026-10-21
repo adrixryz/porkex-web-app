@@ -26,6 +26,12 @@ interface AsyncDataOptions {
 
 const OPTION_KEYS: string[] = ['immediate', 'cacheKey']
 
+// A cache paint does not raise the banner immediately: on a healthy connection
+// the live copy lands in milliseconds, so raising it at once only made the
+// banner flicker on every view change. A failed request raises it right away;
+// one that is merely slow raises it after this grace period.
+const STALE_BANNER_DELAY_MS = 1000
+
 // The second argument is either the initial value or the options object.
 // Only an object whose keys are all option names counts as options, so a data
 // object that happens to have a property called "immediate" is not mistaken.
@@ -82,16 +88,39 @@ export function useAsyncData<T>(
   let savedAt = 0
 
   // The connection banner is global but owned per view: this is the token this
-  // view registered when it painted from the cache (see utils/connection.ts).
+  // view registered when its cached copy was still on screen with no live
+  // response (see utils/connection.ts).
   let staleToken: number | null = null
+  // Pending grace period for a cache paint; see scheduleStale.
+  let staleTimer: ReturnType<typeof setTimeout> | undefined
+
+  function clearStaleTimer() {
+    if (staleTimer !== undefined) {
+      clearTimeout(staleTimer)
+      staleTimer = undefined
+    }
+  }
 
   function raiseStale(savedAt: number) {
+    // The live response landed late or never: no reason to wait any longer.
+    clearStaleTimer()
     // Painting from the cache twice in a row (the immediate block and run()
     // both do it) must not register two owners.
     if (staleToken === null) staleToken = markStale(savedAt)
   }
 
+  // A cache paint alone is not enough: the banner only appears once the live
+  // copy is late, so ordinary navigation between views never shows it.
+  function scheduleStale(savedAt: number) {
+    if (staleToken !== null || staleTimer !== undefined) return
+    staleTimer = setTimeout(() => {
+      staleTimer = undefined
+      raiseStale(savedAt)
+    }, STALE_BANNER_DELAY_MS)
+  }
+
   function releaseStale() {
+    clearStaleTimer()
     if (staleToken !== null) {
       markFresh(staleToken)
       staleToken = null
@@ -121,7 +150,7 @@ export function useAsyncData<T>(
         isStale.value = true
         hasVisibleData = true
         savedAt = cached.savedAt
-        raiseStale(cached.savedAt)
+        scheduleStale(cached.savedAt)
       }
     }
     loading.value = !hasVisibleData

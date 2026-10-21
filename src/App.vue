@@ -2,6 +2,7 @@
   <v-app>
     <UpdateNotice />
     <UndoNotice />
+    <AppSnackbar />
     <div v-if="route.name === 'login'" class="fill-height">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -127,22 +128,22 @@
         >
           {{ lastFlushError }}
           <div v-if="firstBlockedMutation" class="d-flex ga-2 mt-2">
-            <v-btn size="small" variant="outlined" @click="retryBlocked">Retry</v-btn>
-            <v-btn size="small" variant="text" @click="discardDialog = true">Discard change</v-btn>
+            <AppButton size="small" variant="outlined" @click="retryBlocked">Retry</AppButton>
+            <AppButton size="small" variant="text" @click="discardDialog = true">
+              Discard change
+            </AppButton>
           </div>
         </v-alert>
 
-        <v-dialog v-model="discardDialog" max-width="380">
-          <v-card
-            title="Discard pending change?"
-            text="This change has not been confirmed by the server. Discarding removes it from this device's queue."
-          >
-            <v-card-actions>
-              <v-btn @click="discardDialog = false">Cancel</v-btn>
-              <v-btn color="error" @click="discardBlocked">Discard</v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-dialog>
+        <AppConfirmDialog
+          v-model="discardDialog"
+          title="Discard pending change?"
+          confirm-label="Discard"
+          @confirm="discardBlocked"
+        >
+          This change has not been confirmed by the server. Discarding removes it from this device's
+          queue.
+        </AppConfirmDialog>
 
         <router-view v-slot="{ Component }">
           <!-- No mode="out-in": it makes Vue wait for the leaving view to finish
@@ -162,6 +163,9 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import UpdateNotice from '@/components/UpdateNotice.vue'
 import UndoNotice from '@/components/UndoNotice.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppSnackbar from '@/components/ui/AppSnackbar.vue'
 import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { getUser, syncPendingWrites, USER_CHANGE_EVENT, recurringState } from '@/utils/api'

@@ -1,183 +1,168 @@
 <template>
-  <v-dialog
+  <AppDialog
     :model-value="modelValue"
+    :title="isEditing ? 'Edit Recurring Rule' : 'New Recurring Rule'"
     max-width="520"
     persistent
+    :close-disabled="submitting"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <v-card class="rounded-xl" color="surface">
-      <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
-        <span class="font-weight-medium">{{
-          isEditing ? 'Edit Recurring Rule' : 'New Recurring Rule'
-        }}</span>
-        <v-spacer></v-spacer>
-        <v-btn
-          :icon="mdiClose"
-          variant="text"
-          size="small"
-          aria-label="Close dialog"
-          :disabled="submitting"
-          @click="close"
-        ></v-btn>
-      </v-card-title>
-      <v-card-text class="pa-6">
-        <v-alert v-if="rule?.nextException" type="info" density="compact" class="mb-3"
-          >Changing the schedule or type can cancel the next-only edit. Other rule edits preserve
-          it.</v-alert
-        >
-        <v-form @submit.prevent="submit">
-          <v-btn-toggle
-            v-model="form.type"
-            mandatory
-            color="primary"
-            rounded="pill"
-            variant="outlined"
-            density="comfortable"
-            divided
-            class="w-100 mb-4"
-            aria-label="Rule type"
-          >
-            <v-btn value="EXPENSE" class="flex-grow-1">Expense</v-btn>
-            <v-btn value="INCOME" class="flex-grow-1">Income</v-btn>
-          </v-btn-toggle>
+    <v-alert v-if="rule?.nextException" type="info" density="compact" class="mb-3"
+      >Changing the schedule or type can cancel the next-only edit. Other rule edits preserve
+      it.</v-alert
+    >
+    <v-form @submit.prevent="submit">
+      <v-btn-toggle
+        v-model="form.type"
+        mandatory
+        color="primary"
+        rounded="pill"
+        variant="outlined"
+        density="comfortable"
+        divided
+        class="w-100 mb-4"
+        aria-label="Rule type"
+      >
+        <v-btn value="EXPENSE" class="flex-grow-1">Expense</v-btn>
+        <v-btn value="INCOME" class="flex-grow-1">Income</v-btn>
+      </v-btn-toggle>
 
-          <v-text-field
-            v-model="form.amount"
-            label="Amount"
+      <AppTextField
+        v-model="form.amount"
+        label="Amount"
+        type="number"
+        inputmode="decimal"
+        :prefix="cs"
+        min="0.01"
+        step="0.01"
+        hide-spin-buttons
+        autofocus
+        class="mb-2"
+      >
+        <template #append-inner>
+          <AmountStepper
+            :label="isIncome ? 'income amount' : 'expense amount'"
+            @step="stepAmount"
+          ></AmountStepper>
+        </template>
+      </AppTextField>
+
+      <AppTextField
+        v-model="form.description"
+        label="Comment (optional)"
+        maxlength="200"
+        :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Rent'"
+        class="mb-2"
+      ></AppTextField>
+
+      <AppSelect
+        v-model="form.categoryId"
+        :items="categoryOptions"
+        item-title="name"
+        item-value="id"
+        label="Category"
+        class="mb-2"
+      ></AppSelect>
+
+      <v-row dense class="mt-0">
+        <v-col cols="7">
+          <AppSelect
+            v-model="form.frequency"
+            :items="frequencyOptions"
+            item-title="title"
+            item-value="value"
+            label="Repeats"
+          ></AppSelect>
+        </v-col>
+        <v-col cols="5">
+          <AppTextField
+            v-model="form.interval"
             type="number"
-            inputmode="decimal"
-            :prefix="cs"
-            min="0.01"
-            step="0.01"
+            inputmode="numeric"
+            :min="1"
+            :max="MAX_INTERVAL"
+            step="1"
             hide-spin-buttons
-            autofocus
-            class="mb-2"
+            :label="`Every (${unitLabel(form.frequency)})`"
           >
             <template #append-inner>
-              <AmountStepper
-                :label="isIncome ? 'income amount' : 'expense amount'"
-                @step="stepAmount"
-              ></AmountStepper>
+              <AmountStepper label="interval" @step="stepInterval"></AmountStepper>
             </template>
-          </v-text-field>
+          </AppTextField>
+        </v-col>
+      </v-row>
 
-          <v-text-field
-            v-model="form.description"
-            label="Comment (optional)"
-            maxlength="200"
-            :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Rent'"
-            class="mb-2"
-          ></v-text-field>
+      <v-row dense>
+        <v-col cols="6">
+          <AppTextField v-model="form.startDate" label="Starts" type="date"></AppTextField>
+        </v-col>
+        <v-col cols="6">
+          <AppTextField
+            v-model="form.endDate"
+            label="Ends (optional)"
+            type="date"
+            :min="form.startDate || undefined"
+            clearable
+          ></AppTextField>
+        </v-col>
+      </v-row>
 
-          <v-select
-            v-model="form.categoryId"
-            :items="categoryOptions"
-            item-title="name"
-            item-value="id"
-            label="Category"
-            class="mb-2"
-          ></v-select>
+      <div v-if="startsInPast" class="text-caption text-on-surface-variant mb-2">
+        Past dates are not backfilled: the rule starts at the next occurrence from today.
+      </div>
 
-          <v-row dense class="mt-0">
-            <v-col cols="7">
-              <v-select
-                v-model="form.frequency"
-                :items="frequencyOptions"
-                item-title="title"
-                item-value="value"
-                label="Repeats"
-              ></v-select>
-            </v-col>
-            <v-col cols="5">
-              <v-text-field
-                v-model="form.interval"
-                type="number"
-                inputmode="numeric"
-                :min="1"
-                :max="MAX_INTERVAL"
-                step="1"
-                hide-spin-buttons
-                :label="`Every (${unitLabel(form.frequency)})`"
-              >
-                <template #append-inner>
-                  <AmountStepper label="interval" @step="stepInterval"></AmountStepper>
-                </template>
-              </v-text-field>
-            </v-col>
-          </v-row>
+      <v-alert
+        v-if="!categoryOptions.length && categoriesError"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="mt-2"
+      >
+        Categories could not be loaded. Connect once and they will stay available offline.
+      </v-alert>
 
-          <v-row dense>
-            <v-col cols="6">
-              <v-text-field v-model="form.startDate" label="Starts" type="date"></v-text-field>
-            </v-col>
-            <v-col cols="6">
-              <v-text-field
-                v-model="form.endDate"
-                label="Ends (optional)"
-                type="date"
-                :min="form.startDate || undefined"
-                clearable
-              ></v-text-field>
-            </v-col>
-          </v-row>
+      <v-alert
+        v-if="error"
+        type="error"
+        variant="tonal"
+        density="compact"
+        class="mt-4"
+        closable
+        @click:close="error = ''"
+      >
+        {{ error }}
+      </v-alert>
 
-          <div v-if="startsInPast" class="text-caption text-on-surface-variant mb-2">
-            Past dates are not backfilled: the rule starts at the next occurrence from today.
-          </div>
-
-          <v-alert
-            v-if="!categoryOptions.length && categoriesError"
-            type="warning"
-            variant="tonal"
-            density="compact"
-            class="mt-2"
-          >
-            Categories could not be loaded. Connect once and they will stay available offline.
-          </v-alert>
-
-          <v-alert
-            v-if="error"
-            type="error"
-            variant="tonal"
-            density="compact"
-            class="mt-4"
-            closable
-            @click:close="error = ''"
-          >
-            {{ error }}
-          </v-alert>
-
-          <!-- Neutral blue like the other dialogs: the rule itself already
-               says whether it is income or expense. -->
-          <v-btn
-            type="submit"
-            rounded="pill"
-            color="primary"
-            size="large"
-            class="w-100 mt-4 font-weight-bold"
-            elevation="0"
-            :loading="submitting"
-            :disabled="!isValid"
-          >
-            {{ isEditing ? 'Update' : 'Create' }}
-          </v-btn>
-        </v-form>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+      <!-- Neutral blue like the other dialogs: the rule itself already
+           says whether it is income or expense. -->
+      <AppButton
+        type="submit"
+        color="primary"
+        size="large"
+        class="w-100 mt-4 font-weight-bold"
+        :loading="submitting"
+        :disabled="!isValid"
+      >
+        {{ isEditing ? 'Update' : 'Create' }}
+      </AppButton>
+    </v-form>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import AmountStepper from '@/components/AmountStepper.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppDialog from '@/components/ui/AppDialog.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useCurrencySymbol } from '@/utils/currency'
 import { fromDateInput, toDateInput, todayInput } from '@/utils/date'
 import { unitLabel } from '@/utils/recurring'
 import type { Category, RecurringFrequency, RecurringRule, TxType } from '@/types'
-import { mdiClose } from '@mdi/js'
 
 const props = withDefaults(
   defineProps<{
@@ -303,13 +288,15 @@ watch(
 
 const close = () => emit('update:modelValue', false)
 
-// Empty input counts as 0, the value never goes below the 0.01 minimum and
-// decimals stay exact instead of picking up floating point noise.
+// Empty input counts as 0 and decimals stay exact instead of picking up
+// floating point noise. Stepping below the 0.01 minimum clears the field, so
+// the stepper can always be walked back to empty instead of parking the value
+// on a 0.01 the user never chose.
 const stepAmount = (delta: number) => {
   const current = Number.parseFloat(form.value.amount)
   const base = Number.isFinite(current) ? current : 0
-  const next = Math.max(0.01, Math.round((base + delta) * 100) / 100)
-  form.value.amount = String(next)
+  const next = Math.round((base + delta) * 100) / 100
+  form.value.amount = next >= 0.01 ? String(next) : ''
 }
 
 // The interval uses the same custom stepper as the amount. Both bounds are

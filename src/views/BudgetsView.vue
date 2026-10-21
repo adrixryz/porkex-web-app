@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-8 px-md-8 max-w-1200" fluid>
+  <AppPage>
     <!-- LOADING SKELETON -->
     <template v-if="loading">
       <v-row class="mb-4">
@@ -10,38 +10,26 @@
       </v-row>
       <v-row>
         <v-col cols="12" sm="6" md="4" v-for="n in 4" :key="n">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4">
+          <AppCard class="pa-4">
             <v-skeleton-loader type="text" width="120" class="mb-3"></v-skeleton-loader>
             <v-skeleton-loader type="heading" width="140"></v-skeleton-loader>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
 
     <template v-else>
       <!-- HEADER -->
-      <v-row class="mb-4">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
-        >
-          <div>
-            <h1 class="text-h4 font-weight-bold text-on-surface">Budgets</h1>
-            <p class="text-body-2 text-on-surface-variant mt-1">
-              Set a limit per category and watch how much is left.
-            </p>
-          </div>
-          <v-btn
-            color="primary"
-            elevation="0"
-            rounded="pill"
-            :prepend-icon="mdiPlus"
-            @click="openDialog()"
-          >
+      <AppPageHeader
+        title="Budgets"
+        subtitle="Set a limit per category and watch how much is left."
+      >
+        <template #actions>
+          <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
             New Budget
-          </v-btn>
-        </v-col>
-      </v-row>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- PERIOD TOGGLE -->
       <v-row class="mb-4">
@@ -64,78 +52,63 @@
       <!-- SUMMARY -->
       <v-row v-if="totals" class="mb-4">
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              Total limit
-            </div>
-            <div class="text-h5 font-weight-bold text-on-surface">
-              {{ cs }}{{ formatMoney(totals.amount) }}
-            </div>
-            <div class="text-caption text-on-surface-variant">
-              across {{ totals.count }} {{ totals.count === 1 ? 'category' : 'categories' }}
-            </div>
-          </v-card>
+          <AppStatCard
+            label="Total limit"
+            :value="`${cs}${formatMoney(totals.amount)}`"
+            :caption="`across ${totals.count} ${totals.count === 1 ? 'category' : 'categories'}`"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          />
         </v-col>
         <v-col cols="12" sm="6" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">Spent</div>
-            <div class="text-h5 font-weight-bold text-on-surface">
-              {{ cs }}{{ formatMoney(totals.spent) }}
-            </div>
-            <div class="text-caption text-on-surface-variant">
-              {{ overallPercent }}% of the limit used
-            </div>
-          </v-card>
+          <AppStatCard
+            label="Spent"
+            :value="`${cs}${formatMoney(totals.spent)}`"
+            :caption="`${overallPercent}% of the limit used`"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          />
         </v-col>
         <v-col cols="12" sm="12" md="4">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 fill-height">
-            <div class="text-caption text-on-surface-variant font-weight-medium mb-1">
-              Remaining
-            </div>
-            <div
-              class="text-h5 font-weight-bold"
-              :class="remainingTotal < 0 ? 'text-error' : 'text-success'"
-            >
-              {{ cs }}{{ formatMoney(remainingTotal) }}
-            </div>
-            <div class="text-caption text-on-surface-variant">
+          <AppStatCard
+            label="Remaining"
+            :value="`${cs}${formatMoney(remainingTotal)}`"
+            :value-class="remainingTotal < 0 ? 'text-error' : 'text-success'"
+            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
+            class="fill-height"
+          >
+            <template #caption>
               <template v-if="overBudgetCount > 0">
                 <span class="text-error">{{ overBudgetCount }} over budget</span>
               </template>
               <template v-else>Everything within the limits</template>
-            </div>
-          </v-card>
+            </template>
+          </AppStatCard>
         </v-col>
       </v-row>
 
       <!-- EMPTY STATE -->
       <v-row v-if="!loading && budgets.length === 0">
         <v-col cols="12">
-          <div class="text-center pa-12 text-on-surface-variant">
-            <v-icon :icon="mdiPiggyBankOutline" size="72" class="mb-4 opacity-40"></v-icon>
-            <p class="text-h6 font-weight-medium mb-1">
-              No budgets for {{ period === 'MONTH' ? 'this month' : 'this week' }}
-            </p>
-            <p class="text-body-2 mb-6">
-              Set a limit on a category to know when you are getting close to the limit.
-            </p>
-            <v-btn
-              color="primary"
-              elevation="0"
-              rounded="pill"
-              :prepend-icon="mdiPlus"
-              @click="openDialog()"
-            >
-              Create your first budget
-            </v-btn>
-          </div>
+          <AppEmptyState
+            :icon="mdiPiggyBankOutline"
+            :title="`No budgets for ${period === 'MONTH' ? 'this month' : 'this week'}`"
+            description="Set a limit on a category to know when you are getting close to the limit."
+            padding="12"
+          >
+            <template #actions>
+              <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
+                Create your first budget
+              </AppButton>
+            </template>
+          </AppEmptyState>
         </v-col>
       </v-row>
 
       <!-- BUDGET LIST -->
       <v-row v-else>
         <v-col cols="12" md="6" v-for="b in budgets" :key="b.id">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-5 fill-height">
+          <AppCard class="pa-5 fill-height">
             <div class="d-flex align-center mb-3">
               <v-avatar :color="b.category.color ?? undefined" size="40" class="mr-3">
                 <v-icon :icon="mdiTagOutline" color="white"></v-icon>
@@ -148,22 +121,18 @@
                   {{ b.period === 'MONTH' ? 'Monthly' : 'Weekly' }} limit
                 </div>
               </div>
-              <v-btn
+              <AppIconButton
                 :icon="mdiPencilOutline"
-                variant="text"
-                size="small"
+                :label="`Edit budget for ${b.category.name}`"
                 color="primary"
-                :aria-label="`Edit budget for ${b.category.name}`"
                 @click="openDialog(b)"
-              ></v-btn>
-              <v-btn
+              />
+              <AppIconButton
                 :icon="mdiDeleteOutline"
-                variant="text"
-                size="small"
+                :label="`Delete budget for ${b.category.name}`"
                 color="error"
-                :aria-label="`Delete budget for ${b.category.name}`"
                 @click="confirmDelete(b)"
-              ></v-btn>
+              />
             </div>
 
             <div class="d-flex align-baseline justify-space-between mb-2">
@@ -199,122 +168,106 @@
               </span>
               <span class="text-caption text-on-surface-variant">{{ b.usagePercent }}%</span>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
 
     <!-- CREATE/EDIT DIALOG -->
-    <v-dialog v-model="dialog" max-width="440" persistent>
-      <v-card class="rounded-xl" color="surface">
-        <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
-          <span class="font-weight-medium">{{ editingBudget ? 'Edit Budget' : 'New Budget' }}</span>
-          <v-spacer></v-spacer>
-          <v-btn
-            :icon="mdiClose"
-            variant="text"
-            size="small"
-            aria-label="Close dialog"
-            :disabled="submitting"
-            @click="dialog = false"
-          ></v-btn>
-        </v-card-title>
-        <v-card-text class="pa-6">
-          <v-form @submit.prevent="submit">
-            <v-select
-              v-model="form.categoryId"
-              :items="availableCategories"
-              item-title="name"
-              item-value="id"
-              label="Category"
-              :disabled="isEditing"
-              class="mb-2"
-            ></v-select>
-            <v-text-field
-              v-model="form.amount"
-              label="Limit"
-              type="number"
-              inputmode="decimal"
-              :prefix="cs"
-              min="0.01"
-              step="0.01"
-              hide-spin-buttons
-              class="mb-2"
-            >
-              <template #append-inner>
-                <AmountStepper label="budget limit" @step="stepAmount"></AmountStepper>
+    <AppDialog
+      v-model="dialog"
+      :title="editingBudget ? 'Edit Budget' : 'New Budget'"
+      max-width="440"
+      persistent
+      :close-disabled="submitting"
+    >
+      <v-form @submit.prevent="submit">
+        <AppSelect
+          v-model="form.categoryId"
+          :items="availableCategories"
+          item-title="name"
+          item-value="id"
+          label="Category"
+          :disabled="isEditing"
+          class="mb-2"
+        >
+          <template #selection="{ item }">
+            <CategoryDot :color="item.color" />{{ item.name }}
+          </template>
+          <template #item="{ props: option, item }">
+            <v-list-item v-bind="option">
+              <template #prepend>
+                <CategoryDot :color="item.color" />
               </template>
-            </v-text-field>
-            <v-select
-              v-model="form.period"
-              :items="periodOptions"
-              item-title="title"
-              item-value="value"
-              label="Repeats"
-              class="mb-2"
-            ></v-select>
+            </v-list-item>
+          </template>
+        </AppSelect>
+        <AppTextField
+          v-model="form.amount"
+          label="Limit"
+          type="number"
+          inputmode="decimal"
+          :prefix="cs"
+          min="0.01"
+          step="0.01"
+          hide-spin-buttons
+          class="mb-2"
+        >
+          <template #append-inner>
+            <AmountStepper label="budget limit" @step="stepAmount"></AmountStepper>
+          </template>
+        </AppTextField>
+        <AppSelect
+          v-model="form.period"
+          :items="periodOptions"
+          item-title="title"
+          item-value="value"
+          label="Repeats"
+          class="mb-2"
+        ></AppSelect>
 
-            <v-alert
-              v-if="error"
-              type="error"
-              variant="tonal"
-              density="compact"
-              class="mt-4"
-              closable
-              @click:close="error = ''"
-            >
-              {{ error }}
-            </v-alert>
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mt-4"
+          closable
+          @click:close="error = ''"
+        >
+          {{ error }}
+        </v-alert>
 
-            <v-btn
-              type="submit"
-              color="primary"
-              size="large"
-              rounded="pill"
-              class="w-100 mt-4 font-weight-bold"
-              elevation="0"
-              :loading="submitting"
-              :disabled="!isValid"
-            >
-              {{ editingBudget ? 'Update' : 'Create' }}
-            </v-btn>
-          </v-form>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+        <AppButton
+          type="submit"
+          color="primary"
+          size="large"
+          class="w-100 mt-4 font-weight-bold"
+          :loading="submitting"
+          :disabled="!isValid"
+        >
+          {{ editingBudget ? 'Update' : 'Create' }}
+        </AppButton>
+      </v-form>
+    </AppDialog>
 
     <!-- DELETE CONFIRM -->
-    <v-dialog v-model="deleteDialog" max-width="380">
-      <v-card class="rounded-xl" color="surface">
-        <v-card-text class="pa-6 text-center">
-          <v-avatar :color="deletingBudget?.category.color ?? undefined" size="56" class="mb-4">
-            <v-icon :icon="mdiTagOutline" color="white" size="28"></v-icon>
-          </v-avatar>
-          <p class="text-h6 font-weight-medium mb-2">Remove budget?</p>
-          <p class="text-body-2 text-on-surface-variant mb-6">
-            The limit for {{ deletingBudget?.category.name }} will be deleted. Your transactions are
-            not affected.
-          </p>
-          <div class="d-flex ga-3 justify-center">
-            <v-btn
-              variant="outlined"
-              rounded="pill"
-              :disabled="deleting"
-              @click="deleteDialog = false"
-              >Cancel</v-btn
-            >
-            <v-btn color="error" elevation="0" rounded="pill" :loading="deleting" @click="doDelete"
-              >Delete</v-btn
-            >
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
-      snackMessage
-    }}</v-snackbar>
-  </v-container>
+    <AppConfirmDialog
+      v-model="deleteDialog"
+      title="Remove budget?"
+      confirm-label="Delete"
+      :loading="deleting"
+      @confirm="doDelete"
+    >
+      <template #icon>
+        <v-avatar :color="deletingBudget?.category.color ?? undefined" size="56" class="mb-4">
+          <v-icon :icon="mdiTagOutline" color="white" size="28"></v-icon>
+        </v-avatar>
+      </template>
+      The limit for {{ deletingBudget?.category.name }} will be deleted. Your transactions are not
+      affected.
+    </AppConfirmDialog>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -322,6 +275,18 @@ import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
 import AmountStepper from '@/components/AmountStepper.vue'
+import CategoryDot from '@/components/CategoryDot.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppDialog from '@/components/ui/AppDialog.vue'
+import AppEmptyState from '@/components/ui/AppEmptyState.vue'
+import AppIconButton from '@/components/ui/AppIconButton.vue'
+import AppPage from '@/components/ui/AppPage.vue'
+import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppStatCard from '@/components/ui/AppStatCard.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useSnackbar } from '@/composables/useSnackbar'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
@@ -330,7 +295,6 @@ import { todayInput } from '@/utils/date'
 import { getFirstDayOfWeek } from '@/utils/preferences'
 import type { Budget, BudgetPeriod, BudgetsResponse, Category } from '@/types'
 import {
-  mdiClose,
   mdiDeleteOutline,
   mdiPencilOutline,
   mdiPiggyBankOutline,
@@ -339,7 +303,7 @@ import {
 } from '@mdi/js'
 
 const cs = useCurrencySymbol()
-const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
+const { showSnack } = useSnackbar()
 
 const EMPTY_BUDGETS: BudgetsResponse = { budgets: [], totals: [] }
 
@@ -456,10 +420,14 @@ const openDialog = (budget?: Budget) => {
   dialog.value = true
 }
 
+// Empty input counts as 0 and stepping below the 0.01 minimum clears the
+// field, like the other amount steppers: the box goes back to empty instead of
+// parking a 0.01 the user never chose.
 const stepAmount = (delta: number) => {
   const current = Number.parseFloat(form.value.amount)
   const base = Number.isFinite(current) ? current : 0
-  form.value.amount = String(Math.max(0.01, round2(base + delta)))
+  const next = round2(base + delta)
+  form.value.amount = next >= 0.01 ? String(next) : ''
 }
 
 const submit = async () => {

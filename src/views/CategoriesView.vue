@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-8 px-md-8 max-w-1200" fluid>
+  <AppPage>
     <!-- LOADING SKELETON -->
     <template v-if="loading">
       <v-row class="mb-4">
@@ -13,7 +13,7 @@
       </v-row>
       <v-row>
         <v-col cols="12" sm="6" md="4" v-for="n in 6" :key="n">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4">
+          <AppCard class="pa-4">
             <div class="d-flex align-center">
               <v-skeleton-loader type="avatar" class="mr-4"></v-skeleton-loader>
               <div>
@@ -21,27 +21,18 @@
                 <v-skeleton-loader type="chip" width="70"></v-skeleton-loader>
               </div>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
       </v-row>
     </template>
     <template v-else>
-      <v-row class="mb-4">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
-        >
-          <h1 class="text-h4 font-weight-bold text-on-surface">Categories</h1>
-          <v-btn
-            color="primary"
-            elevation="0"
-            rounded="pill"
-            :prepend-icon="mdiPlus"
-            @click="openDialog()"
-            >New Category</v-btn
-          >
-        </v-col>
-      </v-row>
+      <AppPageHeader title="Categories">
+        <template #actions>
+          <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
+            New Category
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <v-row class="mb-4">
         <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
@@ -79,7 +70,7 @@
 
       <v-row>
         <v-col cols="12" sm="6" md="4" v-for="cat in filteredCategories" :key="cat.id">
-          <v-card color="surface" elevation="1" class="rounded-xl pa-4 cat-card fill-height">
+          <AppCard class="pa-4 cat-card fill-height">
             <div class="d-flex align-center justify-space-between">
               <div class="d-flex align-center">
                 <v-avatar :color="cat.color ?? undefined" size="40" class="mr-4">
@@ -102,22 +93,18 @@
                 </div>
               </div>
               <div>
-                <v-btn
+                <AppIconButton
                   :icon="mdiPencilOutline"
-                  variant="text"
-                  size="small"
+                  :label="`Edit ${cat.name}`"
                   color="primary"
-                  :aria-label="`Edit ${cat.name}`"
                   @click="editCat(cat)"
-                ></v-btn>
-                <v-btn
+                />
+                <AppIconButton
                   :icon="mdiDeleteOutline"
-                  variant="text"
-                  size="small"
+                  :label="`Delete ${cat.name}`"
                   color="error"
-                  :aria-label="`Delete ${cat.name}`"
                   @click="confirmDelete(cat)"
-                ></v-btn>
+                />
               </div>
             </div>
             <v-divider class="my-3"></v-divider>
@@ -130,171 +117,135 @@
                 {{ cs }}{{ formatMoney(cat.total) }}
               </span>
             </div>
-          </v-card>
+          </AppCard>
         </v-col>
         <v-col v-if="filteredCategories.length === 0" cols="12">
-          <div class="text-center pa-12 text-on-surface-variant">
-            <v-icon :icon="mdiShapePlusOutline" size="72" class="mb-4 opacity-40"></v-icon>
-            <p class="text-h6 font-weight-medium mb-1">No {{ filterLabel }} categories yet</p>
-            <p class="text-body-2 mb-6">
-              Create one to start organizing your
-              {{ filterLabel === 'income' ? 'earnings' : 'spending' }}.
-            </p>
-            <v-btn
-              color="primary"
-              elevation="0"
-              rounded="pill"
-              :prepend-icon="mdiPlus"
-              @click="openDialog()"
-            >
-              New {{ filterLabel }} category
-            </v-btn>
-          </div>
+          <AppEmptyState
+            :icon="mdiShapePlusOutline"
+            :title="`No ${filterLabel} categories yet`"
+            :description="`Create one to start organizing your ${filterLabel === 'income' ? 'earnings' : 'spending'}.`"
+            padding="12"
+          >
+            <template #actions>
+              <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
+                New {{ filterLabel }} category
+              </AppButton>
+            </template>
+          </AppEmptyState>
         </v-col>
       </v-row>
     </template>
 
     <!-- CREATE/EDIT DIALOG -->
-    <v-dialog v-model="dialog" max-width="440" persistent>
-      <v-card class="rounded-xl" color="surface">
-        <v-card-title class="px-6 py-4 border-b border-outline-variant d-flex align-center">
-          <span class="font-weight-medium">{{ isEditing ? 'Edit Category' : 'New Category' }}</span>
-          <v-spacer></v-spacer>
-          <v-btn
-            :icon="mdiClose"
-            variant="text"
-            size="small"
-            aria-label="Close dialog"
-            @click="dialog = false"
-          ></v-btn>
-        </v-card-title>
-        <v-card-text class="pa-6">
-          <v-form @submit.prevent="submitCat">
-            <v-text-field
-              v-model="catForm.name"
-              label="Name"
-              maxlength="60"
-              class="mb-2"
-            ></v-text-field>
-            <v-select
-              v-model="catForm.type"
-              :items="['INCOME', 'EXPENSE']"
-              label="Type"
-              class="mb-2"
-            ></v-select>
-            <div class="text-body-2 text-on-surface-variant mb-2">Color</div>
-            <div class="d-flex flex-wrap ga-2 mb-4" role="radiogroup" aria-label="Category color">
-              <v-avatar
-                v-for="c in colorOptions"
-                :key="c"
-                :color="c"
-                size="36"
-                class="cursor-pointer"
-                role="radio"
-                tabindex="0"
-                :aria-checked="catForm.color === c"
-                :aria-label="`Color ${c}`"
-                :style="
-                  catForm.color === c ? 'outline: 3px solid #0070f3; outline-offset: 2px;' : ''
-                "
-                @click="catForm.color = c"
-                @keydown.enter.prevent="catForm.color = c"
-                @keydown.space.prevent="catForm.color = c"
-              >
-                <v-icon
-                  v-if="catForm.color === c"
-                  :icon="mdiCheck"
-                  color="white"
-                  size="18"
-                ></v-icon>
-              </v-avatar>
-            </div>
-            <v-btn
-              type="submit"
-              color="primary"
-              size="large"
-              rounded="pill"
-              class="w-100 mt-2 font-weight-bold"
-              elevation="0"
-              :loading="submitting"
-              :disabled="!catForm.name.trim() || !catForm.type"
-              >{{ isEditing ? 'Update' : 'Create' }}</v-btn
-            >
-          </v-form>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    <AppDialog
+      v-model="dialog"
+      :title="isEditing ? 'Edit Category' : 'New Category'"
+      max-width="440"
+      persistent
+    >
+      <v-form @submit.prevent="submitCat">
+        <AppTextField
+          v-model="catForm.name"
+          label="Name"
+          maxlength="60"
+          class="mb-2"
+        ></AppTextField>
+        <AppSelect
+          v-model="catForm.type"
+          :items="['INCOME', 'EXPENSE']"
+          label="Type"
+          class="mb-2"
+        ></AppSelect>
+        <div class="text-body-2 text-on-surface-variant mb-2">Color</div>
+        <div class="d-flex flex-wrap ga-2 mb-4" role="radiogroup" aria-label="Category color">
+          <v-avatar
+            v-for="c in colorOptions"
+            :key="c"
+            :color="c"
+            size="36"
+            class="cursor-pointer"
+            role="radio"
+            tabindex="0"
+            :aria-checked="catForm.color === c"
+            :aria-label="`Color ${c}`"
+            :style="catForm.color === c ? 'outline: 3px solid #0070f3; outline-offset: 2px;' : ''"
+            @click="catForm.color = c"
+            @keydown.enter.prevent="catForm.color = c"
+            @keydown.space.prevent="catForm.color = c"
+          >
+            <v-icon v-if="catForm.color === c" :icon="mdiCheck" color="white" size="18"></v-icon>
+          </v-avatar>
+        </div>
+        <AppButton
+          type="submit"
+          color="primary"
+          size="large"
+          class="w-100 mt-2 font-weight-bold"
+          :loading="submitting"
+          :disabled="!catForm.name.trim() || !catForm.type"
+        >
+          {{ isEditing ? 'Update' : 'Create' }}
+        </AppButton>
+      </v-form>
+    </AppDialog>
 
     <!-- DELETE CONFIRM DIALOG -->
-    <v-dialog v-model="deleteDialog" max-width="420" persistent>
-      <v-card class="rounded-xl" color="surface">
-        <v-card-text class="pa-6 text-center">
-          <v-avatar :color="deletingCat?.color ?? undefined" size="56" class="mb-4">
-            <v-icon :icon="mdiTagOutline" color="white" size="28"></v-icon>
-          </v-avatar>
-          <p class="text-h6 font-weight-medium mb-2">Delete "{{ deletingCat?.name }}"?</p>
-          <p class="text-body-2 text-on-surface-variant mb-6">
-            <template v-if="needsReassignment">
-              It has {{ deletingCat?.allTimeCount ?? 0 }} movement{{
-                deletingCat?.allTimeCount === 1 ? '' : 's'
-              }}
-              in total. Choose which category takes them, or cancel to keep the category.
-            </template>
-            <template v-else>This action cannot be undone.</template>
-            <template v-if="(deletingCat?.budgetCount ?? 0) > 0">
-              <br />
-              <span class="text-warning">
-                Its {{ deletingCat?.budgetCount }} budget{{
-                  (deletingCat?.budgetCount ?? 0) === 1 ? '' : 's'
-                }}
-                will be deleted with it.
-              </span>
-            </template>
-            <template v-if="(deletingCat?.recurringCount ?? 0) > 0">
-              <br />
-              <span class="text-warning">
-                Its {{ deletingCat?.recurringCount }} recurring rule{{
-                  (deletingCat?.recurringCount ?? 0) === 1 ? '' : 's'
-                }}
-                will be deleted with it.
-              </span>
-            </template>
-          </p>
-          <v-select
-            v-if="needsReassignment"
-            v-model="reassignTo"
-            :items="reassignOptions"
-            item-title="title"
-            item-value="value"
-            label="Move transactions to"
-            density="comfortable"
-            rounded="xl"
-            hide-details
-            class="mb-6 text-left"
-          ></v-select>
-          <div class="d-flex ga-3 justify-center">
-            <v-btn variant="outlined" rounded="pill" :disabled="deleting" @click="closeDelete"
-              >Cancel</v-btn
-            >
-            <v-btn
-              color="error"
-              elevation="0"
-              rounded="pill"
-              :loading="deleting"
-              :disabled="!canDelete"
-              @click="doDelete"
-            >
-              {{ needsReassignment ? 'Move & Delete' : 'Delete' }}
-            </v-btn>
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">{{
-      snackMessage
-    }}</v-snackbar>
-  </v-container>
+    <AppConfirmDialog
+      v-model="deleteDialog"
+      :title="deleteTitle"
+      :confirm-label="needsReassignment ? 'Move & Delete' : 'Delete'"
+      :loading="deleting"
+      :confirm-disabled="!canDelete"
+      :cancel-disabled="deleting"
+      persistent
+      max-width="420"
+      @confirm="doDelete"
+      @cancel="closeDelete"
+    >
+      <template #icon>
+        <v-avatar :color="deletingCat?.color ?? undefined" size="56" class="mb-4">
+          <v-icon :icon="mdiTagOutline" color="white" size="28"></v-icon>
+        </v-avatar>
+      </template>
+      <template v-if="needsReassignment">
+        It has {{ deletingCat?.allTimeCount ?? 0 }} movement{{
+          deletingCat?.allTimeCount === 1 ? '' : 's'
+        }}
+        in total. Choose which category takes them, or cancel to keep the category.
+      </template>
+      <template v-else>This action cannot be undone.</template>
+      <template v-if="(deletingCat?.budgetCount ?? 0) > 0">
+        <br />
+        <span class="text-warning">
+          Its {{ deletingCat?.budgetCount }} budget{{
+            (deletingCat?.budgetCount ?? 0) === 1 ? '' : 's'
+          }}
+          will be deleted with it.
+        </span>
+      </template>
+      <template v-if="(deletingCat?.recurringCount ?? 0) > 0">
+        <br />
+        <span class="text-warning">
+          Its {{ deletingCat?.recurringCount }} recurring rule{{
+            (deletingCat?.recurringCount ?? 0) === 1 ? '' : 's'
+          }}
+          will be deleted with it.
+        </span>
+      </template>
+      <AppSelect
+        v-if="needsReassignment"
+        v-model="reassignTo"
+        :items="reassignOptions"
+        item-title="title"
+        item-value="value"
+        label="Move transactions to"
+        density="comfortable"
+        rounded="xl"
+        hide-details
+        class="mb-6 text-left"
+      ></AppSelect>
+    </AppConfirmDialog>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -302,7 +253,16 @@ import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
-const { snackbar, snackMessage, snackColor, showSnack } = useSnackbar()
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppDialog from '@/components/ui/AppDialog.vue'
+import AppEmptyState from '@/components/ui/AppEmptyState.vue'
+import AppIconButton from '@/components/ui/AppIconButton.vue'
+import AppPage from '@/components/ui/AppPage.vue'
+import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppTextField from '@/components/ui/AppTextField.vue'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { Category, PeriodFilter } from '@/types'
@@ -311,7 +271,6 @@ import { getDefaultPeriod } from '@/utils/preferences'
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, toDateOnly } from '@/utils/date'
 import {
   mdiCheck,
-  mdiClose,
   mdiDeleteOutline,
   mdiPencilOutline,
   mdiPlus,
@@ -347,8 +306,10 @@ useUnsavedChanges(
 // Delete confirm
 const deleteDialog = ref(false)
 const deletingCat = ref<Category | null>(null)
+const deleteTitle = computed(() => `Delete "${deletingCat.value?.name ?? ''}"?`)
 const reassignTo = ref<number | null>(null)
 const deleting = ref(false)
+const { showSnack } = useSnackbar()
 
 // The range travels as calendar days ('YYYY-MM-DD'); the backend maps each
 // one to the full UTC day, so the totals match what the user sees.

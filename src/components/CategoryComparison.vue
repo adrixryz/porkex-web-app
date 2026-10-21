@@ -1,34 +1,30 @@
 <template>
-  <v-card
-    color="surface"
-    elevation="1"
-    class="rounded-xl fill-height category-comparison"
-    role="region"
-    aria-label="Category comparison"
-  >
-    <v-card-title class="comparison-heading px-6 py-4 border-b border-outline-variant">
-      <div>
-        <div class="font-weight-medium text-subtitle-1">Category comparison</div>
-        <div class="comparison-subtitle text-on-surface-variant">{{ subtitle }}</div>
-      </div>
-      <v-select
-        :model-value="mode"
-        :items="options"
-        label="Compare categories"
-        density="compact"
-        hide-details
-        variant="outlined"
-        rounded="xl"
-        class="comparison-selector"
-        @update:model-value="selectMode"
-      />
-    </v-card-title>
+  <AppCard class="fill-height category-comparison" role="region" aria-label="Category comparison">
+    <template #header>
+      <v-card-title class="comparison-heading px-6 py-4 border-b border-outline-variant">
+        <div>
+          <div class="font-weight-medium text-subtitle-1">Category comparison</div>
+          <div class="comparison-subtitle text-on-surface-variant">{{ subtitle }}</div>
+        </div>
+        <AppSelect
+          :model-value="mode"
+          :items="options"
+          label="Compare categories"
+          density="compact"
+          hide-details
+          class="comparison-selector"
+          @update:model-value="selectMode"
+        />
+      </v-card-title>
+    </template>
     <v-progress-linear v-if="loading" indeterminate height="2" />
     <v-card-text class="pa-0">
       <v-alert v-if="error" type="error" density="compact" class="ma-4">{{ error }}</v-alert>
-      <div v-else-if="!loading && !rows.length" class="text-center text-on-surface-variant pa-8">
-        No spending data to compare yet
-      </div>
+      <AppEmptyState
+        v-else-if="!loading && !rows.length"
+        description="No spending data to compare yet"
+        padding="8"
+      />
       <div v-if="rows.length" class="overflow-x-auto">
         <v-table theme="dark" class="bg-surface comparison-table">
           <thead>
@@ -89,12 +85,15 @@
         </v-table>
       </div>
     </v-card-text>
-  </v-card>
+  </AppCard>
 </template>
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { mdiTrendingUp, mdiTrendingDown, mdiMinus } from '@mdi/js'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppEmptyState from '@/components/ui/AppEmptyState.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { fetchJson } from '@/utils/api'
 import { todayInput } from '@/utils/date'

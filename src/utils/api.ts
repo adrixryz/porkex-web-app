@@ -163,7 +163,7 @@ function isNetworkFailure(error: unknown): boolean {
 function withClientId(method: string, path: string, body: BodyInit | null): BodyInit | null {
   if (
     method !== 'POST' ||
-    !['/transactions', '/recurring'].includes(path) ||
+    !['/transactions', '/recurring', '/categories', '/budgets'].includes(path) ||
     typeof body !== 'string'
   ) {
     return body
@@ -195,13 +195,20 @@ function confirmedWrite(path: string, notify = true) {
 
 async function sendQueued(mutation: QueuedMutation, session: Session): Promise<Response> {
   assertCurrent(session)
+  // Older catalog creates did not have a stable create key. Use the saved
+  // operation ID, never a fresh UUID on every replay.
+  let body = mutation.body
+  if (mutation.method === 'POST' && ['/categories', '/budgets'].includes(mutation.path) && body) {
+    const parsed = JSON.parse(body) as Record<string, unknown>
+    if (!parsed.clientId) body = JSON.stringify({ ...parsed, clientId: mutation.id })
+  }
   activeWrites.value += 1
   try {
     const response = await fetch(`${API_BASE}${mutation.path}`, {
       method: mutation.method,
       headers: requestHeaders(session),
       signal: withTimeout(undefined, WRITE_TIMEOUT_MS),
-      ...(mutation.body !== null ? { body: mutation.body } : {})
+      ...(body !== null ? { body } : {})
     })
     if (response.status === 401) expireSession(session)
     else if (isCurrent(session)) {

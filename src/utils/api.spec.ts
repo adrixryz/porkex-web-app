@@ -42,6 +42,28 @@ describe('reads are never queued', () => {
   })
 })
 
+it('keeps catalog create keys stable across a lost response and replay', async () => {
+  const bodies: Record<string, unknown>[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, options: RequestInit) => {
+      bodies.push(JSON.parse(options.body as string))
+      if (bodies.length === 1) throw new TypeError('Lost response')
+      return new Response('{}')
+    })
+  )
+  try {
+    await api('/categories', { method: 'POST', body: '{"name":"Food"}' })
+    await syncPendingWrites()
+    expect(bodies).toHaveLength(2)
+    expect(bodies[0]!.clientId).toBeTruthy()
+    expect(bodies[1]!.clientId).toBe(bodies[0]!.clientId)
+    expect(pendingCount.value).toBe(0)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
 describe('writes that never reach the server are queued', () => {
   it('returns a 202 the caller can treat as success', async () => {
     vi.stubGlobal('fetch', networkDown())
@@ -203,10 +225,10 @@ describe('the idempotency key', () => {
     vi.unstubAllGlobals()
   })
 
-  it('is not added to writes that are not transaction or rule creates', async () => {
+  it('is not added to catalog updates', async () => {
     vi.stubGlobal('fetch', networkDown())
 
-    await api('/categories', { method: 'POST', body: '{"name":"Food"}' })
+    await api('/categories/1', { method: 'PUT', body: '{"name":"Food"}' })
 
     const send = vi.fn(async (_m: QueuedMutation) => new Response('{}', { status: 200 }))
     await flushOutbox(send)

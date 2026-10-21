@@ -359,6 +359,7 @@ const progressColor = (b: Budget) => {
 // Dialog state
 const dialog = ref(false)
 const editingBudget = ref<Budget | null>(null)
+const clientId = ref('')
 const submitting = ref(false)
 const error = ref('')
 const form = ref({ categoryId: null as number | null, amount: '', period: 'MONTH' as BudgetPeriod })
@@ -411,6 +412,7 @@ watch(
 const isValid = computed(() => Number(form.value.amount) > 0 && form.value.categoryId !== null)
 
 const openDialog = (budget?: Budget) => {
+  clientId.value = crypto.randomUUID()
   editingBudget.value = budget ?? null
   form.value = budget
     ? { categoryId: budget.categoryId, amount: String(budget.amount), period: budget.period }
@@ -440,7 +442,11 @@ const submit = async () => {
   try {
     const res = await api(url, {
       method,
-      body: JSON.stringify({ ...form.value, amount: Number(form.value.amount) })
+      body: JSON.stringify({
+        ...form.value,
+        amount: Number(form.value.amount),
+        ...(!editing ? { clientId: clientId.value } : {})
+      })
     })
     if (res.ok) {
       dialog.value = false

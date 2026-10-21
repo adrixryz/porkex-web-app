@@ -297,6 +297,7 @@ const periodLabel = computed(() =>
         : 'this year'
 )
 const catForm = ref({ name: '', type: 'EXPENSE', color: '#EA4335' })
+const clientId = ref('')
 const cleanForm = ref('')
 useUnsavedChanges(
   () => dialog.value && JSON.stringify(catForm.value) !== cleanForm.value,
@@ -379,6 +380,7 @@ const loadCategories = async () => {
 }
 
 const openDialog = () => {
+  clientId.value = crypto.randomUUID()
   isEditing.value = false
   editingId.value = null
   catForm.value = { name: '', type: filterType.value, color: '#EA4335' }
@@ -401,7 +403,11 @@ const submitCat = async () => {
   try {
     const res = await api(url, {
       method,
-      body: JSON.stringify({ ...catForm.value, name: catForm.value.name.trim() })
+      body: JSON.stringify({
+        ...catForm.value,
+        name: catForm.value.name.trim(),
+        ...(!isEditing.value ? { clientId: clientId.value } : {})
+      })
     })
     if (res.ok) {
       dialog.value = false

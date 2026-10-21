@@ -173,6 +173,8 @@ const submit = async () => {
       // staying on this device only.
       setCurrencyByCode(data.user?.currency)
       applyPreferences(data.user ?? {})
+      form.value = { name: '', email: '', password: '' }
+      loading.value = false
       router.push('/')
     } else {
       error.value = data?.error || 'Something went wrong.'

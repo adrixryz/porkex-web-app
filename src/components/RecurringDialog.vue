@@ -5,6 +5,7 @@
     max-width="520"
     persistent
     :close-disabled="submitting"
+    :dirty="JSON.stringify(form) !== cleanForm"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-alert v-if="rule?.nextException" type="info" density="compact" class="mb-3"

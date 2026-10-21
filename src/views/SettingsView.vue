@@ -195,7 +195,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { canLeaveForms, useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { pendingCount } from '@/utils/outbox'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -519,6 +519,7 @@ const updatePassword = async () => {
 const logoutDialog = ref(false)
 
 const logout = () => {
+  if (!canLeaveForms()) return
   logoutDialog.value = false
   clearAuth()
   router.push('/login')

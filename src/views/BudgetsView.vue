@@ -177,6 +177,7 @@
     <AppDialog
       v-model="dialog"
       :title="editingBudget ? 'Edit Budget' : 'New Budget'"
+      :dirty="JSON.stringify(form) !== cleanForm"
       max-width="440"
       persistent
       :close-disabled="submitting"

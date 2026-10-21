@@ -4,6 +4,8 @@
     title="Edit tags"
     max-width="480"
     :persistent="busy || dragging !== null"
+    :close-disabled="busy || dragging !== null"
+    :dirty="!!newName || tags.some(tag => names[tag.id] !== tag.name)"
     :closable="false"
     content-class="pa-4"
     @update:model-value="emit('update:modelValue', $event)"
@@ -73,9 +75,7 @@
     </div>
     <template #actions>
       <v-spacer></v-spacer>
-      <AppButton type="button" :disabled="busy" @click="emit('update:modelValue', false)">
-        Done
-      </AppButton>
+      <AppButton type="button" :disabled="busy" @click="close"> Done </AppButton>
     </template>
   </AppDialog>
   <AppConfirmDialog
@@ -102,7 +102,7 @@ import AppTextField from '@/components/ui/AppTextField.vue'
 import type { Tag } from '@/types'
 import { useTags } from '@/composables/useTags'
 import { api, isQueuedResponse } from '@/utils/api'
-import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { confirmDiscard, useUnsavedChanges } from '@/composables/useUnsavedChanges'
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [open: boolean]; removed: [ids: string[]] }>()
 const { tags, refreshTags } = useTags()
@@ -111,6 +111,15 @@ const ordered = ref<Tag[]>([])
 const newName = ref('')
 const newId = ref(crypto.randomUUID())
 const busy = ref(false)
+function close() {
+  if (busy.value || dragging.value !== null) return
+  if (
+    (!!newName.value || tags.value.some(tag => names.value[tag.id] !== tag.name)) &&
+    !confirmDiscard()
+  )
+    return
+  emit('update:modelValue', false)
+}
 const message = ref('')
 const messageType = ref<'error' | 'info' | 'success'>('error')
 const deleting = ref<Tag | null>(null)

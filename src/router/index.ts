@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isAuthenticated } from '@/utils/api'
+import { canLeaveForms } from '@/composables/useUnsavedChanges'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -79,6 +80,11 @@ router.beforeEach((to, _from, next) => {
 })
 
 // One place to name the tab, so every view does not have to.
+router.beforeEach((to, from) => {
+  if (!isAuthenticated() || to.fullPath === from.fullPath) return true
+  return canLeaveForms()
+})
+
 router.afterEach(to => {
   const title = (to.meta as { title?: string }).title
   document.title = title ? `${title} · Porkex` : 'Porkex'

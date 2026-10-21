@@ -5,6 +5,7 @@
     max-width="480"
     persistent
     :close-disabled="submitting"
+    :dirty="JSON.stringify(form) !== cleanForm"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-form @submit.prevent="submit">

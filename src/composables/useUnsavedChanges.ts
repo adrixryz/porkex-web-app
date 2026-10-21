@@ -5,6 +5,21 @@ const busyOwners = new Set<symbol>()
 export const hasUnsavedChanges = ref(false)
 export const hasBusyForms = ref(false)
 
+export function confirmDiscard(): boolean {
+  return window.confirm('Discard your unsaved changes and leave? Cancel to keep editing.')
+}
+
+export function canLeaveForms(): boolean {
+  if (hasBusyForms.value) return false
+  return !hasUnsavedChanges.value || confirmDiscard()
+}
+
+window.addEventListener('beforeunload', event => {
+  if (!hasUnsavedChanges.value && !hasBusyForms.value) return
+  event.preventDefault()
+  event.returnValue = ''
+})
+
 /** Keep drafts in memory; in particular, never persist password fields. */
 export function useUnsavedChanges(dirty: () => boolean, busy: () => boolean = () => false) {
   const owner = Symbol('form')

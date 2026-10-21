@@ -1,6 +1,6 @@
 <template>
   <v-dialog
-    v-model="open"
+    v-model="guardedOpen"
     :max-width="maxWidth"
     :persistent="persistent"
     :aria-label="title || undefined"
@@ -33,6 +33,8 @@
 
 <script setup lang="ts">
 import { mdiClose } from '@mdi/js'
+import { computed } from 'vue'
+import { confirmDiscard } from '@/composables/useUnsavedChanges'
 import AppIconButton from './AppIconButton.vue'
 
 defineOptions({ inheritAttrs: false })
@@ -44,6 +46,7 @@ const props = withDefaults(
     persistent?: boolean
     closable?: boolean
     closeDisabled?: boolean
+    dirty?: boolean
     contentClass?: string
     actionsClass?: string
   }>(),
@@ -53,6 +56,7 @@ const props = withDefaults(
     persistent: false,
     closable: true,
     closeDisabled: false,
+    dirty: false,
     contentClass: 'pa-6',
     actionsClass: ''
   }
@@ -63,10 +67,17 @@ const emit = defineEmits<{
 }>()
 
 const open = defineModel<boolean>({ default: false })
+const guardedOpen = computed({
+  get: () => open.value,
+  set: value => {
+    if (!value && (props.closeDisabled || (props.dirty && !confirmDiscard()))) return
+    open.value = value
+  }
+})
 
 function close() {
   if (props.closeDisabled) return
-  open.value = false
-  emit('close')
+  guardedOpen.value = false
+  if (!open.value) emit('close')
 }
 </script>

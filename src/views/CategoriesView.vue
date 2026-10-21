@@ -140,6 +140,8 @@
     <AppDialog
       v-model="dialog"
       :title="isEditing ? 'Edit Category' : 'New Category'"
+      :close-disabled="submitting"
+      :dirty="JSON.stringify(catForm) !== cleanForm"
       max-width="440"
       persistent
     >

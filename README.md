@@ -265,4 +265,28 @@ before full navigation: an unchanged server row alone cannot acknowledge Undo.
 
 Recurring rules offer Skip next and Edit next for an exact scheduled date. The next-only editor reuses the movement fields with a read-only date and 0–5 tags. A conflict stays visible rather than silently affecting a later date; ordinary edits retain the rule schedule and base values.
 
-Category comparison contains a single Month vs month / Week vs week / Year vs year selector. It compares expenses per category in the existing table, preserving the other Analytics charts and months/days controls. Weekly and annual comparisons use equal elapsed calendar portions; monthly comparison preserves month-to-date versus the full previous month. URL history, local calendar days, week-start preference and zero-base/no-data states remain supported. There is no separate Period comparison panel.
+Category comparison contains a single Month vs month / Week vs week / Year vs year selector. It compares expenses per category in the existing table, preserving the other Analytics charts and months/days controls. Each mode compares the current period through today with the complete previous period; monthly behavior is unchanged. Weekly boundaries follow the account preference. Comparison cache entries use a new namespace so older equal-portion results cannot appear under the new labels. URL history and zero-base/no-data states remain supported.
+
+## Session security and recovery
+
+Danger Zone places **Log Out All Sessions** above **Log Out**. Its confirmation
+explains that other devices must sign in again while this browser stays signed
+in. Changing the password has the same revocation effect. Both actions require
+an online response and immediately install the replacement token. They never
+enter the offline queue, even when ordinary changes are blocked. A short shared
+rotation marker protects other tabs from an old-token 401 during renewal; it
+contains only JWT claims, not the token signature. A lost response may require
+signing in again. Pending changes remain tied to their original account.
+
+Undo retains the eight-second window and cross-tab locking. Recovery uses one
+deadline timeout only while there are pending deletions for the active account;
+it suspends while hidden and processes expired entries on focus or visibility
+recovery. Failed publication is retried after five seconds without idle polling.
+
+## Integration CI
+
+Both repositories run frontend/API integration on Ubuntu with Node 24 and
+Chromium desktop/Android emulation. A push or PR checks the triggering revision
+against the counterpart's main branch. Manual runs accept `counterpart_ref`
+for coordinated changes; logs record both SHAs and failures retain browser
+traces. The harness overrides database credentials and uses disposable SQLite.

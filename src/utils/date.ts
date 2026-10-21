@@ -1,4 +1,5 @@
 import { weekStartIndex } from './preferences'
+import { calendarState } from './calendar'
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n))
 
@@ -28,6 +29,7 @@ export function toDateInput(value: string | Date): string {
 }
 
 export function todayInput(): string {
+  void calendarState.value
   return toDateOnly(new Date())
 }
 

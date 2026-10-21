@@ -3,6 +3,7 @@ import { firstBlockedMutation, pendingCount } from './outbox'
 import { requestRevalidation } from './revalidation'
 import { hasStaleData } from './connection'
 import { refreshAccountProfile } from './profile'
+import { refreshCalendar } from './calendar'
 
 const RETRY_DELAYS = [5_000, 15_000, 30_000, 60_000]
 
@@ -84,9 +85,11 @@ export function startRecovery(): () => void {
     clearTimeout(timer)
     timer = undefined
     retry = 0
+    refreshCalendar()
     dayAndZone = calendar()
     if (clock === undefined) {
       clock = setInterval(() => {
+        refreshCalendar()
         const next = calendar()
         if (next !== dayAndZone) {
           dayAndZone = next

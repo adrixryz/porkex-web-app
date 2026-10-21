@@ -709,7 +709,7 @@ const clearFilters = () => {
 }
 
 const getDateRange = () => {
-  const now = new Date()
+  const now = parseDateOnly(todayInput())!
   let from: Date, to: Date
   if (periodMode.value === 'day') {
     from = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset.value)

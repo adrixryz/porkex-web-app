@@ -138,6 +138,25 @@ checks for a changed local day or timezone without polling API data.
 A pending write is counted in a banner, not shown in the list: the table keeps
 showing what the server last confirmed.
 
+Transaction edits retain their original Save time and mutation ID through
+retries. A delayed edit cannot overwrite one saved later on another device:
+the newer edit is kept, the queue advances and an informational notice explains
+the result. Both devices must use automatic date/time. An older queued edit
+without save metadata is preserved and paused; Retry asks for confirmation
+before treating it as a new edit. No queued operation is silently discarded.
+
+Category and budget forms also retain a stable create ID. Local validation
+rejects malformed amounts, dates and schedules before sending or queueing them.
+Budget category availability accounts for both periods and pending changes.
+Profile recovery applies remote preferences while preserving pending local
+fields. The calendar refresh updates labels and date limits after midnight or
+on resume.
+
+Leaving a modified form asks before discarding it; browser reloads use the
+browser's native warning. Active submissions block internal navigation. Login
+and registration remain available, with registration configuration retried
+after transient failures. Password fields are never saved as drafts.
+
 ## PWA
 
 The app is installable (Android: "Install app"; iOS: Share → Add to Home

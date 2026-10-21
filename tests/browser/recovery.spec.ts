@@ -3,6 +3,8 @@ import { expectIncomeExpenseChart } from './charts'
 
 let token: string
 test.beforeEach(async ({ page }, info) => {
+  // Existing flows explicitly close drafts; targeted protection tests override this handler.
+  page.on('dialog', dialog => dialog.accept())
   token = `${info.project.name}-${info.testId}@example.test`
   if (info.title.startsWith('closed registration')) return
   await page.addInitScript(key => {
@@ -14,6 +16,56 @@ test.beforeEach(async ({ page }, info) => {
       JSON.stringify({ id: 1, name: 'Personal', email: 'owner@example.com' })
     )
   }, token)
+})
+
+test('unsaved expense close can be canceled without losing its fields', async ({ page }) => {
+  page.removeAllListeners('dialog')
+  await page.goto('/transactions')
+  const dialog = await openExpense(page, 'Keep this draft')
+  page.once('dialog', confirmation => confirmation.dismiss())
+  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue(
+    'Keep this draft'
+  )
+  page.once('dialog', confirmation => confirmation.accept())
+  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+})
+
+test('closed registration transient failure recovers its tab without reload', async ({ page }) => {
+  let requests = 0
+  await page.route('**/auth/config', route => {
+    requests++
+    return route.fulfill({
+      status: requests === 1 ? 503 : 200,
+      contentType: 'application/json',
+      body: requests === 1 ? '{}' : '{"registrationEnabled":true}'
+    })
+  })
+  await page.goto('/login')
+  await expect(page.getByRole('tab', { name: 'Sign Up', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Sign Up', exact: true }).click()
+  await expect(page.getByLabel('Full Name', { exact: true })).toBeVisible()
+})
+
+test('midnight changes the visible day label and the requested range together', async ({
+  page
+}) => {
+  await page.clock.install({ time: new Date('2026-10-31T23:59:50-05:00') })
+  await page.goto('/transactions?period=day')
+  await expect(page.getByText('Sat, Oct 31', { exact: true })).toBeVisible()
+  await page.clock.fastForward(31_000)
+  await expect(page.getByText('Sun, Nov 1', { exact: true })).toBeVisible()
+  await expect
+    .poll(async () =>
+      (await state(page)).requests.some((request: { path: string }) =>
+        request.path.includes('from=2026-11-01')
+      )
+    )
+    .toBe(true)
 })
 async function state(page: Page, changes?: object) {
   const response = await page.request.fetch('/__test/state', {

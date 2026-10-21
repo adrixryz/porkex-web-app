@@ -301,6 +301,11 @@ const submit = async () => {
       close()
     } else {
       const data = await res.json().catch(() => null)
+      // This rejection happens before the write. The next explicit save can
+      // capture the corrected clock without restamping ambiguous retries.
+      if (res.status === 400 && data?.code === 'DEVICE_CLOCK_AHEAD') {
+        editStamp = createEditStamp()
+      }
       error.value = data?.error || 'Failed to save transaction.'
     }
   } catch (e) {

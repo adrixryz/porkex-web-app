@@ -1,6 +1,55 @@
 import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 
+test('correcting the device clock retries the same edit through the real API', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Clock owner',
+      email: `clock-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const categoryId = categories.find((item: { type: string }) => item.type === 'EXPENSE').id
+  const movement = await (
+    await page.request.post('/api/transactions', {
+      headers,
+      data: { amount: 10, type: 'EXPENSE', categoryId, comment: 'Clock correction' }
+    })
+  ).json()
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/transactions')
+  await page.getByRole('button', { name: 'Edit Clock correction', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Amount', { exact: true }).fill('20')
+  await page.clock.setFixedTime(new Date(Date.now() + 3_600_000))
+  const rejected = page.waitForResponse(
+    response =>
+      response.url().endsWith(`/api/transactions/${movement.id}`) &&
+      response.request().method() === 'PUT'
+  )
+  await dialog.getByRole('button', { name: 'Update', exact: true }).click()
+  expect((await rejected).status()).toBe(400)
+  expect(await (await rejected).json()).toMatchObject({ code: 'DEVICE_CLOCK_AHEAD' })
+  await expect(dialog.getByText(/The device clock is ahead/)).toBeVisible()
+  await page.clock.setFixedTime(new Date())
+  await dialog.getByRole('button', { name: 'Update', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  const rows = await (await page.request.get('/api/transactions', { headers })).json()
+  expect(rows.items).toHaveLength(1)
+  expect(rows.items[0]).toMatchObject({ id: movement.id, amount: 20 })
+})
+
 test('lost catalog responses replay through the real API without blocking the queue', async ({
   page
 }, info) => {

@@ -50,7 +50,7 @@ const stubs = {
   'v-card-text': { template: '<div><slot /></div>' },
   'v-spacer': { template: '<div />' },
   'v-form': { template: '<form><slot /></form>' },
-  'v-text-field': { template: '<div><slot name="append-inner" /></div>' },
+  'v-text-field': { props: ['prefix'], template: '<div><slot name="append-inner" /></div>' },
   'v-select': VSelectStub,
   'v-alert': { template: '<div class="categories-alert"><slot /></div>' },
   'v-btn': { template: '<button type="button"><slot /></button>' },
@@ -177,6 +177,70 @@ it('edits the pinned next occurrence through its own endpoint', async () => {
     })
     expect(wrapper.text()).toContain('Edit next occurrence')
   } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it.each([
+  { status: 400, code: 'DEVICE_CLOCK_AHEAD', renew: true },
+  { status: 400, code: 'INVALID_INPUT', renew: false },
+  { status: 500, code: undefined, renew: false }
+])('retries an edit after $status/$code with renew=$renew', async ({ status, code, renew }) => {
+  const now = Date.now()
+  const bodies: { mutationId: string; editedAt: string }[] = []
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, options?: RequestInit) => {
+      if (options?.method !== 'PUT') return new Response(JSON.stringify(CATEGORIES))
+      bodies.push(JSON.parse(options.body as string))
+      return bodies.length === 1
+        ? new Response(JSON.stringify({ code, error: 'Retry after correcting the clock.' }), {
+            status
+          })
+        : new Response('{"id":1}')
+    })
+  )
+  try {
+    const wrapper = mount(TransactionDialog, {
+      props: {
+        modelValue: false,
+        type: 'EXPENSE',
+        categories: CATEGORIES,
+        transaction: {
+          id: 1,
+          amount: 10,
+          type: 'EXPENSE',
+          categoryId: 1,
+          category: null,
+          description: 'Lunch',
+          userId: 1,
+          recurringId: null,
+          date: new Date(now).toISOString(),
+          createdAt: new Date(now).toISOString()
+        }
+      },
+      global: { stubs }
+    })
+    await wrapper.setProps({ modelValue: true })
+    const vm = wrapper.vm as unknown as { submit: () => Promise<void> }
+    vi.setSystemTime(now + 3_600_000)
+    await vm.submit()
+    expect(wrapper.emitted('saved')).toBeUndefined()
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    vi.setSystemTime(now)
+    await vm.submit()
+    expect(bodies).toHaveLength(2)
+    expect(bodies[0]!.editedAt).toBe(new Date(now + 3_600_000).toISOString())
+    if (renew) {
+      expect(bodies[1]!.mutationId).not.toBe(bodies[0]!.mutationId)
+      expect(bodies[1]!.editedAt).toBe(new Date(now).toISOString())
+    } else {
+      expect(bodies[1]).toEqual(bodies[0])
+    }
+    expect(wrapper.emitted('saved')).toHaveLength(1)
+  } finally {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   }
 })

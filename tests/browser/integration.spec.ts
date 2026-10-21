@@ -1,4 +1,80 @@
 import { test, expect } from '@playwright/test'
+import { expectIncomeExpenseChart } from './charts'
+
+test('real analytics totals, net results and averages reach the income and expense chart', async ({
+  page
+}, info) => {
+  await page.clock.install({ time: new Date('2024-03-06T17:00:00-05:00') })
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Analytics owner',
+      email: `analytics-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  for (const [date, type, amount] of [
+    ['2023-12-01', 'EXPENSE', 999],
+    ['2024-01-01', 'INCOME', 100.1],
+    ['2024-01-02', 'INCOME', 0.2],
+    ['2024-01-01', 'EXPENSE', 40.1],
+    ['2024-01-02', 'EXPENSE', 0.2],
+    ['2024-02-01', 'EXPENSE', 90.99],
+    ['2024-03-01', 'INCOME', 200.05]
+  ] as const) {
+    const category = categories.find((item: { type: string }) => item.type === type)
+    const response = await page.request.post('/api/transactions', {
+      headers,
+      data: { date, type, amount, categoryId: category.id }
+    })
+    expect(response.status()).toBe(201)
+  }
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+
+  const response = page.waitForResponse(
+    response => new URL(response.url()).pathname === '/api/analytics'
+  )
+  await page.goto('/analytics?months=3&days=7')
+  const analyticsResponse = await response
+  expect(analyticsResponse.status()).toBe(200)
+  const data = await analyticsResponse.json()
+  expect(data.range).toEqual({ months: 3, days: 7 })
+  expect(data.monthlyData).toEqual([
+    { month: 'Jan 24', income: 100.3, expense: 40.3, net: 60, avgExpense: 40.3 },
+    { month: 'Feb 24', income: 0, expense: 90.99, net: -90.99, avgExpense: 65.65 },
+    { month: 'Mar 24', income: 200.05, expense: 0, net: 200.05, avgExpense: 43.76 }
+  ])
+  expect(data.insights.currentMonthIncome).toBe(200.05)
+  expect(data.insights.currentMonthExpense).toBe(0)
+  await expectIncomeExpenseChart(page)
+
+  const nextResponse = page.waitForResponse(response => {
+    const url = new URL(response.url())
+    return url.pathname === '/api/analytics' && url.searchParams.get('months') === '6'
+  })
+  await page.getByLabel('Months', { exact: true }).fill('6')
+  await page.getByLabel('Months', { exact: true }).press('Enter')
+  const expanded = await (await nextResponse).json()
+  expect(expanded.monthlyData).toHaveLength(6)
+  expect(expanded.monthlyData.slice(0, 3)).toEqual([
+    { month: 'Oct 23', income: 0, expense: 0, net: 0, avgExpense: 0 },
+    { month: 'Nov 23', income: 0, expense: 0, net: 0, avgExpense: 0 },
+    { month: 'Dec 23', income: 0, expense: 999, net: -999, avgExpense: 333 }
+  ])
+  await expect(page).toHaveURL(/months=6/)
+  await expect(
+    page.getByRole('img', { name: 'Income vs expenses for the last 6 months', exact: true })
+  ).toBeVisible()
+})
 
 test('enabled registration exposes Sign Up and creates an account through the real API', async ({
   page

@@ -253,6 +253,8 @@ import AppStatCard from '@/components/ui/AppStatCard.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 import {
   Chart as ChartJS,
+  BarController,
+  LineController,
   CategoryScale,
   LinearScale,
   BarElement,
@@ -276,6 +278,8 @@ import { todayInput } from '@/utils/date'
 import type { ChartData } from 'chart.js'
 
 ChartJS.register(
+  BarController,
+  LineController,
   CategoryScale,
   LinearScale,
   BarElement,

@@ -1095,7 +1095,8 @@ onMounted(async () => {
   .compact-toggle :deep(.v-btn) {
     flex: 1 1 0;
     padding: 12px 4px !important;
-    font-size: 0.875rem !important;
+    /* Leave room for wider system fonts while keeping the 44px touch target. */
+    font-size: clamp(0.75rem, 3.75vw, 0.875rem) !important;
     height: 44px !important;
   }
 }
@@ -1103,7 +1104,6 @@ onMounted(async () => {
 @media (max-width: 360px) {
   .compact-toggle :deep(.v-btn) {
     padding-inline: 2px !important;
-    font-size: 0.8125rem !important;
   }
 }
 

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { expectIncomeExpenseChart } from './charts'
 
 let token: string
 test.beforeEach(async ({ page }, info) => {
@@ -212,22 +213,34 @@ test('period selection stays mounted during loading and fits mobile without stre
         })
       )
       .toBeLessThan(1)
-    const layout = await toggle.evaluate(track => {
-      const bounds = track.getBoundingClientRect()
-      return Array.from(track.querySelectorAll('.v-btn')).map(button => {
-        const box = button.getBoundingClientRect()
-        const label = button.querySelector('.v-btn__content')!.getBoundingClientRect()
-        return {
-          height: box.height,
-          inside: box.left >= bounds.left && box.right <= bounds.right,
-          labelFits: label.width <= box.width
-        }
+    // A wider fallback font reproduces the small-screen failure seen on CI.
+    for (const font of ['', 'Verdana, sans-serif']) {
+      await toggle.evaluate((track, family) => {
+        track.style.fontFamily = family
+      }, font)
+      const layout = await toggle.evaluate(track => {
+        const bounds = track.getBoundingClientRect()
+        return Array.from(track.querySelectorAll('.v-btn')).map(button => {
+          const box = button.getBoundingClientRect()
+          const label = button.querySelector('.v-btn__content')!.getBoundingClientRect()
+          return {
+            label: button.textContent!.trim(),
+            font: getComputedStyle(button).font,
+            buttonWidth: box.width,
+            labelWidth: label.width,
+            height: box.height,
+            inside: box.left >= bounds.left && box.right <= bounds.right,
+            labelFits: label.width <= box.width
+          }
+        })
       })
-    })
-    expect(layout).toHaveLength(5)
-    for (const button of layout) {
-      expect(button.height).toBeGreaterThanOrEqual(width <= 600 ? 44 : 40)
-      expect(button.inside && button.labelFits).toBe(true)
+      expect(layout).toHaveLength(5)
+      for (const button of layout) {
+        const diagnostic = JSON.stringify({ viewport: width, ...button })
+        expect(button.height, diagnostic).toBeGreaterThanOrEqual(width <= 600 ? 44 : 40)
+        expect(button.inside, diagnostic).toBe(true)
+        expect(button.labelFits, diagnostic).toBe(true)
+      }
     }
   }
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -494,6 +507,26 @@ test('offline filters use only their own saved rows', async ({ page, context }) 
   await page.getByLabel('Search transactions', { exact: true }).fill('uncached')
   await expect(page).toHaveURL(/search=uncached/)
   await expect(page.getByText('Expense row', { exact: true })).not.toBeVisible()
+})
+
+test('income and expense bars render alongside losses and the moving average', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  page.on('pageerror', error => errors.push(error.message))
+  await state(page, {
+    monthlyData: [
+      { month: 'Jan 24', income: 100.3, expense: 40.3, net: 60, avgExpense: 40.3 },
+      { month: 'Feb 24', income: 0, expense: 90.99, net: -90.99, avgExpense: 65.65 },
+      { month: 'Mar 24', income: 200.05, expense: 0, net: 200.05, avgExpense: 43.76 }
+    ]
+  })
+  await page.goto('/analytics?months=3')
+  await expectIncomeExpenseChart(page)
+  await page.setViewportSize({ width: 320, height: 900 })
+  await expectIncomeExpenseChart(page)
+  expect(errors).toEqual([])
 })
 
 test('analytics history restores missing ranges to defaults', async ({ page }) => {

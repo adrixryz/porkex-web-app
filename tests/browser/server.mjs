@@ -25,6 +25,7 @@ function state(key) {
       rules: [],
       categoryComparisons: {},
       topCategories: [],
+      monthlyData: [],
       requests: [],
       failure: 0,
       recurring: 'ready',
@@ -222,7 +223,7 @@ const server = createServer(async (req, res) => {
               months: Number(url.searchParams.get('months') || 6),
               days: Number(url.searchParams.get('days') || 30)
             },
-            monthlyData: [],
+            monthlyData: db.monthlyData,
             trendData: [],
             topCategories: db.topCategories,
             categoryComparison: [],

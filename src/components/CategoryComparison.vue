@@ -127,14 +127,14 @@ const key = () =>
   `/analytics/category-comparison?mode=${mode.value}&weekStart=${getFirstDayOfWeek()}`
 const { data, loading, error, run } = useAsyncData<Comparison>(
   signal => fetchJson(`${key()}&today=${todayInput()}`, { signal }),
-  { cacheKey: key }
+  { cacheKey: () => `full-previous:${key()}` }
 )
 const rows = computed(() => (data.value?.mode === mode.value ? data.value.categoryComparison : []))
 const subtitle = computed(() =>
   mode.value === 'month'
     ? 'This month vs last month'
     : data.value?.partial
-      ? 'Same elapsed portion of each period'
+      ? `This ${mode.value} to date vs full previous ${mode.value}`
       : `This ${mode.value} vs last ${mode.value}`
 )
 function selectMode(value: unknown) {

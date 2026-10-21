@@ -675,12 +675,18 @@ test('category comparison selector keeps Analytics ranges and restores browser h
     await expect(spending.getByText(name, { exact: true })).toBeVisible()
   const selector = card.locator('.comparison-selector')
   await expect(card.getByRole('columnheader', { name: 'This week', exact: true })).toBeVisible()
+  await expect(
+    card.getByText('This week to date vs full previous week', { exact: true })
+  ).toBeVisible()
   await expect(card.getByText('Transport', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
   await selector.click()
   await page.getByRole('option', { name: 'Year vs year', exact: true }).click()
   await expect(page).toHaveURL(/comparison=year/)
   await expect(card.getByText('Housing', { exact: true })).toBeVisible()
+  await expect(
+    card.getByText('This year to date vs full previous year', { exact: true })
+  ).toBeVisible()
   await expect(card.getByText('New', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Days', { exact: true })).toHaveValue('60')
   await expect(page.getByText('Period comparison', { exact: true })).toHaveCount(0)

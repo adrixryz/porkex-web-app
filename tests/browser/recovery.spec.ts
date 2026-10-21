@@ -75,6 +75,40 @@ async function state(page: Page, changes?: object) {
   })
   return response.json()
 }
+
+test('remote week preference updates the visible range together with its request', async ({
+  page
+}) => {
+  await page.clock.install({ time: new Date('2026-10-21T12:00:00-05:00') })
+  await page.addInitScript(() => localStorage.setItem('porkex_week_start', 'MONDAY'))
+  let firstDayOfWeek = 'MONDAY'
+  await page.route('**/api/profile', route =>
+    route.fulfill({
+      json: {
+        id: 1,
+        name: 'Personal',
+        email: 'owner@example.com',
+        currency: 'USD',
+        firstDayOfWeek
+      }
+    })
+  )
+  await page.goto('/transactions?period=week')
+  await expect(page.getByText('Oct 19 - Oct 25', { exact: true })).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('porkex_week_start')))
+    .toBe('MONDAY')
+  firstDayOfWeek = 'SUNDAY'
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect
+    .poll(async () =>
+      (await state(page)).requests.some((request: { path: string }) =>
+        request.path.includes('from=2026-10-18&to=2026-10-24')
+      )
+    )
+    .toBe(true)
+  await expect(page.getByText('Oct 18 - Oct 24', { exact: true })).toBeVisible()
+})
 async function openExpense(page: Page, description: string) {
   await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
   const dialog = page.getByRole('dialog')

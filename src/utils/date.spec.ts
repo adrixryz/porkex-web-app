@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vite-plus/test'
+import { computed } from 'vue'
 import {
   startOfMonth,
   endOfMonth,
@@ -135,6 +136,18 @@ describe('startOfWeek / endOfWeek', () => {
 describe('startOfWeek with a configured first day', () => {
   afterEach(() => {
     setFirstDayOfWeek('MONDAY')
+  })
+
+  it('updates computed week bounds after a preference change or another tab changes it', () => {
+    const day = new Date(2026, 9, 21)
+    setFirstDayOfWeek('MONDAY')
+    const range = computed(() => [toDateOnly(startOfWeek(day)), toDateOnly(endOfWeek(day))])
+    expect(range.value).toEqual(['2026-10-19', '2026-10-25'])
+    setFirstDayOfWeek('SUNDAY')
+    expect(range.value).toEqual(['2026-10-18', '2026-10-24'])
+    localStorage.setItem('porkex_week_start', 'TUESDAY')
+    window.dispatchEvent(new StorageEvent('storage', { key: 'porkex_week_start' }))
+    expect(range.value).toEqual(['2026-10-20', '2026-10-26'])
   })
 
   it('anchors to Sunday when that is the first day', () => {

@@ -44,6 +44,7 @@ export function getDefaultPeriod(): PeriodFilter {
 }
 
 export function getFirstDayOfWeek(): WeekDay {
+  void preferencesVersion.value
   const raw = localStorage.getItem(WEEK_START_KEY)
   return (WEEK_DAYS as readonly string[]).includes(raw ?? '') ? (raw as WeekDay) : 'MONDAY'
 }

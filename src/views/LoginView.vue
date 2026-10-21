@@ -18,10 +18,33 @@
         <!-- TABS -->
         <v-tabs v-model="tab" color="primary" align-tabs="center" class="mb-2">
           <v-tab value="login">Log In</v-tab>
-          <v-tab v-if="registrationEnabled" value="register">Sign Up</v-tab>
+          <v-tab v-if="registrationState !== 'disabled'" value="register">Sign Up</v-tab>
         </v-tabs>
 
         <v-card-text class="pa-6 pt-4">
+          <v-alert
+            v-if="
+              registrationState === 'error' ||
+              (tab === 'register' && registrationState === 'pending')
+            "
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            {{
+              registrationState === 'pending'
+                ? 'Checking registration availability…'
+                : 'Registration availability could not be checked. Login is still available.'
+            }}
+            <AppButton
+              v-if="registrationState === 'error'"
+              size="small"
+              variant="text"
+              @click="loadRegistration"
+              >Retry</AppButton
+            >
+          </v-alert>
           <v-alert
             v-if="error"
             type="error"
@@ -74,7 +97,9 @@
               class="w-100 mt-4 font-weight-bold"
               :loading="loading"
               :disabled="
-                !form.email.trim() || !form.password || (tab === 'register' && !form.name.trim())
+                !form.email.trim() ||
+                !form.password ||
+                (tab === 'register' && (!form.name.trim() || registrationState !== 'enabled'))
               "
             >
               {{ tab === 'login' ? 'Log In' : 'Create Account' }}
@@ -105,8 +130,9 @@ const tab = ref('login')
 const showPass = ref(false)
 const loading = ref(false)
 const error = ref('')
-const registrationEnabled = ref(false)
+const registrationState = ref<'pending' | 'enabled' | 'disabled' | 'error'>('pending')
 const configController = new AbortController()
+let configRequest: Promise<void> | undefined
 
 const form = ref({
   name: '',
@@ -120,7 +146,15 @@ useUnsavedChanges(
 )
 
 // Login remains usable when the public configuration cannot be loaded.
-onMounted(async () => {
+function loadRegistration(): Promise<void> {
+  if (configRequest) return configRequest
+  configRequest = readRegistration().finally(() => {
+    configRequest = undefined
+  })
+  return configRequest
+}
+async function readRegistration() {
+  registrationState.value = 'pending'
   const origin = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
   try {
     const signal =
@@ -128,15 +162,33 @@ onMounted(async () => {
         ? AbortSignal.any([configController.signal, AbortSignal.timeout(30_000)])
         : configController.signal
     const response = await fetch(`${origin}/auth/config`, { signal })
-    if (!response.ok || configController.signal.aborted) return
+    if (configController.signal.aborted) return
+    if (!response.ok) throw new Error('Configuration unavailable')
     const config = (await response.json()) as { registrationEnabled?: unknown }
-    if (!configController.signal.aborted)
-      registrationEnabled.value = config.registrationEnabled === true
+    if (configController.signal.aborted) return
+    if (typeof config.registrationEnabled !== 'boolean') throw new Error('Invalid configuration')
+    registrationState.value = config.registrationEnabled ? 'enabled' : 'disabled'
+    if (registrationState.value === 'disabled') tab.value = 'login'
   } catch {
-    registrationEnabled.value = false
+    if (!configController.signal.aborted) registrationState.value = 'error'
   }
+}
+function recoverRegistration() {
+  if (document.visibilityState !== 'hidden' && registrationState.value === 'error')
+    void loadRegistration()
+}
+onMounted(() => {
+  void loadRegistration()
+  window.addEventListener('online', recoverRegistration)
+  window.addEventListener('focus', recoverRegistration)
+  document.addEventListener('visibilitychange', recoverRegistration)
 })
-onUnmounted(() => configController.abort())
+onUnmounted(() => {
+  configController.abort()
+  window.removeEventListener('online', recoverRegistration)
+  window.removeEventListener('focus', recoverRegistration)
+  document.removeEventListener('visibilitychange', recoverRegistration)
+})
 
 // Switching between Log In and Sign Up should not carry over a stale error or
 // a half-typed password from the other tab.
@@ -146,7 +198,7 @@ watch(tab, () => {
 })
 
 const submit = async () => {
-  if (loading.value || (tab.value === 'register' && !registrationEnabled.value)) return
+  if (loading.value || (tab.value === 'register' && registrationState.value !== 'enabled')) return
   loading.value = true
   error.value = ''
 

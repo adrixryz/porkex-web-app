@@ -62,14 +62,32 @@ async function fillLogin() {
 }
 
 describe('registration configuration', () => {
-  it('starts with registration closed and shows it only after explicit server permission', async () => {
+  it('recovers a failed config without remounting and groups recovery events', async () => {
+    const recovered = deferred<Response>()
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Offline'))
+      .mockImplementation(() => recovered.promise)
+    vi.stubGlobal('fetch', fetch)
+    render()
+    await flushPromises()
+    expect(wrapper!.text()).toContain('Retry')
+    window.dispatchEvent(new Event('online'))
+    window.dispatchEvent(new Event('focus'))
+    expect(fetch).toHaveBeenCalledTimes(2)
+    recovered.resolve(new Response('{"registrationEnabled":true}'))
+    await flushPromises()
+    expect(wrapper!.text()).not.toContain('Retry')
+    expect(wrapper!.text()).toContain('Sign Up')
+  })
+  it('keeps the registration tab visible while checking server permission', async () => {
     const config = deferred<Response>()
     vi.stubGlobal(
       'fetch',
       vi.fn(() => config.promise)
     )
     render()
-    expect(wrapper!.text()).not.toContain('Sign Up')
+    expect(wrapper!.text()).toContain('Sign Up')
     config.resolve(new Response('{"registrationEnabled":true}'))
     await flushPromises()
     expect(wrapper!.text()).toContain('Sign Up')
@@ -88,7 +106,7 @@ describe('registration configuration', () => {
     vi.stubGlobal('fetch', vi.fn(load))
     render()
     await flushPromises()
-    expect(wrapper!.text()).not.toContain('Sign Up')
+    expect(wrapper!.text().includes('Sign Up')).toBe(_label !== 'disabled')
     await fillLogin()
     await wrapper!.get('form').trigger('submit')
     await flushPromises()

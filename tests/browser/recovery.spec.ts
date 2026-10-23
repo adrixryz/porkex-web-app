@@ -18,6 +18,22 @@ test.beforeEach(async ({ page }, info) => {
   }, token)
 })
 
+test('navigation lists the requested view order with English labels', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Toggle navigation', exact: true }).click()
+  const links = page.locator('.v-navigation-drawer .v-list').first().getByRole('link')
+  await expect(links).toHaveText([
+    'Dashboard',
+    'Transactions',
+    'Categories',
+    'Budgets',
+    'Recurring',
+    'Analytics'
+  ])
+  await expect(links.last()).toBeVisible()
+  expect(await page.locator('html').getAttribute('lang')).toBe('en')
+})
+
 test('unsaved expense close can be canceled without losing its fields', async ({ page }) => {
   page.removeAllListeners('dialog')
   await page.goto('/transactions')
@@ -674,6 +690,8 @@ test('category comparison selector keeps Analytics ranges and restores browser h
   for (const name of ['Food', 'Transport', 'Housing', 'Health', 'Shopping'])
     await expect(spending.getByText(name, { exact: true })).toBeVisible()
   const selector = card.locator('.comparison-selector')
+  await expect(card.locator('.app-card-title')).toHaveCSS('font-size', '16px')
+  await expect(card.locator('.app-card-subtitle')).toHaveCSS('font-size', '12px')
   await expect(card.getByRole('columnheader', { name: 'This week', exact: true })).toBeVisible()
   await expect(
     card.getByText('This week to date vs full previous week', { exact: true })
@@ -848,16 +866,16 @@ test('undo survives navigation and an expired deletion survives reload', async (
   await page.goto('/transactions')
   await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
   const undoSnackbar = page
     .locator('.v-snackbar__wrapper')
-    .filter({ has: page.getByRole('button', { name: 'Deshacer', exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Undo', exact: true }) })
   await expect(undoSnackbar).toHaveCSS('border-radius', '12px')
   await page.evaluate(() => {
     history.pushState({}, '', '/')
     window.dispatchEvent(new PopStateEvent('popstate'))
   })
-  await page.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
   // Clicking starts an async Web Lock request. A server row count is not an
   // acknowledgement: the DELETE is deliberately delayed for eight seconds.
   await expect
@@ -867,19 +885,129 @@ test('undo survives navigation and an expired deletion survives reload', async (
       )
     )
     .toBe(0)
-  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).not.toBeVisible()
   await expect(page.getByText('Undo me', { exact: true }).first()).toBeVisible()
   expect((await state(page)).rows).toHaveLength(1)
   await page.goto('/transactions')
   await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
   await expect.poll(async () => (await state(page)).rows.length, { timeout: 12_000 }).toBe(0)
   expect(
     (await state(page)).requests.filter((r: { method: string }) => r.method === 'DELETE')
   ).toHaveLength(1)
+})
+
+async function seedToggleRule(page: Page) {
+  await state(page, {
+    rules: [
+      {
+        id: 1,
+        userId: 1,
+        categoryId: 1,
+        type: 'EXPENSE',
+        amount: 10,
+        description: 'Regular',
+        frequency: 'DAY',
+        interval: 1,
+        startDate: '2090-01-01T00:00:00.000Z',
+        nextDate: '2090-01-01T00:00:00.000Z',
+        endDate: null,
+        active: true,
+        category: { id: 1, name: 'Food', color: '#EA4335', type: 'EXPENSE' }
+      }
+    ]
+  })
+  await page.goto('/recurring')
+  await expect(page.getByRole('button', { name: 'Pause Regular', exact: true })).toBeVisible()
+}
+
+test('recurring pause and resume require confirmation and cancellation preserves state', async ({
+  page
+}, info) => {
+  await seedToggleRule(page)
+  const updates = async () =>
+    (await state(page)).requests.filter(
+      (request: { method: string; path: string }) =>
+        request.method === 'PUT' && request.path === '/api/recurring/1'
+    )
+  for (const [action, active] of [
+    ['Pause', true],
+    ['Resume', false]
+  ] as const) {
+    await page.getByRole('button', { name: `${action} Regular`, exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: `${action} rule?`, exact: true })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText(/Regular/)).toBeVisible()
+    const count = (await updates()).length
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(dialog).not.toBeVisible()
+    expect(await updates()).toHaveLength(count)
+    expect((await state(page)).rules[0].active).toBe(active)
+    await page.getByRole('button', { name: `${action} Regular`, exact: true }).click()
+    if (action === 'Pause')
+      await dialog.screenshot({ path: info.outputPath('pause-rule.png'), animations: 'disabled' })
+    await dialog.getByRole('button', { name: action, exact: true }).click()
+    await expect(dialog).not.toBeVisible()
+    await expect.poll(async () => (await state(page)).rules[0].active).toBe(!active)
+    expect(await updates()).toHaveLength(count + 1)
+  }
+})
+
+test('recurring confirmation keeps errors retryable and blocks duplicate changes while saving', async ({
+  page
+}) => {
+  await seedToggleRule(page)
+  await page.getByRole('button', { name: 'Pause Regular', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Pause rule?', exact: true })
+  // Reject only this write; background reads remain available.
+  await page.route('**/api/recurring/1', route =>
+    route.fulfill({ status: 400, json: { error: 'Cannot pause this rule' } })
+  )
+  await dialog.getByRole('button', { name: 'Pause', exact: true }).click()
+  await expect(page.getByText('Cannot pause this rule', { exact: true })).toBeVisible()
+  await expect(dialog).toBeVisible()
+  expect((await state(page)).rules[0].active).toBe(true)
+  await page.unroute('**/api/recurring/1')
+  await state(page, { delay: 1500 })
+  await dialog.getByRole('button', { name: 'Pause', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: 'Pause', exact: true })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeVisible()
+  await expect(dialog).not.toBeVisible()
+  const result = await state(page)
+  expect(result.rules[0].active).toBe(false)
+  expect(
+    result.requests.filter(
+      (request: { method: string; path: string }) =>
+        request.method === 'PUT' && request.path === '/api/recurring/1'
+    )
+  ).toHaveLength(1)
+})
+
+test('confirmed recurring changes queue offline and replay after reconnection', async ({
+  page,
+  context
+}) => {
+  await seedToggleRule(page)
+  await context.setOffline(true)
+  await page.getByRole('button', { name: 'Pause Regular', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Pause rule?', exact: true })
+  await dialog.getByRole('button', { name: 'Pause', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    )
+    .toBe(1)
+  expect((await state(page)).rules[0].active).toBe(true)
+  await context.setOffline(false)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect.poll(async () => (await state(page)).rules[0].active).toBe(false)
+  await expect(page.getByRole('button', { name: 'Resume Regular', exact: true })).toBeVisible()
 })
 
 test('next-only edit and skip preserve the rule base and target exact dates', async ({ page }) => {
@@ -1203,6 +1331,43 @@ test('category selects show the color of each category', async ({ page }) => {
   )
 })
 
+test('recurring category colors match in new and edit dialogs for expenses and income', async ({
+  page
+}) => {
+  await seedToggleRule(page)
+  for (const mode of ['New', 'Edit']) {
+    await page
+      .getByRole('button', {
+        name: mode === 'New' ? 'New Rule' : 'Edit Regular',
+        exact: true
+      })
+      .click()
+    const dialog = page.getByRole('dialog', { name: `${mode} Recurring Rule`, exact: true })
+    const category = dialog.locator('.v-select').first()
+    if (mode === 'Edit')
+      await expect(category.locator('.v-select__selection .category-dot')).toHaveCSS(
+        'background-color',
+        'rgb(234, 67, 53)'
+      )
+    for (const [type, name, color] of [
+      ['Expense', 'Food', 'rgb(234, 67, 53)'],
+      ['Income', 'Salary', 'rgb(52, 168, 83)']
+    ]) {
+      await dialog.getByRole('button', { name: type, exact: true }).click()
+      await category.locator('.v-field').click()
+      const option = page.getByRole('option', { name, exact: true })
+      await expect(option.locator('.category-dot')).toHaveCSS('background-color', color)
+      await option.click()
+      await expect(category.locator('.v-select__selection .category-dot')).toHaveCSS(
+        'background-color',
+        color
+      )
+    }
+    await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+    await expect(dialog).not.toBeVisible()
+  }
+})
+
 test('recent transaction comments and amounts align in fixed columns', async ({ page }, info) => {
   const date = new Date().toISOString()
   await state(page, {
@@ -1281,8 +1446,8 @@ test('another tab can undo the same scheduled deletion before it is sent', async
   await other.goto('/transactions')
   await page.getByRole('button', { name: 'Delete Shared undo', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
-  await expect(other.getByRole('button', { name: 'Deshacer', exact: true })).toBeVisible()
-  await other.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await expect(other.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
+  await other.getByRole('button', { name: 'Undo', exact: true }).click()
   await expect(page.getByText('Shared undo', { exact: true })).toBeVisible()
   const saved = await state(page)
   expect(saved.rows).toHaveLength(1)
@@ -1316,7 +1481,7 @@ test('Undo acknowledges durable cancellation before reload when another tab hold
   await expect(other.getByRole('button', { name: 'Delete Locked undo', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Delete Locked undo', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
-  const undo = page.getByRole('button', { name: 'Deshacer', exact: true })
+  const undo = page.getByRole('button', { name: 'Undo', exact: true })
   await expect(undo).toBeVisible()
   await other.evaluate(() => {
     const control = window as Window & { undoLockHeld?: boolean; releaseUndoLock?: () => void }

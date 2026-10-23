@@ -8,7 +8,6 @@ export const CURRENCIES = [
   { symbol: '$', code: 'USD', name: 'US Dollar' },
   { symbol: '€', code: 'EUR', name: 'Euro' },
   { symbol: '£', code: 'GBP', name: 'British Pound' },
-  { symbol: '¥', code: 'JPY', name: 'Japanese Yen' },
   { symbol: 'R$', code: 'BRL', name: 'Brazilian Real' },
   { symbol: '$', code: 'MXN', name: 'Mexican Peso' },
   { symbol: 'S/.', code: 'PEN', name: 'Peruvian Sol' }
@@ -20,7 +19,8 @@ export function getCurrency(): { symbol: string; code: string } {
     try {
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed.symbol === 'string' && typeof parsed.code === 'string') {
-        return parsed
+        const currency = CURRENCIES.find(c => c.code === parsed.code)
+        if (currency) return { symbol: currency.symbol, code: currency.code }
       }
     } catch {
       /* fallback */

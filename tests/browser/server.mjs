@@ -215,6 +215,12 @@ const server = createServer(async (req, res) => {
       if (url.pathname === '/api/budgets')
         return json(res, { budgets: [], totals: [] }, 200, headers)
       if (url.pathname === '/api/recurring') return json(res, db.rules, 200, headers)
+      if (/^\/api\/recurring\/\d+$/.test(url.pathname) && req.method === 'PUT') {
+        const rule = db.rules.find(rule => rule.id === Number(url.pathname.split('/').at(-1)))
+        if (!rule) return json(res, { error: 'Rule not found' }, 404, headers)
+        Object.assign(rule, body)
+        return json(res, rule, 200, headers)
+      }
       if (url.pathname === '/api/analytics')
         return json(
           res,

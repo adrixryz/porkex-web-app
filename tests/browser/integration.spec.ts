@@ -515,7 +515,7 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   expect(movement.amount).toBe(29.18)
   await row.getByRole('button', { name: /^Delete/ }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
-  await page.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
   await expect
     .poll(() =>
       page.evaluate(
@@ -546,6 +546,31 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   const rule = await response.json()
   await page.goto('/recurring')
   const card = page.locator('.v-card').filter({ has: page.getByText(ruleName, { exact: true }) })
+  await card.getByRole('button', { name: `Pause ${ruleName}`, exact: true }).click()
+  const pauseDialog = page.getByRole('dialog', { name: 'Pause rule?', exact: true })
+  await pauseDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect(
+    (await (await page.request.get('/api/recurring', { headers })).json()).find(
+      (item: { id: number }) => item.id === rule.id
+    ).active
+  ).toBe(true)
+  for (const [action, active] of [
+    ['Pause', false],
+    ['Resume', true]
+  ] as const) {
+    await card.getByRole('button', { name: `${action} ${ruleName}`, exact: true }).click()
+    const confirmation = page.getByRole('dialog', { name: `${action} rule?`, exact: true })
+    await confirmation.getByRole('button', { name: action, exact: true }).click()
+    await expect(confirmation).not.toBeVisible()
+    await expect
+      .poll(
+        async () =>
+          (await (await page.request.get('/api/recurring', { headers })).json()).find(
+            (item: { id: number }) => item.id === rule.id
+          ).active
+      )
+      .toBe(active)
+  }
   await card.getByRole('button', { name: 'Edit next', exact: true }).click()
   const nextDialog = page.getByRole('dialog')
   await nextDialog.getByLabel('Amount', { exact: true }).fill('77.66')

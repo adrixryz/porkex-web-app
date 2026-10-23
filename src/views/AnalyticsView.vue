@@ -144,7 +144,7 @@
                 </template>
               </AppTextField>
             </template>
-            <v-card-text class="pa-6">
+            <AppCardBody>
               <div
                 style="height: 320px"
                 role="img"
@@ -152,7 +152,7 @@
               >
                 <Chart type="bar" v-if="barReady" :data="barChartData" :options="barOptions" />
               </div>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
 
@@ -180,7 +180,7 @@
                 </template>
               </AppTextField>
             </template>
-            <v-card-text class="pa-6">
+            <AppCardBody>
               <div
                 style="height: 320px"
                 role="img"
@@ -188,7 +188,7 @@
               >
                 <Line v-if="lineReady" :data="lineChartData" :options="lineOptions" />
               </div>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
       </v-row>
@@ -204,7 +204,7 @@
                 >
               </div>
             </template>
-            <v-card-text class="pa-6">
+            <AppCardBody>
               <div v-if="!topCategories.length" class="text-center text-on-surface-variant py-8">
                 <v-icon :icon="mdiChartPie" size="40" class="mb-2 opacity-50"></v-icon>
                 <p>No expenses recorded this month</p>
@@ -230,7 +230,7 @@
                   rounded
                 ></v-progress-linear>
               </div>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
 
@@ -247,6 +247,7 @@ import CategoryComparison from '@/components/CategoryComparison.vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AppCard from '@/components/ui/AppCard.vue'
+import AppCardBody from '@/components/ui/AppCardBody.vue'
 import AppPage from '@/components/ui/AppPage.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppStatCard from '@/components/ui/AppStatCard.vue'

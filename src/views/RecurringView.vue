@@ -116,7 +116,7 @@
                   :icon="r.active ? mdiPause : mdiPlayOutline"
                   :label="r.active ? `Pause ${r.description}` : `Resume ${r.description}`"
                   :color="r.active ? 'warning' : 'success'"
-                  @click="toggleActive(r)"
+                  @click="confirmToggle(r)"
                 />
                 <AppIconButton
                   :icon="mdiPencilOutline"
@@ -147,23 +147,39 @@
       :occurrence="nextTarget"
       @saved="onNextSaved"
     />
-    <AppDialog
+    <AppConfirmDialog
       :model-value="!!skipRule"
       title="Skip next occurrence?"
+      confirm-label="Skip"
+      color="warning"
+      :icon="mdiRepeat"
       max-width="400"
-      :persistent="skipping"
-      :close-disabled="skipping"
+      :loading="skipping"
       @update:model-value="skipRule = null"
+      @confirm="skipNext"
     >
-      <p class="text-body-2">
-        Skip {{ skipRule ? formatDateOnly(skipRule.nextDate) : '' }}? The rule will continue on its
-        following date.
-      </p>
-      <template #actions>
-        <AppButton :disabled="skipping" @click="skipRule = null">Cancel</AppButton>
-        <AppButton color="warning" :loading="skipping" @click="skipNext">Skip</AppButton>
+      Skip {{ skipRule ? formatDateOnly(skipRule.nextDate) : '' }}? The rule will continue on its
+      following date.
+    </AppConfirmDialog>
+    <AppConfirmDialog
+      v-model="toggleDialog"
+      :title="togglingRule?.active ? 'Pause rule?' : 'Resume rule?'"
+      :confirm-label="togglingRule?.active ? 'Pause' : 'Resume'"
+      :color="togglingRule?.active ? 'warning' : 'success'"
+      :icon="togglingRule?.active ? mdiPause : mdiPlayOutline"
+      :loading="toggling"
+      max-width="420"
+      @confirm="toggleActive"
+    >
+      <template v-if="togglingRule?.active">
+        Pause "{{ togglingRule.description }}"? It will stop creating movements until you resume it.
+        Existing movements stay in your history.
       </template>
-    </AppDialog>
+      <template v-else>
+        Resume "{{ togglingRule?.description }}"? It will continue on its next scheduled date.
+        Movements missed while paused will not be created.
+      </template>
+    </AppConfirmDialog>
     <!-- DELETE CONFIRM -->
     <AppConfirmDialog
       v-model="deleteDialog"
@@ -192,7 +208,6 @@ import RecurringDialog from '@/components/RecurringDialog.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
-import AppDialog from '@/components/ui/AppDialog.vue'
 import AppEmptyState from '@/components/ui/AppEmptyState.vue'
 import AppIconButton from '@/components/ui/AppIconButton.vue'
 import AppPage from '@/components/ui/AppPage.vue'
@@ -300,7 +315,17 @@ const onSaved = async ({ isEditing, queued }: { isEditing: boolean; queued: bool
 
 // Pause/resume sends the rule back as the form would. The API recomputes the
 // next occurrence on every update, and a resume never fills in the pause.
-const toggleActive = async (rule: RecurringRule) => {
+const toggleDialog = ref(false)
+const togglingRule = ref<RecurringRule | null>(null)
+const toggling = ref(false)
+function confirmToggle(rule: RecurringRule) {
+  togglingRule.value = rule
+  toggleDialog.value = true
+}
+const toggleActive = async () => {
+  if (!togglingRule.value || toggling.value) return
+  const rule = togglingRule.value
+  toggling.value = true
   try {
     const res = await api(`/recurring/${rule.id}`, {
       method: 'PUT',
@@ -320,6 +345,7 @@ const toggleActive = async (rule: RecurringRule) => {
       showSnack(
         ...mutationFeedback(isQueuedResponse(res), rule.active ? 'Rule paused!' : 'Rule resumed!')
       )
+      toggleDialog.value = false
     } else {
       const data = await res.json().catch(() => null)
       showSnack(data?.error || 'Could not update the rule.', 'error')
@@ -327,6 +353,8 @@ const toggleActive = async (rule: RecurringRule) => {
   } catch (e) {
     console.error(e)
     showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
+  } finally {
+    toggling.value = false
   }
 }
 

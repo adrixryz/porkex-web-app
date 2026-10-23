@@ -12,19 +12,20 @@
           `${waitingDeletes.length} movement${waitingDeletes.length === 1 ? '' : 's'} removed; deletion pending.`
     }}
     <template #actions
-      ><v-btn
+      ><AppButton
         v-if="waitingDeletes.length || undoing"
         variant="text"
-        aria-label="Deshacer"
+        aria-label="Undo"
         :loading="undoing"
         :disabled="undoing"
         @click="undo"
-        >Deshacer</v-btn
-      ><v-btn v-else variant="text" @click="retry">Retry</v-btn></template
+        >Undo</AppButton
+      ><AppButton v-else variant="text" @click="retry">Retry</AppButton></template
     >
   </v-snackbar>
 </template>
 <script setup lang="ts">
+import AppButton from '@/components/ui/AppButton.vue'
 import { onMounted, onUnmounted, ref } from 'vue'
 import {
   waitingDeletes,

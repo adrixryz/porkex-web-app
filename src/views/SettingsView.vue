@@ -124,27 +124,31 @@
                 :prepend-inner-icon="mdiLockOutline"
                 :append-inner-icon="showPassword ? mdiEyeOff : mdiEye"
                 @click:append-inner="showPassword = !showPassword"
+                hide-details
                 class="mb-2"
               ></AppTextField>
               <AppTextField
                 v-model="newPassword"
                 label="New Password"
-                :type="showPassword ? 'text' : 'password'"
+                :type="showNewPassword ? 'text' : 'password'"
                 autocomplete="new-password"
                 :prepend-inner-icon="mdiLockOutline"
-                hint="At least 6 characters"
-                persistent-hint
-                hide-details="false"
+                :append-inner-icon="showNewPassword ? mdiEyeOff : mdiEye"
+                @click:append-inner="showNewPassword = !showNewPassword"
+                hide-details
                 class="mb-2"
               ></AppTextField>
               <AppTextField
                 v-model="confirmPassword"
                 label="Confirm New Password"
-                :type="showPassword ? 'text' : 'password'"
+                :type="showConfirmPassword ? 'text' : 'password'"
                 autocomplete="new-password"
                 :prepend-inner-icon="mdiLockOutline"
+                :append-inner-icon="showConfirmPassword ? mdiEyeOff : mdiEye"
+                @click:append-inner="showConfirmPassword = !showConfirmPassword"
                 :error="confirmMismatch"
                 :error-messages="confirmMismatch ? 'Passwords do not match' : ''"
+                :hide-details="false"
                 class="mb-2"
               ></AppTextField>
               <AppButton
@@ -300,6 +304,8 @@ const newPassword = ref('')
 const confirmPassword = ref('')
 const savingPassword = ref(false)
 const showPassword = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
 
 const userInitial = computed(() =>
   profile.value.name ? profile.value.name.charAt(0).toUpperCase() : 'U'

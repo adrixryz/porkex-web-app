@@ -183,26 +183,12 @@
       :close-disabled="submitting"
     >
       <v-form @submit.prevent="submit">
-        <AppSelect
+        <CategorySelect
           v-model="form.categoryId"
           :items="availableCategories"
-          item-title="name"
-          item-value="id"
-          label="Category"
           :disabled="isEditing"
           class="mb-2"
-        >
-          <template #selection="{ item }">
-            <CategoryDot :color="item.color" />{{ item.name }}
-          </template>
-          <template #item="{ props: option, item }">
-            <v-list-item v-bind="option">
-              <template #prepend>
-                <CategoryDot :color="item.color" />
-              </template>
-            </v-list-item>
-          </template>
-        </AppSelect>
+        />
         <AppTextField
           v-model="form.amount"
           label="Limit"
@@ -285,7 +271,7 @@ import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
 import AmountStepper from '@/components/AmountStepper.vue'
-import CategoryDot from '@/components/CategoryDot.vue'
+import CategorySelect from '@/components/CategorySelect.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'

@@ -4,13 +4,16 @@
     <div v-if="!canUpdate" class="text-caption">Finish or clear your form before updating.</div>
     <div v-if="error" class="text-caption">{{ error }}</div>
     <template #actions>
-      <v-btn variant="text" :disabled="!canUpdate || updating" @click="applyUpdate">Update</v-btn>
-      <v-btn variant="text" :disabled="updating" @click="dismissed = true">Later</v-btn>
+      <AppButton variant="text" :disabled="!canUpdate || updating" @click="applyUpdate"
+        >Update</AppButton
+      >
+      <AppButton variant="text" :disabled="updating" @click="dismissed = true">Later</AppButton>
     </template>
   </v-snackbar>
 </template>
 
 <script setup lang="ts">
+import AppButton from '@/components/ui/AppButton.vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
 import { hasBusyForms, hasUnsavedChanges } from '@/composables/useUnsavedChanges'

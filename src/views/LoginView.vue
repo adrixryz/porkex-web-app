@@ -1,114 +1,111 @@
 <template>
-  <div class="bg-background login-wrapper d-flex">
-    <v-container class="d-flex align-center justify-center" fluid>
-      <AppCard class="mx-auto" width="100%" max-width="420" elevation="4">
-        <!-- HEADER -->
-        <div class="text-center pt-8 pb-4">
-          <img
-            src="/porkex-logo.svg"
-            alt="Porkex logo"
-            width="64"
-            height="64"
-            class="brand-logo mb-4"
-          />
-          <h1 class="text-h4 font-weight-bold text-on-surface">Porkex</h1>
-          <p class="text-body-2 text-on-surface-variant mt-1">Your personal finance tracker</p>
-        </div>
+  <AppPage centered class="bg-background">
+    <AppCard class="mx-auto" width="100%" max-width="420">
+      <!-- HEADER -->
+      <div class="text-center pt-8 pb-4">
+        <img
+          src="/porkex-logo.svg"
+          alt="Porkex logo"
+          width="64"
+          height="64"
+          class="brand-logo mb-4"
+        />
+        <h1 class="text-h4 font-weight-bold text-on-surface">Porkex</h1>
+        <p class="text-body-2 text-on-surface-variant mt-1">Your personal finance tracker</p>
+      </div>
 
-        <!-- TABS -->
-        <v-tabs v-model="tab" color="primary" align-tabs="center" class="mb-2">
-          <v-tab value="login">Log In</v-tab>
-          <v-tab v-if="registrationState !== 'disabled'" value="register">Sign Up</v-tab>
-        </v-tabs>
+      <!-- TABS -->
+      <v-tabs v-model="tab" color="primary" align-tabs="center" class="mb-2">
+        <v-tab value="login">Log In</v-tab>
+        <v-tab v-if="registrationState !== 'disabled'" value="register">Sign Up</v-tab>
+      </v-tabs>
 
-        <v-card-text class="pa-6 pt-4">
-          <v-alert
-            v-if="
-              registrationState === 'error' ||
-              (tab === 'register' && registrationState === 'pending')
+      <AppCardBody padding="pa-6 pt-4">
+        <v-alert
+          v-if="
+            registrationState === 'error' || (tab === 'register' && registrationState === 'pending')
+          "
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+        >
+          {{
+            registrationState === 'pending'
+              ? 'Checking registration availability…'
+              : 'Registration availability could not be checked. Login is still available.'
+          }}
+          <AppButton
+            v-if="registrationState === 'error'"
+            size="small"
+            variant="text"
+            @click="loadRegistration"
+            >Retry</AppButton
+          >
+        </v-alert>
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+          density="compact"
+          closable
+          @click:close="error = ''"
+        >
+          {{ error }}
+        </v-alert>
+
+        <v-form @submit.prevent="submit">
+          <!-- Name (register only) -->
+          <AppTextField
+            v-if="tab === 'register'"
+            v-model="form.name"
+            label="Full Name"
+            autocomplete="name"
+            maxlength="80"
+            :prepend-inner-icon="mdiAccountOutline"
+            class="mb-2"
+          ></AppTextField>
+
+          <AppTextField
+            v-model="form.email"
+            label="Email"
+            type="email"
+            autocomplete="email"
+            :prepend-inner-icon="mdiEmailOutline"
+            autofocus
+            class="mb-2"
+          ></AppTextField>
+
+          <AppTextField
+            v-model="form.password"
+            :label="tab === 'register' ? 'Password (min 6 chars)' : 'Password'"
+            :type="showPass ? 'text' : 'password'"
+            :autocomplete="tab === 'register' ? 'new-password' : 'current-password'"
+            :prepend-inner-icon="mdiLockOutline"
+            :append-inner-icon="showPass ? mdiEyeOff : mdiEye"
+            @click:append-inner="showPass = !showPass"
+            class="mb-2"
+          ></AppTextField>
+
+          <AppButton
+            type="submit"
+            color="primary"
+            size="large"
+            class="w-100 mt-4 font-weight-bold"
+            :loading="loading"
+            :disabled="
+              !form.email.trim() ||
+              !form.password ||
+              (tab === 'register' && (!form.name.trim() || registrationState !== 'enabled'))
             "
-            type="info"
-            variant="tonal"
-            density="compact"
-            class="mb-4"
           >
-            {{
-              registrationState === 'pending'
-                ? 'Checking registration availability…'
-                : 'Registration availability could not be checked. Login is still available.'
-            }}
-            <AppButton
-              v-if="registrationState === 'error'"
-              size="small"
-              variant="text"
-              @click="loadRegistration"
-              >Retry</AppButton
-            >
-          </v-alert>
-          <v-alert
-            v-if="error"
-            type="error"
-            variant="tonal"
-            class="mb-4"
-            density="compact"
-            closable
-            @click:close="error = ''"
-          >
-            {{ error }}
-          </v-alert>
-
-          <v-form @submit.prevent="submit">
-            <!-- Name (register only) -->
-            <AppTextField
-              v-if="tab === 'register'"
-              v-model="form.name"
-              label="Full Name"
-              autocomplete="name"
-              maxlength="80"
-              :prepend-inner-icon="mdiAccountOutline"
-              class="mb-2"
-            ></AppTextField>
-
-            <AppTextField
-              v-model="form.email"
-              label="Email"
-              type="email"
-              autocomplete="email"
-              :prepend-inner-icon="mdiEmailOutline"
-              autofocus
-              class="mb-2"
-            ></AppTextField>
-
-            <AppTextField
-              v-model="form.password"
-              :label="tab === 'register' ? 'Password (min 6 chars)' : 'Password'"
-              :type="showPass ? 'text' : 'password'"
-              :autocomplete="tab === 'register' ? 'new-password' : 'current-password'"
-              :prepend-inner-icon="mdiLockOutline"
-              :append-inner-icon="showPass ? mdiEyeOff : mdiEye"
-              @click:append-inner="showPass = !showPass"
-              class="mb-2"
-            ></AppTextField>
-
-            <AppButton
-              type="submit"
-              color="primary"
-              size="large"
-              class="w-100 mt-4 font-weight-bold"
-              :loading="loading"
-              :disabled="
-                !form.email.trim() ||
-                !form.password ||
-                (tab === 'register' && (!form.name.trim() || registrationState !== 'enabled'))
-              "
-            >
-              {{ tab === 'login' ? 'Log In' : 'Create Account' }}
-            </AppButton>
-          </v-form>
-        </v-card-text>
-      </AppCard>
-    </v-container>
-  </div>
+            {{ tab === 'login' ? 'Log In' : 'Create Account' }}
+          </AppButton>
+        </v-form>
+      </AppCardBody>
+    </AppCard>
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -120,6 +117,8 @@ import { applyPreferences } from '@/utils/preferences'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
+import AppCardBody from '@/components/ui/AppCardBody.vue'
+import AppPage from '@/components/ui/AppPage.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 import type { AuthResponse } from '@/types'
 import { mdiAccountOutline, mdiEmailOutline, mdiEye, mdiEyeOff, mdiLockOutline } from '@mdi/js'
@@ -239,11 +238,3 @@ const submit = async () => {
   loading.value = false
 }
 </script>
-
-<style scoped>
-.login-wrapper {
-  min-height: 100vh;
-  align-items: center;
-  justify-content: center;
-}
-</style>

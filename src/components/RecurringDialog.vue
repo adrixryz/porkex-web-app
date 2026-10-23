@@ -61,14 +61,7 @@
         class="mb-2"
       ></AppTextField>
 
-      <AppSelect
-        v-model="form.categoryId"
-        :items="categoryOptions"
-        item-title="name"
-        item-value="id"
-        label="Category"
-        class="mb-2"
-      ></AppSelect>
+      <CategorySelect v-model="form.categoryId" :items="categoryOptions" class="mb-2" />
 
       <v-row dense class="mt-0">
         <v-col cols="7">
@@ -160,6 +153,7 @@ import { validAmount } from '@/utils/validation'
 import { ref, computed, watch } from 'vue'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import AmountStepper from '@/components/AmountStepper.vue'
+import CategorySelect from '@/components/CategorySelect.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppDialog from '@/components/ui/AppDialog.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'

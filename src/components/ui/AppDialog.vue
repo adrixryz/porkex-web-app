@@ -21,9 +21,9 @@
           @click="close"
         ></AppIconButton>
       </v-card-title>
-      <v-card-text :class="contentClass">
+      <AppCardBody :padding="contentClass">
         <slot></slot>
-      </v-card-text>
+      </AppCardBody>
       <v-card-actions v-if="$slots.actions" :class="actionsClass">
         <slot name="actions"></slot>
       </v-card-actions>
@@ -36,6 +36,7 @@ import { mdiClose } from '@mdi/js'
 import { computed } from 'vue'
 import { confirmDiscard } from '@/composables/useUnsavedChanges'
 import AppIconButton from './AppIconButton.vue'
+import AppCardBody from './AppCardBody.vue'
 
 defineOptions({ inheritAttrs: false })
 

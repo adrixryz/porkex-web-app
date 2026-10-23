@@ -142,7 +142,7 @@
                 <v-btn value="INCOME">Income</v-btn>
               </v-btn-toggle>
 
-              <AppSelect
+              <CategorySelect
                 v-model="filterCategory"
                 :items="categoryOptions"
                 item-title="title"
@@ -152,18 +152,7 @@
                 density="compact"
                 hide-details
                 class="category-filter"
-              >
-                <template #selection="{ item }">
-                  <CategoryDot :color="item.color" />{{ item.title }}
-                </template>
-                <template #item="{ props: option, item }">
-                  <v-list-item v-bind="option">
-                    <template #prepend>
-                      <CategoryDot :color="item.color" />
-                    </template>
-                  </v-list-item>
-                </template>
-              </AppSelect>
+              />
 
               <AppSelect
                 v-model="sortOption"
@@ -288,7 +277,7 @@
       <v-row>
         <v-col cols="12">
           <AppCard class="overflow-hidden" :aria-busy="loading">
-            <v-card-text class="pa-0">
+            <AppCardBody padding="pa-0">
               <v-skeleton-loader
                 v-if="loading"
                 type="list-item-two-line@4"
@@ -474,7 +463,7 @@
                   </template>
                 </template>
               </AppEmptyState>
-            </v-card-text>
+            </AppCardBody>
 
             <!-- PAGINATION -->
             <div
@@ -526,10 +515,11 @@ import TransactionSummary from '@/components/TransactionSummary.vue'
 import TagChips from '@/components/TagChips.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AmountStepper from '@/components/AmountStepper.vue'
-import CategoryDot from '@/components/CategoryDot.vue'
+import CategorySelect from '@/components/CategorySelect.vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
+import AppCardBody from '@/components/ui/AppCardBody.vue'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
 import AppEmptyState from '@/components/ui/AppEmptyState.vue'
 import AppIconButton from '@/components/ui/AppIconButton.vue'

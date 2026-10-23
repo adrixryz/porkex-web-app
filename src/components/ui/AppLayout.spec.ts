@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test'
 import { mount } from '@vue/test-utils'
 import AppCard from './AppCard.vue'
+import AppCardBody from './AppCardBody.vue'
 import AppEmptyState from './AppEmptyState.vue'
 import AppPage from './AppPage.vue'
 import AppPageHeader from './AppPageHeader.vue'
@@ -20,6 +21,17 @@ const stubs = {
 }
 
 describe('AppPage', () => {
+  it('centers authentication content without dashboard width and spacing', () => {
+    const wrapper = mount(AppPage, {
+      props: { centered: true },
+      slots: { default: '<form>Log In and Sign Up</form>' },
+      global: { stubs }
+    })
+
+    expect(wrapper.classes()).toContain('app-page-centered')
+    expect(wrapper.classes()).not.toContain('max-w-1200')
+    expect(wrapper.find('form').exists()).toBe(true)
+  })
   it('renders its content and merges caller attributes', () => {
     const wrapper = mount(AppPage, {
       attrs: { class: 'custom-page', 'data-test': 'page' },
@@ -100,6 +112,24 @@ describe('AppCard', () => {
     })
 
     expect(wrapper.find('.title-slot').text()).toBe('Custom title')
+  })
+})
+
+describe('AppCardBody', () => {
+  it('shares body padding while allowing flush lists and custom dialog spacing', () => {
+    const standard = mount(AppCardBody, { slots: { default: 'Chart' }, global: { stubs } })
+    expect(standard.classes()).toContain('pa-6')
+    const flush = mount(AppCardBody, {
+      props: { padding: 'pa-0' },
+      attrs: { class: 'overflow-x-auto', role: 'region' },
+      slots: { default: '<table />' },
+      global: { stubs }
+    })
+    expect(flush.classes()).toContain('pa-0')
+    expect(flush.classes()).not.toContain('pa-6')
+    expect(flush.classes()).toContain('overflow-x-auto')
+    expect(flush.attributes('role')).toBe('region')
+    expect(flush.find('table').exists()).toBe(true)
   })
 })
 

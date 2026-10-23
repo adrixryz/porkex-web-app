@@ -18,8 +18,8 @@ describe('CURRENCIES', () => {
   // The backend has a check:currencies script that parses this list, so the
   // codes here and CURRENCY_CODES in porkex-backend/src/lib/currencies.ts
   // have to stay identical.
-  it('exposes the 7 codes the backend knows about', () => {
-    expect(CURRENCIES.map(c => c.code)).toEqual(['USD', 'EUR', 'GBP', 'JPY', 'BRL', 'MXN', 'PEN'])
+  it('exposes the 6 codes the backend knows about', () => {
+    expect(CURRENCIES.map(c => c.code)).toEqual(['USD', 'EUR', 'GBP', 'BRL', 'MXN', 'PEN'])
   })
 
   it('has no duplicate codes', () => {

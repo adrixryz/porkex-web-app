@@ -50,24 +50,7 @@
         </div>
       </div>
 
-      <AppSelect
-        v-model="form.categoryId"
-        :items="categoryOptions"
-        item-title="name"
-        item-value="id"
-        label="Category"
-      >
-        <template #selection="{ item }">
-          <CategoryDot :color="item.color" />{{ item.name }}
-        </template>
-        <template #item="{ props: option, item }">
-          <v-list-item v-bind="option">
-            <template #prepend>
-              <CategoryDot :color="item.color" />
-            </template>
-          </v-list-item>
-        </template>
-      </AppSelect>
+      <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
 
       <AppTextField
         v-model="form.description"
@@ -134,10 +117,9 @@ import { createEditStamp } from '@/utils/editStamp'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import TagPicker from '@/components/TagPicker.vue'
 import AmountStepper from '@/components/AmountStepper.vue'
-import CategoryDot from '@/components/CategoryDot.vue'
+import CategorySelect from '@/components/CategorySelect.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppDialog from '@/components/ui/AppDialog.vue'
-import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'

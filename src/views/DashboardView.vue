@@ -33,10 +33,10 @@
       <v-row>
         <v-col cols="12" md="8">
           <AppCard>
-            <v-card-title class="px-6 py-4"
+            <template #title
               ><v-skeleton-loader type="text" width="180"></v-skeleton-loader
-            ></v-card-title>
-            <v-card-text class="pa-0">
+            ></template>
+            <AppCardBody padding="pa-0">
               <div v-for="n in 5" :key="n" class="px-6 py-4 d-flex align-center">
                 <v-skeleton-loader
                   type="avatar"
@@ -50,17 +50,17 @@
                 </div>
                 <v-skeleton-loader type="text" width="80"></v-skeleton-loader>
               </div>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
         <v-col cols="12" md="4">
           <AppCard>
-            <v-card-title class="px-6 py-4"
+            <template #title
               ><v-skeleton-loader type="text" width="160"></v-skeleton-loader
-            ></v-card-title>
-            <v-card-text class="pa-6 d-flex justify-center">
+            ></template>
+            <AppCardBody class="d-flex justify-center">
               <v-skeleton-loader type="ossein" width="200" height="200"></v-skeleton-loader>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
       </v-row>
@@ -132,7 +132,7 @@
                 View All
               </AppButton>
             </template>
-            <v-card-text class="pa-0">
+            <AppCardBody padding="pa-0">
               <v-list lines="two" bg-color="transparent" class="py-0">
                 <AppEmptyState
                   v-if="db.recentTransactions.length === 0"
@@ -170,14 +170,14 @@
                   ></v-divider>
                 </template>
               </v-list>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
 
         <!-- PIE CHART -->
         <v-col cols="12" md="4">
           <AppCard title="Expense Breakdown" class="fill-height">
-            <v-card-text class="pa-6 d-flex flex-column align-center justify-center">
+            <AppCardBody class="d-flex flex-column align-center justify-center">
               <div
                 v-if="chartData.labels.length === 0"
                 class="text-center text-on-surface-variant py-10"
@@ -211,7 +211,7 @@
                   >
                 </div>
               </div>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
       </v-row>
@@ -224,7 +224,7 @@
                 Manage
               </AppButton>
             </template>
-            <v-card-text class="pa-6">
+            <AppCardBody>
               <div class="d-flex flex-column ga-5">
                 <div v-for="b in monthBudgets" :key="b.id">
                   <div class="d-flex align-center justify-space-between mb-1">
@@ -256,7 +256,7 @@
                   ></v-progress-linear>
                 </div>
               </div>
-            </v-card-text>
+            </AppCardBody>
           </AppCard>
         </v-col>
       </v-row>
@@ -274,6 +274,7 @@ import TransactionSummary from '@/components/TransactionSummary.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
+import AppCardBody from '@/components/ui/AppCardBody.vue'
 import AppEmptyState from '@/components/ui/AppEmptyState.vue'
 import AppPage from '@/components/ui/AppPage.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'

@@ -383,6 +383,7 @@
                           :style="`color: ${textOn(tx.category?.color)}`"
                           >{{ tx.category?.name }}</v-chip
                         >
+                        <div class="text-caption">{{ tx.account?.name || 'Main' }}</div>
                       </td>
                       <td><TagChips :tags="tx.tags" /></td>
                       <td

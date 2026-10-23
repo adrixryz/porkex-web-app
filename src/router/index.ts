@@ -24,6 +24,12 @@ const router = createRouter({
       meta: { title: 'Transactions' }
     },
     {
+      path: '/accounts',
+      name: 'accounts',
+      component: () => import('@/views/AccountsView.vue'),
+      meta: { title: 'Accounts' }
+    },
+    {
       path: '/recurring',
       name: 'recurring',
       component: () => import('@/views/RecurringView.vue'),

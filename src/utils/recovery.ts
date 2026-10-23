@@ -34,7 +34,11 @@ export function startRecovery(): () => void {
     if (schedule(RETRY_DELAYS[Math.min(retry, RETRY_DELAYS.length - 1)])) retry++
   }
   const fresh = () => {
-    if (!hasStaleData.value && pendingCount.value === 0 && recurringState.value === 'ready') {
+    if (
+      !hasStaleData.value &&
+      pendingCount.value === 0 &&
+      ['ready', 'blocked'].includes(recurringState.value)
+    ) {
       clearTimeout(timer)
       timer = undefined
       retry = 0
@@ -56,7 +60,7 @@ export function startRecovery(): () => void {
       requestRevalidation()
       if (
         (pendingCount.value > 0 && !firstBlockedMutation.value) ||
-        recurringState.value !== 'ready'
+        !['ready', 'blocked'].includes(recurringState.value)
       )
         failed()
     } catch {

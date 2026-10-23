@@ -123,9 +123,11 @@
           class="ma-3"
         >
           {{
-            recurringState === 'pending'
-              ? 'Recurring transactions are still updating. Totals may be incomplete.'
-              : 'Recurring transactions could not be updated. Totals may be incomplete; we will retry.'
+            recurringState === 'blocked'
+              ? 'A recurring expense is waiting for sufficient funds. Add funds or skip its next occurrence.'
+              : recurringState === 'pending'
+                ? 'Recurring transactions are still updating. Totals may be incomplete.'
+                : 'Recurring transactions could not be updated. Totals may be incomplete; we will retry.'
           }}
         </v-alert>
 
@@ -290,6 +292,7 @@ const userName = computed(() => currentUser.value?.name || 'User')
 const navItems = [
   { title: 'Dashboard', icon: mdiViewDashboardOutline, route: '/' },
   { title: 'Transactions', icon: mdiSwapHorizontal, route: '/transactions' },
+  { title: 'Accounts', icon: mdiSwapHorizontal, route: '/accounts' },
   { title: 'Categories', icon: mdiShapeOutline, route: '/categories' },
   { title: 'Budgets', icon: mdiPiggyBankOutline, route: '/budgets' },
   { title: 'Recurring', icon: mdiRepeat, route: '/recurring' },

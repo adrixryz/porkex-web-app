@@ -29,7 +29,7 @@ export const activeProfileChanges = new Map<
   string,
   { userId: number; patch: Record<string, unknown> }
 >()
-export const recurringState = ref<'ready' | 'pending' | 'failed'>('ready')
+export const recurringState = ref<'ready' | 'pending' | 'failed' | 'blocked'>('ready')
 let sessionGeneration = 0
 
 function getToken(): string | null {
@@ -115,9 +115,10 @@ function expireSession(session: Session) {
 function recordRecurringState(response: Response, session: Session) {
   if (!isCurrent(session)) return
   const state = response.headers.get('X-Porkex-Recurring-State')
-  if (state === 'ready' || state === 'pending' || state === 'failed') {
+  if (state === 'ready' || state === 'pending' || state === 'failed' || state === 'blocked') {
     recurringState.value = state
-    if (state !== 'ready') window.dispatchEvent(new Event('porkex-read-failed'))
+    if (state !== 'ready' && state !== 'blocked')
+      window.dispatchEvent(new Event('porkex-read-failed'))
   }
 }
 
@@ -146,6 +147,10 @@ function handleResponse(response: Response, session: Session): Response {
 }
 
 const WRITE_INVALIDATES = [
+  '/accounts',
+  '/transfers',
+  '/goals',
+  '/favorites',
   '/dashboard',
   '/transactions',
   '/categories',

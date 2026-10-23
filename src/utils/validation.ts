@@ -9,6 +9,43 @@ export function validAmount(value: unknown): boolean {
 /** Local shape checks only; account ownership and live references belong to the API. */
 export function mutationError(path: string, method: string, body: string | null): string | null {
   if (!['POST', 'PUT'].includes(method)) return null
+  if (/^\/(accounts|transfers)(?:\/[^/]+)?$/.test(path)) {
+    let payload: Record<string, unknown>
+    try {
+      payload = JSON.parse(body || '{}')
+    } catch {
+      return 'The change must contain valid JSON.'
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+      return 'Enter valid details.'
+    if (path.startsWith('/accounts')) {
+      if (
+        payload.name !== undefined &&
+        (typeof payload.name !== 'string' ||
+          !payload.name.trim() ||
+          payload.name.trim().length > 60)
+      )
+        return 'Name must contain 1–60 characters.'
+      if (
+        payload.openingBalance !== undefined &&
+        !(Number(payload.openingBalance) === 0 || validAmount(payload.openingBalance))
+      )
+        return 'Enter a nonnegative opening balance with up to two decimals.'
+    } else {
+      if (!payload.sourceId || !payload.destinationId || payload.sourceId === payload.destinationId)
+        return 'Choose two different accounts.'
+      if (!validAmount(payload.amount)) return 'Enter a positive amount with up to two decimals.'
+      if (
+        typeof payload.date !== 'string' ||
+        !parseDateOnly(payload.date) ||
+        payload.date > todayInput()
+      )
+        return 'Choose a valid date on or before today.'
+      if (typeof payload.comment !== 'string' || payload.comment.length > 200)
+        return 'Comment must contain at most 200 characters.'
+    }
+    return null
+  }
   const movement = /^\/transactions(?:\/\d+)?$/.test(path)
   const occurrence = /^\/recurring\/\d+\/occurrences\//.test(path)
   const rule = /^\/recurring(?:\/\d+)?$/.test(path)

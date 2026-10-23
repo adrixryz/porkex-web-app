@@ -50,6 +50,13 @@
         </div>
       </div>
 
+      <AppSelect
+        v-model="form.accountId"
+        :items="activeAccounts"
+        item-title="name"
+        item-value="id"
+        label="Account"
+      />
       <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
 
       <AppTextField
@@ -111,6 +118,9 @@
 </template>
 
 <script setup lang="ts">
+import AppSelect from '@/components/ui/AppSelect.vue'
+import { useAccounts } from '@/composables/useAccounts'
+import { getUser } from '@/utils/api'
 import { validAmount } from '@/utils/validation'
 import { ref, computed, watch } from 'vue'
 import { createEditStamp } from '@/utils/editStamp'
@@ -148,9 +158,11 @@ const emit = defineEmits<{
   (e: 'saved', payload: { isEditing: boolean; queued: boolean; superseded?: boolean }): void
 }>()
 
+const { activeAccounts, run: fetchAccounts } = useAccounts()
 const cs = useCurrencySymbol()
 
 const form = ref({
+  accountId: '',
   amount: '',
   description: '',
   tagIds: [] as string[],
@@ -198,7 +210,12 @@ const allCategories = computed(() =>
 const categoryOptions = computed(() => allCategories.value.filter(c => c.type === props.type))
 
 const isValid = computed(() => {
-  return validAmount(form.value.amount) && !!form.value.date && form.value.categoryId !== null
+  return (
+    validAmount(form.value.amount) &&
+    !!form.value.date &&
+    categoryOptions.value.some(c => c.id === form.value.categoryId) &&
+    activeAccounts.value.some(a => a.id === form.value.accountId)
+  )
 })
 
 const reset = () => {
@@ -206,6 +223,7 @@ const reset = () => {
   clientId.value = crypto.randomUUID()
   const tx = props.transaction
   form.value = {
+    accountId: tx?.accountId ?? `main-${getUser()?.id}`,
     amount: tx ? String(tx.amount) : '',
     description: tx?.comment ?? tx?.description ?? '',
     tagIds: (tx?.tags ?? []).map(tag => tag.id),
@@ -214,6 +232,7 @@ const reset = () => {
   }
   cleanForm.value = JSON.stringify(form.value)
   error.value = ''
+  void fetchAccounts()
   // Always refresh when the parent does not supply its own list, otherwise the
   // dropdown would stay frozen at whatever was fetched first.
   if (!props.categories?.length) void fetchCategories()

@@ -55,7 +55,10 @@ function normalize(map: CacheMap): CacheMap {
       valid.push([url, entry])
     }
   }
-  valid.sort((a, b) => b[1].savedAt - a[1].savedAt)
+  const pinned = new Set(['/categories', '/accounts', '/tags', '/goals', '/favorites'])
+  valid.sort(
+    (a, b) => Number(pinned.has(b[0])) - Number(pinned.has(a[0])) || b[1].savedAt - a[1].savedAt
+  )
   return Object.fromEntries(valid.slice(0, MAX_ENTRIES))
 }
 

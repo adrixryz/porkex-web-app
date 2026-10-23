@@ -3,6 +3,26 @@
 
 export type TxType = 'INCOME' | 'EXPENSE'
 
+export interface Account {
+  id: string
+  userId: number
+  name: string
+  openingBalance: number
+  balance: number
+  isMain: boolean
+  archived: boolean
+}
+export interface Transfer {
+  id: string
+  sourceId: string
+  destinationId: string
+  amount: number
+  date: string
+  comment: string
+  source: Account
+  destination: Account
+}
+
 /** The period filters the transactions and categories screens offer. */
 export type PeriodFilter = 'day' | 'week' | 'month' | 'year'
 
@@ -43,6 +63,8 @@ export interface Tag {
 }
 
 export interface Transaction {
+  accountId?: string | null
+  account?: Account | null
   editedAt?: string | null
   lastEditId?: string | null
   comment?: string
@@ -190,6 +212,7 @@ export interface BudgetsResponse {
 export type RecurringFrequency = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'
 
 export interface RecurringRule {
+  accountId?: string | null
   nextException?: {
     date: string
     amount: number

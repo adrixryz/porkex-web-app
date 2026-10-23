@@ -1,3 +1,4 @@
+import { ref, computed } from 'vue'
 import { installTestLocks } from '@/utils/locks.test-helper'
 import { setToken, setUser } from '@/utils/api'
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vite-plus/test'
@@ -113,7 +114,9 @@ describe('RecurringDialog categories offline', () => {
 
     const wrapper = await openDialog()
 
-    const select = wrapper.findAllComponents(VSelectStub)[0]
+    const select = wrapper
+      .findAllComponents(VSelectStub)
+      .find(c => c.props('label') === 'Category')!
     const items = select.props('items') as Category[]
     expect(items.map(c => c.name)).toEqual(['Housing'])
     expect(wrapper.find('.categories-alert').exists()).toBe(false)
@@ -125,7 +128,9 @@ describe('RecurringDialog categories offline', () => {
 
     const wrapper = await openDialog()
 
-    const select = wrapper.findAllComponents(VSelectStub)[0]
+    const select = wrapper
+      .findAllComponents(VSelectStub)
+      .find(c => c.props('label') === 'Category')!
     expect(select.props('items')).toEqual([])
     expect(wrapper.find('.categories-alert').exists()).toBe(true)
     vi.unstubAllGlobals()
@@ -327,3 +332,20 @@ it('reuses the rule clientId after a failed write without closing the form', asy
     vi.unstubAllGlobals()
   }
 })
+
+vi.mock('@/composables/useAccounts', () => ({
+  useAccounts: () => {
+    const accounts = ref([
+      {
+        id: 'main-1',
+        name: 'Main',
+        balance: 1000,
+        openingBalance: 1000,
+        isMain: true,
+        archived: false,
+        userId: 1
+      }
+    ])
+    return { accounts, activeAccounts: computed(() => accounts.value), run: vi.fn() }
+  }
+}))

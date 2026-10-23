@@ -1,3 +1,4 @@
+import { ref, computed } from 'vue'
 import { installTestLocks } from '@/utils/locks.test-helper'
 import { setToken, setUser } from '@/utils/api'
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vite-plus/test'
@@ -37,7 +38,7 @@ const CATEGORIES: Category[] = [
 
 // The parent passes no categories (the dashboard quick-add), so the dialog has
 // to load its own. Vuetify is stubbed down to what the assertions need.
-const VSelectStub = { props: ['items'], template: '<div class="category-select" />' }
+const VSelectStub = { props: ['items', 'label'], template: '<div class="category-select" />' }
 
 const stubs = {
   TagPicker: true,
@@ -88,7 +89,10 @@ describe('TransactionDialog categories offline', () => {
 
     const wrapper = await openDialog()
 
-    const items = wrapper.findComponent(VSelectStub).props('items') as Category[]
+    const items = wrapper
+      .findAllComponents(VSelectStub)
+      .find(c => c.props('label') === 'Category')!
+      .props('items') as Category[]
     expect(items.map(c => c.name)).toEqual(['Food'])
     expect(wrapper.find('.categories-alert').exists()).toBe(false)
     vi.unstubAllGlobals()
@@ -99,7 +103,12 @@ describe('TransactionDialog categories offline', () => {
 
     const wrapper = await openDialog()
 
-    expect(wrapper.findComponent(VSelectStub).props('items')).toEqual([])
+    expect(
+      wrapper
+        .findAllComponents(VSelectStub)
+        .find(c => c.props('label') === 'Category')!
+        .props('items')
+    ).toEqual([])
     expect(wrapper.find('.categories-alert').exists()).toBe(true)
     vi.unstubAllGlobals()
   })
@@ -269,3 +278,20 @@ it('walks the amount stepper back to empty instead of parking it on 0.01', async
     vi.unstubAllGlobals()
   }
 })
+
+vi.mock('@/composables/useAccounts', () => ({
+  useAccounts: () => {
+    const accounts = ref([
+      {
+        id: 'main-1',
+        name: 'Main',
+        balance: 1000,
+        openingBalance: 1000,
+        isMain: true,
+        archived: false,
+        userId: 1
+      }
+    ])
+    return { accounts, activeAccounts: computed(() => accounts.value), run: vi.fn() }
+  }
+}))

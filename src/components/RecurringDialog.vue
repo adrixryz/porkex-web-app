@@ -61,6 +61,13 @@
         class="mb-2"
       ></AppTextField>
 
+      <AppSelect
+        v-model="form.accountId"
+        :items="activeAccounts"
+        item-title="name"
+        item-value="id"
+        label="Account"
+      />
       <CategorySelect v-model="form.categoryId" :items="categoryOptions" class="mb-2" />
 
       <v-row dense class="mt-0">
@@ -149,6 +156,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAccounts } from '@/composables/useAccounts'
+import { getUser } from '@/utils/api'
 import { validAmount } from '@/utils/validation'
 import { ref, computed, watch } from 'vue'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
@@ -182,7 +191,9 @@ const emit = defineEmits<{
 
 const cs = useCurrencySymbol()
 
+const { activeAccounts, run: fetchAccounts } = useAccounts()
 const form = ref({
+  accountId: '',
   type: 'EXPENSE' as TxType,
   amount: '',
   description: '',
@@ -238,6 +249,7 @@ const isValid = computed(() => {
     interval <= MAX_INTERVAL &&
     !!form.value.startDate &&
     form.value.categoryId !== null &&
+    activeAccounts.value.some(a => a.id === form.value.accountId) &&
     endOk
   )
 })
@@ -261,6 +273,7 @@ const reset = () => {
   clientId.value = crypto.randomUUID()
   const rule = props.rule
   form.value = {
+    accountId: rule?.accountId ?? `main-${getUser()?.id}`,
     type: rule?.type ?? 'EXPENSE',
     amount: rule ? String(rule.amount) : '',
     description: rule?.description ?? '',
@@ -274,6 +287,7 @@ const reset = () => {
   cleanForm.value = JSON.stringify(form.value)
   error.value = ''
   // Always refresh, unless offline: the cached list is what shows then.
+  void fetchAccounts()
   void fetchCategories()
 }
 
@@ -322,6 +336,7 @@ const submit = async () => {
         type: form.value.type,
         amount: Number(form.value.amount),
         description: form.value.description.trim(),
+        accountId: form.value.accountId,
         categoryId: form.value.categoryId,
         frequency: form.value.frequency,
         interval: Number(form.value.interval),

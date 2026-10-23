@@ -9,6 +9,7 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-form @submit.prevent="submit">
+      <AppTextField v-if="favoriteMode" v-model="form.name" label="Favorite name" maxlength="60" />
       <div class="amount-date-row">
         <div>
           <div class="text-caption mb-1">Amount</div>
@@ -135,13 +136,17 @@ import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useCurrencySymbol } from '@/utils/currency'
 import { fromDateInput, toDateInput, todayInput, formatDateTime } from '@/utils/date'
-import type { Category, Transaction } from '@/types'
+import type { Category, Transaction, MovementDraft, Favorite } from '@/types'
 
 const props = withDefaults(
   defineProps<{
     modelValue: boolean
     type?: 'INCOME' | 'EXPENSE'
     transaction?: Transaction | null
+    draft?: MovementDraft | null
+    favorite?: Favorite | null
+    favoriteMode?: boolean
+    defaultAccountId?: string
     categories?: Category[]
     occurrence?: { ruleId: number; date: string }
   }>(),
@@ -162,6 +167,7 @@ const { activeAccounts, run: fetchAccounts } = useAccounts()
 const cs = useCurrencySymbol()
 
 const form = ref({
+  name: '',
   accountId: '',
   amount: '',
   description: '',
@@ -190,17 +196,21 @@ const {
   cacheKey: '/categories'
 })
 
-const isEditing = computed(() => !!props.transaction)
+const isEditing = computed(() => !!props.transaction || (props.favoriteMode && !!props.favorite))
 const isIncome = computed(() => props.type === 'INCOME')
 
 const title = computed(() =>
-  props.occurrence
-    ? 'Edit next occurrence'
-    : isEditing.value
-      ? 'Edit Transaction'
-      : props.type === 'INCOME'
-        ? 'New Income'
-        : 'New Expense'
+  props.favoriteMode
+    ? props.favorite
+      ? 'Edit favorite'
+      : 'New favorite'
+    : props.occurrence
+      ? 'Edit next occurrence'
+      : isEditing.value
+        ? 'Edit Transaction'
+        : props.type === 'INCOME'
+          ? 'New Income'
+          : 'New Expense'
 )
 
 // The parent may pass its own categories (e.g. for the filter); if not, they are loaded here.
@@ -211,6 +221,7 @@ const categoryOptions = computed(() => allCategories.value.filter(c => c.type ==
 
 const isValid = computed(() => {
   return (
+    (!props.favoriteMode || !!form.value.name.trim()) &&
     validAmount(form.value.amount) &&
     !!form.value.date &&
     categoryOptions.value.some(c => c.id === form.value.categoryId) &&
@@ -222,12 +233,16 @@ const reset = () => {
   editStamp = createEditStamp()
   clientId.value = crypto.randomUUID()
   const tx = props.transaction
+  const source = tx ?? props.favorite ?? props.draft
   form.value = {
-    accountId: tx?.accountId ?? `main-${getUser()?.id}`,
-    amount: tx ? String(tx.amount) : '',
-    description: tx?.comment ?? tx?.description ?? '',
-    tagIds: (tx?.tags ?? []).map(tag => tag.id),
-    categoryId: tx?.categoryId ?? null,
+    name: props.favorite?.name ?? source?.comment ?? '',
+    accountId: source?.accountId ?? props.defaultAccountId ?? `main-${getUser()?.id}`,
+    amount: source ? String(source.amount) : '',
+    description: source?.comment ?? tx?.description ?? '',
+    tagIds: tx
+      ? (tx.tags ?? []).map(tag => tag.id)
+      : ((props.favorite ?? props.draft)?.tagIds ?? []),
+    categoryId: source?.categoryId ?? null,
     date: tx ? toDateInput(tx.date) : todayInput()
   }
   cleanForm.value = JSON.stringify(form.value)
@@ -264,22 +279,28 @@ const submit = async () => {
   submitting.value = true
   error.value = ''
 
-  const url = props.occurrence
-    ? `/recurring/${props.occurrence.ruleId}/occurrences/${props.occurrence.date}`
-    : isEditing.value
-      ? `/transactions/${props.transaction!.id}`
-      : '/transactions'
+  const url = props.favoriteMode
+    ? props.favorite
+      ? `/favorites/${props.favorite.id}`
+      : '/favorites'
+    : props.occurrence
+      ? `/recurring/${props.occurrence.ruleId}/occurrences/${props.occurrence.date}`
+      : isEditing.value
+        ? `/transactions/${props.transaction!.id}`
+        : '/transactions'
   const method = props.occurrence || isEditing.value ? 'PUT' : 'POST'
 
   try {
     const stamp =
-      isEditing.value && !props.occurrence
+      isEditing.value && !props.occurrence && !props.favoriteMode
         ? editStamp(JSON.stringify({ ...form.value, type: props.type }))
         : {}
     const res = await api(url, {
       method,
       body: JSON.stringify({
-        ...(!isEditing.value ? { clientId: clientId.value } : {}),
+        ...(!isEditing.value
+          ? { clientId: clientId.value, ...(props.favoriteMode ? { id: clientId.value } : {}) }
+          : {}),
         ...form.value,
         ...stamp,
         ...(props.occurrence ? { kind: 'EDIT' } : {}),

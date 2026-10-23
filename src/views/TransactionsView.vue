@@ -37,6 +37,7 @@
     <template v-else>
       <AppPageHeader title="Transactions">
         <template #actions>
+          <AppButton @click="favoritesOpen = true">Favorites</AppButton>
           <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('EXPENSE')">
             Expense
           </AppButton>
@@ -301,6 +302,10 @@
                             color="primary"
                             @click="editTx(tx)"
                           />
+                          <MovementShortcutsMenu
+                            @duplicate="duplicate(tx)"
+                            @favorite="duplicate(tx, true)"
+                          />
                           <AppIconButton
                             :icon="mdiDeleteOutline"
                             :label="`Delete ${tx.description || tx.category?.name}`"
@@ -412,6 +417,10 @@
                           color="primary"
                           @click="editTx(tx)"
                         />
+                        <MovementShortcutsMenu
+                          @duplicate="duplicate(tx)"
+                          @favorite="duplicate(tx, true)"
+                        />
                         <AppIconButton
                           :icon="mdiDeleteOutline"
                           :label="`Delete ${tx.comment || tx.description || tx.category?.name}`"
@@ -485,7 +494,12 @@
     </template>
 
     <!-- ADD/EDIT DIALOG -->
+    <AppDialog v-model="favoritesOpen" title="Favorites" max-width="720"
+      ><FavoritesPanel manage
+    /></AppDialog>
     <TransactionDialog
+      :draft="draft"
+      :favorite-mode="favoriteMode"
       v-model="dialog"
       :type="dialogType"
       :transaction="editingTx"
@@ -507,6 +521,11 @@
 </template>
 
 <script setup lang="ts">
+import MovementShortcutsMenu from '@/components/MovementShortcutsMenu.vue'
+import FavoritesPanel from '@/components/FavoritesPanel.vue'
+import AppDialog from '@/components/ui/AppDialog.vue'
+import { movementDraft } from '@/utils/movementDraft'
+import type { MovementDraft } from '@/types'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -896,13 +915,27 @@ onUnmounted(() => {
   window.clearTimeout(navigationTimer)
 })
 
+const favoritesOpen = ref(false)
+const draft = ref<MovementDraft | null>(null)
+const favoriteMode = ref(false)
+function duplicate(tx: Transaction, favorite = false) {
+  editingTx.value = null
+  draft.value = movementDraft(tx)
+  favoriteMode.value = favorite
+  dialogType.value = tx.type
+  dialog.value = true
+}
 const openDialog = (type: 'INCOME' | 'EXPENSE') => {
   editingTx.value = null
+  draft.value = null
+  favoriteMode.value = false
   dialogType.value = type
   dialog.value = true
 }
 
 const editTx = (tx: Transaction) => {
+  draft.value = null
+  favoriteMode.value = false
   editingTx.value = tx
   dialogType.value = tx.type
   dialog.value = true

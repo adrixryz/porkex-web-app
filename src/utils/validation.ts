@@ -61,12 +61,13 @@ export function mutationError(path: string, method: string, body: string | null)
     }
     return null
   }
+  const favorite = /^\/favorites(?:\/[^/]+)?$/.test(path)
   const movement = /^\/transactions(?:\/\d+)?$/.test(path)
   const occurrence = /^\/recurring\/\d+\/occurrences\//.test(path)
   const rule = /^\/recurring(?:\/\d+)?$/.test(path)
   const budget = /^\/budgets(?:\/\d+)?$/.test(path)
   const category = /^\/categories(?:\/\d+)?$/.test(path)
-  if (!movement && !occurrence && !rule && !budget && !category) return null
+  if (!favorite && !movement && !occurrence && !rule && !budget && !category) return null
   let data: Record<string, unknown>
   try {
     const parsed: unknown = JSON.parse(body ?? '')
@@ -75,10 +76,18 @@ export function mutationError(path: string, method: string, body: string | null)
   } catch {
     return 'The change must contain valid JSON.'
   }
+  if (
+    favorite &&
+    (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 60)
+  )
+    return 'Favorite name must contain 1–60 characters.'
   if (occurrence && data.kind === 'SKIP') return null
   if (!category && !validAmount(data.amount))
     return 'Amount must be positive, at most 10,000,000 and have at most two decimal places.'
-  if ((movement || rule || category) && !['INCOME', 'EXPENSE'].includes(String(data.type)))
+  if (
+    (movement || favorite || rule || category) &&
+    !['INCOME', 'EXPENSE'].includes(String(data.type))
+  )
     return 'Choose income or expense.'
   if (
     !category &&

@@ -25,6 +25,19 @@ export interface Transfer {
   destination: Account
 }
 
+export interface MovementDraft {
+  type: TxType
+  amount: number
+  comment: string
+  categoryId: number
+  accountId?: string | null
+  tagIds: string[]
+}
+export interface Favorite extends MovementDraft {
+  id: string
+  name: string
+}
+
 /** The period filters the transactions and categories screens offer. */
 export type PeriodFilter = 'day' | 'week' | 'month' | 'year'
 

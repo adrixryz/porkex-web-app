@@ -72,14 +72,27 @@
       <AppPageHeader>
         <template #title>
           <div class="text-overline text-on-surface-variant mb-1 d-flex align-center ga-2">
-            Global Balance
-            <v-chip size="x-small" variant="tonal">All time</v-chip>
+            <AppSelect
+              v-model="selectedAccountId"
+              :items="balanceOptions"
+              item-title="name"
+              item-value="id"
+              aria-label="Balance account"
+              hide-details
+              density="compact"
+              class="balance-select"
+            />
+            <AppIconButton
+              :icon="hideBalances ? mdiEyeOffOutline : mdiEyeOutline"
+              :label="hideBalances ? 'Show balances' : 'Hide balances'"
+              @click="toggleBalances"
+            />
           </div>
           <h1
             class="text-h3 font-weight-bold"
-            :class="db.globalBalance < 0 ? 'text-error' : 'text-on-surface'"
+            :class="!hideBalances && summary.globalBalance < 0 ? 'text-error' : 'text-on-surface'"
           >
-            {{ cs }}{{ formatMoney(db.globalBalance) }}
+            {{ hideBalances ? '**.**' : cs + formatMoney(summary.globalBalance) }}
           </h1>
         </template>
         <template #actions>
@@ -92,12 +105,15 @@
         </template>
       </AppPageHeader>
 
+      <v-alert v-if="summaryError && selectedAccountId !== 'global'" type="warning" class="mb-4">{{
+        summaryError
+      }}</v-alert>
       <!-- KPI CARDS -->
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4">
           <AppStatCard
             label="Total Income"
-            :value="`+${cs}${formatMoney(db.totalIncome)}`"
+            :value="hideBalances ? '**.**' : `+${cs}${formatMoney(summary.totalIncome)}`"
             :icon="mdiArrowUpCircleOutline"
             color="success"
             value-class="text-success"
@@ -106,7 +122,7 @@
         <v-col cols="12" sm="6" md="4">
           <AppStatCard
             label="Total Expenses"
-            :value="`-${cs}${formatMoney(db.totalExpense)}`"
+            :value="hideBalances ? '**.**' : `-${cs}${formatMoney(summary.totalExpense)}`"
             :icon="mdiArrowDownCircleOutline"
             color="error"
             value-class="text-error"
@@ -115,7 +131,7 @@
         <v-col cols="12" sm="12" md="4">
           <AppStatCard
             label="Transactions"
-            :value="db.transactionCount"
+            :value="hideBalances ? '**.**' : summary.transactionCount"
             :icon="mdiReceiptTextOutline"
             color="primary"
             value-class="text-on-surface"
@@ -126,7 +142,11 @@
       <!-- MAIN TWO COLUMNS -->
       <v-row>
         <v-col cols="12" md="8">
-          <AppCard title="Recent Transactions" class="overflow-hidden fill-height">
+          <AppCard
+            title="Recent Transactions"
+            subtitle="All accounts"
+            class="overflow-hidden fill-height"
+          >
             <template #header-actions>
               <AppButton variant="text" size="small" color="primary" to="/transactions">
                 View All
@@ -264,11 +284,22 @@
 
     <FavoritesPanel class="mt-6" />
     <GoalsPanel compact class="mt-6" />
-    <TransactionDialog v-model="dialog" :type="dialogType" @saved="onSaved"></TransactionDialog>
+    <TransactionDialog
+      :default-account-id="selectedAccountId === 'global' ? undefined : selectedAccountId"
+      v-model="dialog"
+      :type="dialogType"
+      @saved="onSaved"
+    ></TransactionDialog>
   </AppPage>
 </template>
 
 <script setup lang="ts">
+import { useRoute, useRouter } from 'vue-router'
+import { watch } from 'vue'
+import { useAccounts } from '@/composables/useAccounts'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppIconButton from '@/components/ui/AppIconButton.vue'
+
 import FavoritesPanel from '@/components/FavoritesPanel.vue'
 import GoalsPanel from '@/components/GoalsPanel.vue'
 import { mutationFeedback } from '@/utils/mutationFeedback'
@@ -295,6 +326,8 @@ import { todayInput } from '@/utils/date'
 import { themeColors } from '@/utils/color'
 import { useTheme } from 'vuetify'
 import {
+  mdiEyeOutline,
+  mdiEyeOffOutline,
   mdiArrowDownCircleOutline,
   mdiArrowUpCircleOutline,
   mdiChartPie,
@@ -335,6 +368,67 @@ const {
   EMPTY_DASHBOARD,
   { cacheKey: '/dashboard' }
 )
+
+const route = useRoute(),
+  router = useRouter()
+const { activeAccounts, run: fetchAccounts } = useAccounts()
+const balanceOptions = computed(() => [
+  { id: 'global', name: 'Global Balance' },
+  ...activeAccounts.value
+])
+const selectedAccountId = computed({
+  get: () =>
+    typeof route.query.accountId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(route.query.accountId)
+      ? route.query.accountId
+      : 'global',
+  set: (value: string) => {
+    const query = { ...route.query }
+    if (value === 'global') delete query.accountId
+    else query.accountId = value
+    void router.push({ query })
+  }
+})
+let hidden = false
+try {
+  hidden = localStorage.getItem('porkex_hide_balances') === 'true'
+} catch {
+  /* Device preferences are optional. */
+}
+const hideBalances = ref(hidden)
+function toggleBalances() {
+  hideBalances.value = !hideBalances.value
+  try {
+    localStorage.setItem('porkex_hide_balances', String(hideBalances.value))
+  } catch {
+    /* Retain the in-memory preference. */
+  }
+}
+type BalanceSummary = Pick<
+  DashboardResponse,
+  'globalBalance' | 'totalIncome' | 'totalExpense' | 'transactionCount'
+>
+const summaryUrl = () =>
+  `/dashboard/summary?accountId=${encodeURIComponent(selectedAccountId.value)}`
+const {
+  data: accountSummary,
+  run: fetchSummary,
+  error: summaryError
+} = useAsyncData<BalanceSummary>(
+  signal =>
+    selectedAccountId.value === 'global'
+      ? Promise.resolve(db.value)
+      : fetchJson(summaryUrl(), { signal }),
+  { globalBalance: 0, totalIncome: 0, totalExpense: 0, transactionCount: 0 },
+  { cacheKey: summaryUrl }
+)
+const summary = computed(() =>
+  selectedAccountId.value === 'global' ? db.value : accountSummary.value
+)
+watch(selectedAccountId, () => void fetchSummary())
+onMounted(async () => {
+  await fetchAccounts()
+  if (selectedAccountId.value !== 'global') await fetchSummary()
+})
 
 // Budget glance: the dashboard shows the current month only, quietly, and only
 // when the user actually has budgets set. `today` anchors that window to the
@@ -415,6 +509,10 @@ onMounted(loadDashboard)
 </script>
 
 <style scoped>
+.balance-select {
+  min-width: 180px;
+  max-width: 300px;
+}
 .hover-item {
   transition: background-color 0.2s;
 }

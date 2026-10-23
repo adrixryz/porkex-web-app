@@ -1,8 +1,10 @@
 <template>
-  <AppCard title="Savings goals" subtitle="Money set aside across all accounts">
+  <AppCard v-bind="$attrs" title="Savings goals" subtitle="Money set aside across all accounts">
     <template #header-actions
       ><AppButton v-if="!compact" @click="newGoal">New goal</AppButton
-      ><AppButton v-else to="/goals" variant="text">Manage goals</AppButton></template
+      ><AppButton v-else to="/goals" variant="text" size="small" color="primary"
+        >Manage goals</AppButton
+      ></template
     >
     <AppCardBody>
       <v-alert v-if="error || loadError" type="error" class="mb-3">{{
@@ -84,8 +86,11 @@
   >
 </template>
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false })
 import { onMounted, ref } from 'vue'
 import type { Account } from '@/types'
+import { usePendingCatalog } from '@/composables/usePendingCatalog'
+import { getUser } from '@/utils/api'
 import { useAccounts } from '@/composables/useAccounts'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
@@ -105,10 +110,22 @@ const { activeAccounts, run } = useAccounts(),
   cs = useCurrencySymbol(),
   { showSnack } = useSnackbar()
 const {
-  data: goals,
+  data: savedGoals,
   run: load,
   error: loadError
 } = useAsyncData<Account[]>(signal => fetchJson('/goals', { signal }), [], { cacheKey: '/goals' })
+const goals = usePendingCatalog(savedGoals, '/goals', body => ({
+  ...body,
+  id: String(body.id),
+  userId: getUser()!.id,
+  name: String(body.name),
+  isMain: false,
+  isGoal: true,
+  archived: false,
+  openingBalance: 0,
+  balance: Number(body.balance || 0),
+  targetAmount: Number(body.targetAmount)
+}))
 const dialog = ref(false),
   editing = ref<Account | null>(null),
   deleting = ref<Account | null>(null),

@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import { useAsyncData } from './useAsyncData'
 import { fetchJson, getUser } from '@/utils/api'
-import { outboxRevision, ownedPending } from '@/utils/outbox'
+import { outboxRevision, pendingForDisplay } from '@/utils/outbox'
 import type { Account } from '@/types'
 
 export function useAccounts() {
@@ -13,10 +13,16 @@ export function useAccounts() {
     const userId = getUser()?.id
     const rows = new Map(query.data.value.map(row => [row.id, { ...row }]))
     if (userId)
-      for (const op of ownedPending(userId)) {
+      for (const op of pendingForDisplay(userId)) {
         if (!/^\/accounts(?:\/[^/]+)?$/.test(op.path) || !op.body) continue
-        const body = JSON.parse(op.body)
-        const id = body.id ?? body.clientId ?? op.path.split('/')[2]
+        let body
+        try {
+          body = JSON.parse(op.body)
+        } catch {
+          continue
+        }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) continue
+        const id = op.method === 'POST' ? (body.id ?? body.clientId) : op.path.split('/')[2]
         if (op.method === 'POST')
           rows.set(id, {
             ...body,
@@ -26,7 +32,7 @@ export function useAccounts() {
             archived: false,
             balance: Number(body.openingBalance || 0)
           })
-        else if (rows.has(id)) rows.set(id, { ...rows.get(id)!, ...body })
+        else if (rows.has(id)) rows.set(id, { ...rows.get(id)!, ...body, id })
       }
     return [...rows.values()]
   })

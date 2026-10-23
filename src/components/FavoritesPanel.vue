@@ -1,5 +1,9 @@
 <template>
-  <AppCard title="Favorites" subtitle="Open a template, review it and confirm before saving.">
+  <AppCard
+    v-bind="$attrs"
+    title="Favorites"
+    subtitle="Open a template, review it and confirm before saving."
+  >
     <AppCardBody>
       <v-alert v-if="error || loadError" type="error" class="mb-3">{{
         error || loadError
@@ -41,8 +45,10 @@
   >
 </template>
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false })
 import { onMounted, ref } from 'vue'
 import type { Favorite } from '@/types'
+import { usePendingCatalog } from '@/composables/usePendingCatalog'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { api, fetchJson } from '@/utils/api'
 import TransactionDialog from './TransactionDialog.vue'
@@ -52,12 +58,22 @@ import AppButton from './ui/AppButton.vue'
 import AppConfirmDialog from './ui/AppConfirmDialog.vue'
 defineProps<{ manage?: boolean }>()
 const {
-  data: favorites,
+  data: savedFavorites,
   run: load,
   error: loadError
 } = useAsyncData<Favorite[]>(signal => fetchJson('/favorites', { signal }), [], {
   cacheKey: '/favorites'
 })
+const favorites = usePendingCatalog<Favorite>(savedFavorites, '/favorites', body => ({
+  id: String(body.id),
+  name: String(body.name),
+  type: body.type as Favorite['type'],
+  amount: Number(body.amount),
+  comment: String(body.comment || ''),
+  categoryId: Number(body.categoryId),
+  accountId: String(body.accountId),
+  tagIds: body.tagIds as string[]
+}))
 const dialog = ref(false),
   editing = ref(false),
   selected = ref<Favorite | null>(null),

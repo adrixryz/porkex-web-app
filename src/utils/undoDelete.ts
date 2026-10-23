@@ -75,11 +75,15 @@ export async function undoDelete(id: string) {
   const userId = getUser()?.id
   const clickedAt = Date.now()
   await withOutboxLock(LOCK, async () => {
-    write(
-      read().filter(
-        item => !(item.id === id && item.userId === userId && item.deadline > clickedAt)
-      )
+    const all = read()
+    const selected = all.find(
+      item => item.id === id && item.userId === userId && item.deadline > clickedAt
     )
+    if (!selected)
+      throw new Error(
+        'This deletion can no longer be undone. It has already been published or its Undo window has ended.'
+      )
+    write(all.filter(item => item !== selected))
   })
 }
 export const hiddenTransactionIds = computed(() => {

@@ -252,6 +252,15 @@ async function sendQueued(mutation: QueuedMutation, session: Session): Promise<R
     else if (isCurrent(session)) {
       recordRecurringState(response, session)
       if (response.ok || (mutation.method === 'DELETE' && response.status === 404)) {
+        if (response.ok) {
+          const data: unknown = await response
+            .clone()
+            .json()
+            .catch(() => null)
+          window.dispatchEvent(
+            new CustomEvent('porkex-mutation-confirmed', { detail: { mutation, data } })
+          )
+        }
         if (mutation.method === 'PUT' && /^\/transactions\/\d+$/.test(mutation.path)) {
           const data = await response
             .clone()

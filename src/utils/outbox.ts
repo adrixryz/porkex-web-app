@@ -75,6 +75,16 @@ export function ownedPending(userId: number) {
   return readAll().filter(item => item.userId === userId)
 }
 
+/** A damaged queue must not prevent the user from viewing cached catalogs. */
+export function pendingForDisplay(userId: number) {
+  try {
+    return ownedPending(userId)
+  } catch (error) {
+    lastFlushError.value = (error as Error).message
+    return []
+  }
+}
+
 export function refreshPendingCount() {
   outboxRevision.value++
   try {
@@ -118,7 +128,15 @@ export async function enqueue(mutation: NewMutation) {
   await withOutboxLock(STORAGE_LOCK, async () => {
     const items = readAll()
     if (items.some(item => item.id === mutation.id)) return
-    writeAll([...items, { ...mutation, createdAt: Date.now(), attempts: 0, status: 'pending' }])
+    writeAll([
+      ...items,
+      {
+        ...mutation,
+        createdAt: Date.now(),
+        attempts: mutation.outcome === 'unknown' ? 1 : 0,
+        status: 'pending'
+      }
+    ])
   })
 }
 
@@ -175,10 +193,8 @@ export async function retryFirstBlocked() {
 export async function discardFirstBlocked() {
   const item = firstBlockedMutation.value
   if (!item || item.userId !== currentUserId) return
-  await withSendLock(item.userId, async () => {
-    await updateItem(item.id, () => null)
-    lastFlushError.value = ''
-  })
+  await discardPending(item.id)
+  lastFlushError.value = ''
 }
 
 /** Explicit data removal only; signing out must never call this. */
@@ -233,6 +249,11 @@ export async function drainOutbox(
     }
     if (response.status === 401) {
       lastFlushError.value = 'Sign in to the same account to send your saved changes.'
+      await updateItem(item.id, stored => ({
+        ...stored,
+        attempts: stored.attempts + 1,
+        lastError: lastFlushError.value
+      }))
       return { sent, stopped: 'auth' }
     }
     if (
@@ -274,12 +295,20 @@ export async function revisePending(id: string, body: string) {
       if (item.outcome === 'unknown' || (item.attempts > 0 && item.outcome !== 'rejected'))
         throw new Error('Retry the original change before editing: its outcome is unknown.')
       if (item.method === 'DELETE') throw new Error('Deletions cannot be edited.')
+      if (item.method === 'PUT' && /^\/transactions\/\d+$/.test(item.path) && body !== item.body) {
+        body = JSON.stringify({
+          ...JSON.parse(body),
+          mutationId: crypto.randomUUID(),
+          editedAt: new Date().toISOString()
+        })
+      }
       return { ...item, body, status: 'pending', lastError: undefined }
     })
   )
 }
 
 export async function retryPending(id: string) {
+  if (firstBlockedMutation.value?.id === id) return retryFirstBlocked()
   const userId = currentUserId
   if (userId === null) return
   await withSendLock(userId, () =>
@@ -301,7 +330,19 @@ export async function discardPending(id: string) {
       const all = readAll()
       const item = all.find(value => value.id === id && value.userId === userId)
       if (!item) return
-      const body = item.body ? JSON.parse(item.body) : {}
+      let body: Record<string, unknown> = {}
+      try {
+        body = item.body ? JSON.parse(item.body) : {}
+      } catch {
+        if (
+          all.some(
+            value =>
+              value.userId === userId && value.createdAt >= item.createdAt && value.id !== item.id
+          )
+        )
+          throw new Error('Discard later changes first because this payload cannot be read.')
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) body = {}
       const reference = body.id ?? body.clientId
       if (
         item.method === 'POST' &&
@@ -310,7 +351,7 @@ export async function discardPending(id: string) {
           value =>
             value.id !== id &&
             value.userId === userId &&
-            (value.body?.includes(reference) || value.path.includes(reference))
+            (value.body?.includes(String(reference)) || value.path.includes(String(reference)))
         )
       )
         throw new Error('Discard dependent changes first, then discard this creation.')

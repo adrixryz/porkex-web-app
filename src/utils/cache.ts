@@ -14,6 +14,7 @@ const KEY = 'porkex_cache'
 // combinations of the transaction list. Bounded so browsing many filters cannot
 // grow localStorage without limit.
 const MAX_ENTRIES = 12
+const PINNED = new Set(['/categories', '/accounts', '/tags', '/goals', '/favorites'])
 
 // A single response larger than this is not worth keeping: it would eat the
 // quota on its own and JSON.parse on every paint is not free.
@@ -55,9 +56,8 @@ function normalize(map: CacheMap): CacheMap {
       valid.push([url, entry])
     }
   }
-  const pinned = new Set(['/categories', '/accounts', '/tags', '/goals', '/favorites'])
   valid.sort(
-    (a, b) => Number(pinned.has(b[0])) - Number(pinned.has(a[0])) || b[1].savedAt - a[1].savedAt
+    (a, b) => Number(PINNED.has(b[0])) - Number(PINNED.has(a[0])) || b[1].savedAt - a[1].savedAt
   )
   return Object.fromEntries(valid.slice(0, MAX_ENTRIES))
 }
@@ -94,7 +94,8 @@ export function invalidateCache(...fragments: string[]) {
   const map = readAll()
   let changed = false
   for (const url of Object.keys(map)) {
-    if (fragments.some(f => url.includes(f))) {
+    // Catalog snapshots remain available offline while active consumers revalidate.
+    if (!PINNED.has(url) && fragments.some(f => url.includes(f))) {
       delete map[url]
       changed = true
     }

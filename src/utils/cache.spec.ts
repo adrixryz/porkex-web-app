@@ -167,3 +167,15 @@ describe('formatAge', () => {
     expect(formatAge(now + 60_000, now)).toBe('just now')
   })
 })
+
+it('pins bounded catalogs and keeps their offline snapshot during revalidation', () => {
+  writeCache('/accounts', [{ id: 'main-1' }])
+  writeCache('/categories', [{ id: 1 }])
+  for (let i = 0; i < 30; i++) writeCache(`/transactions?page=${i}`, { items: [] })
+  invalidateCache('/accounts', '/categories', '/transactions')
+  expect(readCache('/accounts')?.data).toEqual([{ id: 'main-1' }])
+  expect(readCache('/categories')?.data).toEqual([{ id: 1 }])
+  expect(Object.keys(JSON.parse(localStorage.getItem('porkex_cache')!)).length).toBeLessThanOrEqual(
+    12
+  )
+})

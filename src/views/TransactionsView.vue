@@ -214,6 +214,14 @@
             <!-- Active filter summary -->
             <div v-if="hasActiveFilters" class="d-flex align-center flex-wrap ga-2 mt-3">
               <span class="text-caption text-on-surface-variant">Active filters:</span>
+              <v-chip
+                v-if="filterTag"
+                size="small"
+                color="primary"
+                closable
+                @click:close="filterTag = null"
+                >{{ selectedTagName }}</v-chip
+              >
               <v-chip v-if="searchQuery" size="x-small" closable @click:close="searchQuery = ''"
                 >"{{ searchQuery }}"</v-chip
               >
@@ -293,7 +301,11 @@
               >
                 <template v-for="tx in transactions" :key="tx.id">
                   <v-list-item class="px-2 px-sm-4 py-3 hover-row">
-                    <TransactionSummary :transaction="tx"
+                    <TransactionSummary
+                      :transaction="tx"
+                      selectable-tags
+                      :selected-tag-id="filterTag"
+                      @select-tag="toggleTag"
                       ><template #actions
                         ><div class="d-flex justify-end mt-1">
                           <AppIconButton
@@ -390,7 +402,14 @@
                         >
                         <div class="text-caption">{{ tx.account?.name || 'Main' }}</div>
                       </td>
-                      <td><TagChips :tags="tx.tags" /></td>
+                      <td>
+                        <TagChips
+                          :tags="tx.tags"
+                          selectable
+                          :selected-tag-id="filterTag"
+                          @select="toggleTag"
+                        />
+                      </td>
                       <td
                         class="font-weight-medium description-cell"
                         :title="tx.comment ?? tx.description ?? ''"
@@ -532,6 +551,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { scheduleDelete, hiddenTransactionIds } from '@/utils/undoDelete'
 import TransactionSummary from '@/components/TransactionSummary.vue'
+import { useTags } from '@/composables/useTags'
 import TagChips from '@/components/TagChips.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AmountStepper from '@/components/AmountStepper.vue'
@@ -589,6 +609,17 @@ const editingTx = ref<Transaction | null>(null)
 // Search, filters, sorting & pagination (server-side)
 const searchQuery = ref('')
 const filterType = ref<'ALL' | 'INCOME' | 'EXPENSE'>('ALL')
+const filterTag = ref<string | null>(null)
+const { tags: tagCatalog } = useTags()
+const selectedTagName = computed(
+  () =>
+    tagCatalog.value.find(
+      t => t.id === filterTag.value || t.aliases?.includes(filterTag.value || '')
+    )?.name || 'Tag'
+)
+function toggleTag(id: string) {
+  filterTag.value = filterTag.value === id ? null : id
+}
 const filterCategory = ref<number | null>(null)
 const minAmount = ref('')
 const maxAmount = ref('')
@@ -642,6 +673,7 @@ const transactionsUrl = () => {
   })
   const search = searchQuery.value.trim()
   if (search) params.set('search', search)
+  if (filterTag.value) params.set('tagId', filterTag.value)
   if (filterType.value !== 'ALL') params.set('type', filterType.value)
   if (filterCategory.value !== null) params.set('categoryId', String(filterCategory.value))
   if (minBound.value !== null) params.set('min', String(minBound.value))
@@ -706,6 +738,7 @@ const hasActiveFilters = computed(
     !!searchQuery.value.trim() ||
     filterType.value !== 'ALL' ||
     filterCategory.value !== null ||
+    !!filterTag.value ||
     minBound.value !== null ||
     maxBound.value !== null
 )
@@ -714,6 +747,7 @@ const clearFilters = () => {
   searchQuery.value = ''
   filterType.value = 'ALL'
   filterCategory.value = null
+  filterTag.value = null
   minAmount.value = ''
   maxAmount.value = ''
 }
@@ -770,6 +804,7 @@ function readRouteQuery() {
   filterType.value = 'ALL'
   searchQuery.value = ''
   filterCategory.value = null
+  filterTag.value = null
   minAmount.value = ''
   maxAmount.value = ''
   sortBy.value = 'date'
@@ -784,6 +819,8 @@ function readRouteQuery() {
   if (typeof q.type === 'string' && (TYPES as readonly string[]).includes(q.type)) {
     filterType.value = q.type as typeof filterType.value
   }
+  if (typeof q.tagId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(q.tagId))
+    filterTag.value = q.tagId
   if (typeof q.search === 'string') searchQuery.value = q.search
   if (typeof q.category === 'string') {
     const id = Number(q.category)
@@ -811,6 +848,7 @@ function readRouteQuery() {
 
 async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
   const query: Record<string, string> = { period: periodMode.value }
+  if (filterTag.value) query.tagId = filterTag.value
   if (filterType.value !== 'ALL') query.type = filterType.value
   if (searchQuery.value.trim()) query.search = searchQuery.value.trim()
   if (filterCategory.value !== null) query.category = String(filterCategory.value)
@@ -906,7 +944,7 @@ watch([searchQuery, minAmount, maxAmount], () => {
   searchTimer = window.setTimeout(() => reload(undefined, 'replace'), 350)
 })
 
-watch([filterType, filterCategory, sortOption], () => reload())
+watch([filterType, filterCategory, filterTag, sortOption], () => reload())
 watch(page, () => {
   if (!hydrating) reload(undefined, 'push', false)
 })

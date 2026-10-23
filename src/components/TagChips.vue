@@ -5,7 +5,12 @@
       :key="tag.id"
       :title="tag.name"
       size="x-small"
-      color="grey-darken-2"
+      :color="selectedTagId === tag.id && selectable ? 'primary' : 'grey-darken-2'"
+      v-bind="
+        selectable
+          ? { onClick: () => emit('select', tag.id), 'aria-pressed': selectedTagId === tag.id }
+          : {}
+      "
       variant="flat"
       class="tag-pill"
       >{{ tag.name }}</v-chip
@@ -23,7 +28,13 @@
           <span class="total-count">+{{ ordered.length }}</span>
         </button></template
       ><v-list density="compact"
-        ><v-list-item v-for="tag in ordered" :key="tag.id" :title="tag.name" /></v-list
+        ><v-list-item
+          v-for="tag in ordered"
+          :key="tag.id"
+          :title="tag.name"
+          :active="selectable && selectedTagId === tag.id"
+          color="primary"
+          v-bind="selectable ? { onClick: () => emit('select', tag.id) } : {}" /></v-list
     ></v-menu>
   </span>
 </template>
@@ -31,10 +42,19 @@
 import { computed } from 'vue'
 import type { Tag } from '@/types'
 import { tags as catalog } from '@/composables/useTags'
-const props = withDefaults(defineProps<{ tags?: Tag[]; compact?: boolean }>(), {
-  tags: () => [],
-  compact: false
-})
+const props = withDefaults(
+  defineProps<{
+    tags?: Tag[]
+    compact?: boolean
+    selectable?: boolean
+    selectedTagId?: string | null
+  }>(),
+  {
+    tags: () => [],
+    compact: false
+  }
+)
+const emit = defineEmits<{ select: [id: string] }>()
 const ordered = computed(() =>
   props.tags
     .map(tag => catalog.value.find(t => t.id === tag.id || t.aliases?.includes(tag.id)) ?? tag)

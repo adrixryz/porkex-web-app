@@ -18,7 +18,13 @@
         <span>{{
           formatDateOnly(transaction.date, { month: 'numeric', day: 'numeric', year: '2-digit' })
         }}</span
-        ><TagChips :tags="transaction.tags" compact />
+        ><TagChips
+          :tags="transaction.tags"
+          compact
+          :selectable="selectableTags"
+          :selected-tag-id="selectedTagId"
+          @select="emit('selectTag', $event)"
+        />
       </div>
     </div>
     <div class="summary-comment text-caption" :title="comment">{{ comment }}</div>
@@ -38,7 +44,12 @@ import type { Transaction } from '@/types'
 import { formatDateOnly } from '@/utils/date'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import TagChips from './TagChips.vue'
-const props = defineProps<{ transaction: Transaction }>()
+const props = defineProps<{
+  transaction: Transaction
+  selectableTags?: boolean
+  selectedTagId?: string | null
+}>()
+const emit = defineEmits<{ selectTag: [id: string] }>()
 const cs = useCurrencySymbol()
 const comment = computed(() => props.transaction.comment ?? props.transaction.description ?? '')
 </script>

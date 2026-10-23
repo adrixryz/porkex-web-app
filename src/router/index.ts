@@ -30,6 +30,12 @@ const router = createRouter({
       meta: { title: 'Accounts' }
     },
     {
+      path: '/goals',
+      name: 'goals',
+      component: () => import('@/views/GoalsView.vue'),
+      meta: { title: 'Goals' }
+    },
+    {
       path: '/recurring',
       name: 'recurring',
       component: () => import('@/views/RecurringView.vue'),

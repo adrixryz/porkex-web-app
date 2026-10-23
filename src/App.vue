@@ -295,6 +295,7 @@ const navItems = [
   { title: 'Accounts', icon: mdiSwapHorizontal, route: '/accounts' },
   { title: 'Categories', icon: mdiShapeOutline, route: '/categories' },
   { title: 'Budgets', icon: mdiPiggyBankOutline, route: '/budgets' },
+  { title: 'Goals', icon: mdiPiggyBankOutline, route: '/goals' },
   { title: 'Recurring', icon: mdiRepeat, route: '/recurring' },
   { title: 'Analytics', icon: mdiChartBar, route: '/analytics' }
 ]

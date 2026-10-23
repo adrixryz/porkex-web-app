@@ -9,6 +9,21 @@ export function validAmount(value: unknown): boolean {
 /** Local shape checks only; account ownership and live references belong to the API. */
 export function mutationError(path: string, method: string, body: string | null): string | null {
   if (!['POST', 'PUT'].includes(method)) return null
+  if (path.startsWith('/goals')) {
+    try {
+      const value = JSON.parse(body || '{}')
+      if (
+        typeof value.name !== 'string' ||
+        !value.name.trim() ||
+        value.name.trim().length > 60 ||
+        !validAmount(value.targetAmount)
+      )
+        return 'Enter a goal name and a positive target with up to two decimals.'
+    } catch {
+      return 'Enter valid goal details.'
+    }
+    return null
+  }
   if (/^\/(accounts|transfers)(?:\/[^/]+)?$/.test(path)) {
     let payload: Record<string, unknown>
     try {

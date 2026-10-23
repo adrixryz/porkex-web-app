@@ -262,11 +262,13 @@
       </v-row>
     </template>
 
+    <GoalsPanel compact class="mt-6" />
     <TransactionDialog v-model="dialog" :type="dialogType" @saved="onSaved"></TransactionDialog>
   </AppPage>
 </template>
 
 <script setup lang="ts">
+import GoalsPanel from '@/components/GoalsPanel.vue'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed } from 'vue'
 import { hiddenTransactionIds } from '@/utils/undoDelete'

@@ -4,6 +4,8 @@
 export type TxType = 'INCOME' | 'EXPENSE'
 
 export interface Account {
+  isGoal?: boolean
+  targetAmount?: number | null
   id: string
   userId: number
   name: string

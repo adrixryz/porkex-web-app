@@ -25,8 +25,10 @@ test('navigation lists the requested view order with English labels', async ({ p
   await expect(links).toHaveText([
     'Dashboard',
     'Transactions',
+    'Accounts',
     'Categories',
     'Budgets',
+    'Goals',
     'Recurring',
     'Analytics'
   ])
@@ -130,7 +132,7 @@ async function openExpense(page: Page, description: string) {
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Amount', { exact: true }).fill('12.34')
   await dialog.getByLabel('Comment (optional)', { exact: true }).fill(description)
-  await dialog.locator('.v-select').click()
+  await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name: 'Food', exact: true }).click()
   return dialog
 }
@@ -1322,7 +1324,7 @@ test('category selects show the color of each category', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Budgets', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'New Budget', exact: true }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.locator('.v-select').first().click()
+  await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   const budgetFood = page.getByRole('option', { name: 'Food', exact: true })
   const budgetDot = budgetFood.locator('.category-dot')
   await expect(budgetDot).toBeVisible()
@@ -1343,7 +1345,7 @@ test('recurring category colors match in new and edit dialogs for expenses and i
       })
       .click()
     const dialog = page.getByRole('dialog', { name: `${mode} Recurring Rule`, exact: true })
-    const category = dialog.locator('.v-select').first()
+    const category = dialog.locator('.v-select').filter({ hasText: 'Category' })
     if (mode === 'Edit')
       await expect(category.locator('.v-select__selection .category-dot')).toHaveCSS(
         'background-color',

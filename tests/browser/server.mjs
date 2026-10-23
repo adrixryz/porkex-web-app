@@ -209,6 +209,25 @@ const server = createServer(async (req, res) => {
           headers
         )
       }
+      if (url.pathname === '/api/accounts')
+        return json(
+          res,
+          [
+            {
+              id: 'main-1',
+              userId: 1,
+              name: 'Main',
+              isMain: true,
+              openingBalance: 0,
+              balance: 0,
+              archived: false
+            }
+          ],
+          200,
+          headers
+        )
+      if (url.pathname === '/api/goals' || url.pathname === '/api/favorites')
+        return json(res, [], 200, headers)
       if (url.pathname === '/api/categories') return json(res, categories, 200, headers)
       if (url.pathname === '/api/profile')
         return json(res, { ...user, createdAt: new Date().toISOString() }, 200, headers)
@@ -283,6 +302,8 @@ const server = createServer(async (req, res) => {
           return json(res, decorate(row), 201, headers)
         }
         let rows = db.rows
+        if (url.searchParams.get('tagId'))
+          rows = rows.filter(r => (r.tagIds || []).includes(url.searchParams.get('tagId')))
         if (url.searchParams.get('type'))
           rows = rows.filter(r => r.type === url.searchParams.get('type'))
         if (url.searchParams.get('search'))

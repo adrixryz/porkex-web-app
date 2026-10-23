@@ -13,6 +13,10 @@ test('Danger Zone confirmation revokes the phone session and preserves its offli
     }
   })
   const { token, user } = await registration.json()
+  await page.request.put(`/api/accounts/main-${user.id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { openingBalance: 1000 }
+  })
   const init = ({ token, user }: { token: string; user: object }) => {
     if (sessionStorage.getItem('sessions-initialized')) return
     sessionStorage.setItem('sessions-initialized', 'yes')
@@ -29,7 +33,7 @@ test('Danger Zone confirmation revokes the phone session and preserves its offli
     const draft = mobile.getByRole('dialog')
     await draft.getByLabel('Amount', { exact: true }).fill('13')
     await draft.getByLabel('Comment (optional)', { exact: true }).fill('Offline phone change')
-    await draft.locator('.v-select').click()
+    await draft.locator('.v-select').filter({ hasText: 'Category' }).click()
     await mobile.getByRole('option', { name: 'Food', exact: true }).click()
     await phone.setOffline(true)
     await draft.getByRole('button', { name: 'Save', exact: true }).click()
@@ -248,7 +252,7 @@ test('lost catalog responses replay through the real API without blocking the qu
   await page.getByRole('button', { name: 'New Budget', exact: true }).click()
   dialog = page.getByRole('dialog')
   await dialog.getByLabel('Limit', { exact: true }).fill('50')
-  await dialog.locator('.v-select').first().click()
+  await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name, exact: true }).click()
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
@@ -437,7 +441,7 @@ test('real API and temporary SQLite confirm a replay exactly once', async ({
   const description = `SQLite ${info.project.name}`
   await dialog.getByLabel('Amount', { exact: true }).fill('18.76')
   await dialog.getByLabel('Comment (optional)', { exact: true }).fill(description)
-  await dialog.locator('.v-select').click()
+  await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name: 'Food', exact: true }).click()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).not.toBeVisible()
@@ -485,7 +489,7 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Amount', { exact: true }).fill('29.18')
-  await dialog.locator('.v-select').click()
+  await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name: 'Food', exact: true }).click()
   await dialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
   const manager = page
@@ -603,4 +607,161 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   ).toBeVisible()
   await expect(comparison.getByText('Food', { exact: true })).toBeVisible()
   await expect(page.getByText('Period comparison', { exact: true })).toHaveCount(0)
+})
+
+test('accounts, savings, favorites, tag filters and balance privacy work together', async ({
+  page,
+  context
+}, info) => {
+  test.setTimeout(90_000)
+  const registered = await page.request.post('/auth/register', {
+    data: {
+      name: 'Feature owner',
+      email: `features-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registered.status()).toBe(201)
+  const { token, user } = await registered.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 500 }
+      })
+    ).status()
+  ).toBe(200)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/accounts')
+  await page.getByRole('button', { name: 'New account', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: 'New account', exact: true })
+  await dialog.getByLabel('Name', { exact: true }).fill('Cash')
+  await dialog.getByLabel('Opening balance', { exact: true }).fill('50')
+  await dialog.getByRole('button', { name: 'Save account', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.getByRole('button', { name: 'Transfer', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'New transfer', exact: true })
+  await dialog.locator('.v-select').filter({ hasText: 'From account' }).click()
+  await page.getByRole('option', { name: 'Main', exact: true }).click()
+  await dialog.locator('.v-select').filter({ hasText: 'To account' }).click()
+  await page.getByRole('option', { name: 'Cash', exact: true }).click()
+  await dialog.getByLabel('Amount', { exact: true }).fill('20')
+  await dialog.getByRole('button', { name: 'Transfer', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.goto('/goals')
+  await page.getByRole('button', { name: 'New goal', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'New goal', exact: true })
+  await dialog.getByLabel('Name', { exact: true }).fill('Vacation')
+  await dialog.getByLabel('Target amount', { exact: true }).fill('800')
+  await dialog.getByRole('button', { name: 'Save goal', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.getByRole('button', { name: 'Add funds', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'New transfer', exact: true })
+  await dialog.locator('.v-select').filter({ hasText: 'From account' }).click()
+  await page.getByRole('option', { name: 'Main', exact: true }).click()
+  await dialog.getByLabel('Amount', { exact: true }).fill('30')
+  await dialog.getByRole('button', { name: 'Transfer', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  const accounts = await (await page.request.get('/api/accounts', { headers })).json()
+  const cash = accounts.find((a: { name: string }) => a.name === 'Cash')
+  await page.goto('/')
+  await page.locator('.balance-select').click()
+  await page.getByRole('option', { name: 'Cash', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`accountId=${cash.id}`))
+  await expect(page.locator('h1')).toHaveText('$70.00')
+  await page.getByRole('button', { name: 'Hide balances', exact: true }).click()
+  await expect(page.getByText('**.**', { exact: true })).toHaveCount(3)
+  await expect(page.getByText('-', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('**.**', { exact: true })).toHaveCount(3)
+  await expect(page.getByText('-', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Show balances', exact: true }).click()
+  await expect(page.locator('h1')).toHaveText('$70.00')
+  const favoritesCard = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Favorites', { exact: true }) })
+    .first()
+  const goalsCard = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Savings goals', { exact: true }) })
+    .first()
+  expect(
+    (await goalsCard.boundingBox())!.y -
+      ((await favoritesCard.boundingBox())!.y + (await favoritesCard.boundingBox())!.height)
+  ).toBeGreaterThanOrEqual(20)
+  await expect(page.getByRole('link', { name: 'Manage goals', exact: true })).toHaveClass(
+    /text-primary/
+  )
+  await page.screenshot({ path: info.outputPath('dashboard.png'), fullPage: true })
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const food = categories.find((c: { name: string }) => c.name === 'Food')
+  const tagId = `feature-${info.project.name}`
+  await page.request.post('/api/tags', { headers, data: { id: tagId, name: 'Lunch' } })
+  await page.request.post('/api/transactions', {
+    headers,
+    data: {
+      clientId: crypto.randomUUID(),
+      type: 'EXPENSE',
+      amount: 12,
+      categoryId: food.id,
+      accountId: `main-${user.id}`,
+      tagIds: [tagId],
+      comment: 'Feature lunch'
+    }
+  })
+  await page.goto('/transactions?period=year')
+  const pill = page.locator('.tag-pill').filter({ hasText: 'Lunch' }).first()
+  if (await pill.isVisible()) await pill.click()
+  else {
+    await page.getByRole('button', { name: 'Show 1 tags', exact: true }).click()
+    await page.getByText('Lunch', { exact: true }).filter({ visible: true }).click()
+  }
+  await expect(page).toHaveURL(new RegExp(`tagId=${tagId}`))
+  await expect(page.locator('.tag-pill[aria-pressed="true"]')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
+  await page.getByText('Duplicate', { exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'New Expense', exact: true })
+  await expect(dialog.getByLabel('Amount', { exact: true })).toHaveValue('12')
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect(page.getByText('Feature lunch', { exact: true })).toHaveCount(2)
+  await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
+  await page.getByText('Save as favorite', { exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'New favorite', exact: true })
+  await dialog.getByLabel('Favorite name', { exact: true }).fill('Usual lunch')
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.getByRole('button', { name: 'Favorites', exact: true }).click()
+  await page.getByRole('button', { name: 'Usual lunch', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'New Expense', exact: true })
+  await expect(dialog.getByLabel('Amount', { exact: true })).toHaveValue('12')
+  expect((await (await page.request.get('/api/transactions', { headers })).json()).total).toBe(2)
+  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: 'Favorites', exact: true })
+    .getByRole('button', { name: 'Close dialog', exact: true })
+    .click()
+  await context.setOffline(true)
+  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  dialog = page.getByRole('dialog', { name: 'New Expense', exact: true })
+  await dialog.getByLabel('Amount', { exact: true }).fill('2')
+  await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
+  await page.getByRole('option', { name: 'Food', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.getByRole('button', { name: 'Pending changes', exact: true }).click()
+  const center = page.getByRole('dialog', { name: 'Pending changes', exact: true })
+  await expect(center.getByRole('button', { name: 'Retry and edit', exact: true })).toBeVisible()
+  await center.getByRole('button', { name: 'Discard', exact: true }).click()
+  const confirmation = page.getByRole('dialog', { name: 'Discard pending change?', exact: true })
+  await confirmation.getByRole('button', { name: 'Discard', exact: true }).click()
+  await expect(center.getByText('No pending changes.', { exact: true })).toBeVisible()
+  await context.setOffline(false)
 })

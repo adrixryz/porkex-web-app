@@ -16,6 +16,14 @@
         @click="toggle(tag)"
         >{{ tag.name }}</v-chip
       >
+      <v-chip
+        v-for="id in unavailable"
+        :key="id"
+        closable
+        color="warning"
+        @click:close="remove([id])"
+        >Unavailable tag</v-chip
+      >
       <AppButton
         type="button"
         size="small"
@@ -31,7 +39,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { mdiPencilOutline } from '@mdi/js'
 import { useTags } from '@/composables/useTags'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -41,6 +49,9 @@ const props = defineProps<{ modelValue: string[] }>()
 const emit = defineEmits<{ 'update:modelValue': [ids: string[]] }>()
 const { tags, error } = useTags()
 const editing = ref(false)
+const unavailable = computed(() =>
+  props.modelValue.filter(id => !tags.value.some(tag => tag.id === id || tag.aliases?.includes(id)))
+)
 const selected = (tag: Tag) =>
   props.modelValue.some(id => id === tag.id || tag.aliases?.includes(id))
 function toggle(tag: Tag) {

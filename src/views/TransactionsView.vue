@@ -618,7 +618,11 @@ const selectedTagName = computed(
     )?.name || 'Tag'
 )
 function toggleTag(id: string) {
-  filterTag.value = filterTag.value === id ? null : id
+  const current =
+    tagCatalog.value.find(
+      tag => tag.id === filterTag.value || tag.aliases?.includes(filterTag.value || '')
+    )?.id ?? filterTag.value
+  filterTag.value = current === id ? null : id
 }
 const filterCategory = ref<number | null>(null)
 const minAmount = ref('')

@@ -5,11 +5,9 @@
       :key="tag.id"
       :title="tag.name"
       size="x-small"
-      :color="selectedTagId === tag.id && selectable ? 'primary' : 'grey-darken-2'"
+      :color="isSelected(tag) ? 'primary' : 'grey-darken-2'"
       v-bind="
-        selectable
-          ? { onClick: () => emit('select', tag.id), 'aria-pressed': selectedTagId === tag.id }
-          : {}
+        selectable ? { onClick: () => emit('select', tag.id), 'aria-pressed': isSelected(tag) } : {}
       "
       variant="flat"
       class="tag-pill"
@@ -32,7 +30,7 @@
           v-for="tag in ordered"
           :key="tag.id"
           :title="tag.name"
-          :active="selectable && selectedTagId === tag.id"
+          :active="isSelected(tag)"
           color="primary"
           v-bind="selectable ? { onClick: () => emit('select', tag.id) } : {}" /></v-list
     ></v-menu>
@@ -51,10 +49,15 @@ const props = withDefaults(
   }>(),
   {
     tags: () => [],
-    compact: false
+    compact: false,
+    selectable: false,
+    selectedTagId: null
   }
 )
 const emit = defineEmits<{ select: [id: string] }>()
+const isSelected = (tag: Tag) =>
+  !!props.selectable &&
+  (props.selectedTagId === tag.id || !!tag.aliases?.includes(props.selectedTagId || ''))
 const ordered = computed(() =>
   props.tags
     .map(tag => catalog.value.find(t => t.id === tag.id || t.aliases?.includes(tag.id)) ?? tag)

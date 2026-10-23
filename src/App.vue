@@ -175,6 +175,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useAccounts } from '@/composables/useAccounts'
 import UpdateNotice from '@/components/UpdateNotice.vue'
 import SyncCenter from '@/components/SyncCenter.vue'
 import AppIconButton from '@/components/ui/AppIconButton.vue'
@@ -205,6 +206,8 @@ import {
   mdiRepeat,
   mdiShapeOutline,
   mdiSwapHorizontal,
+  mdiWalletOutline,
+  mdiFlagOutline,
   mdiViewDashboardOutline
 } from '@mdi/js'
 
@@ -260,6 +263,13 @@ const handleNavIconClick = () => {
 // getUser() reads localStorage (not reactive): keep a reactive copy
 // in sync on every navigation and on changes (login/logout/profile).
 const currentUser = ref<User | null>(null)
+const { run: preloadAccounts } = useAccounts()
+watch(
+  () => currentUser.value?.id,
+  id => {
+    if (id) void preloadAccounts()
+  }
+)
 
 const refreshUser = () => {
   currentUser.value = getUser()
@@ -292,10 +302,10 @@ const userName = computed(() => currentUser.value?.name || 'User')
 const navItems = [
   { title: 'Dashboard', icon: mdiViewDashboardOutline, route: '/' },
   { title: 'Transactions', icon: mdiSwapHorizontal, route: '/transactions' },
-  { title: 'Accounts', icon: mdiSwapHorizontal, route: '/accounts' },
+  { title: 'Accounts', icon: mdiWalletOutline, route: '/accounts' },
   { title: 'Categories', icon: mdiShapeOutline, route: '/categories' },
   { title: 'Budgets', icon: mdiPiggyBankOutline, route: '/budgets' },
-  { title: 'Goals', icon: mdiPiggyBankOutline, route: '/goals' },
+  { title: 'Goals', icon: mdiFlagOutline, route: '/goals' },
   { title: 'Recurring', icon: mdiRepeat, route: '/recurring' },
   { title: 'Analytics', icon: mdiChartBar, route: '/analytics' }
 ]

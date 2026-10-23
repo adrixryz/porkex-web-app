@@ -45,6 +45,8 @@
               variant="text"
               @click="archiving = account"
               >Archive</AppButton
+            ><AppButton v-if="account.archived" variant="text" @click="restore(account)"
+              >Restore</AppButton
             ></AppCardBody
           ></AppCard
         ></v-col
@@ -54,7 +56,7 @@
       ><AppCardBody>
         <AppSelect
           v-model="accountFilter"
-          :items="accounts"
+          :items="historyAccounts"
           item-title="name"
           item-value="id"
           label="Filter by account"
@@ -142,20 +144,31 @@ const accountDialog = ref(false),
   error = ref(''),
   accountFilter = ref<string | null>(null),
   page = ref(1)
+const { data: historyAccounts, run: loadHistoryAccounts } = useAsyncData<Account[]>(
+  signal => fetchJson('/accounts?includeGoals=true', { signal }),
+  [],
+  { cacheKey: '/accounts?includeGoals=true' }
+)
 const url = () =>
   `/transfers?page=${page.value}${accountFilter.value ? `&accountId=${encodeURIComponent(accountFilter.value)}` : ''}`
 const {
   data: history,
   run: load,
   error: transfersError
-} = useAsyncData<{ items: Transfer[]; totalPages: number }>(
+} = useAsyncData<{ items: Transfer[]; totalPages: number; page: number }>(
   signal => fetchJson(url(), { signal }),
-  { items: [], totalPages: 1 },
+  { items: [], totalPages: 1, page: 1 },
   { cacheKey: url }
 )
 async function refresh() {
-  await Promise.all([run(), load()])
+  await Promise.all([run(), load(), loadHistoryAccounts()])
 }
+watch(
+  () => history.value.page,
+  actual => {
+    if (actual !== page.value) page.value = actual
+  }
+)
 watch(accountFilter, () => {
   page.value = 1
   void load()
@@ -179,6 +192,12 @@ async function mutate(path: string, method: string, body?: unknown) {
 }
 async function remove() {
   if (deleting.value) await mutate(`/transfers/${deleting.value.id}`, 'DELETE')
+}
+async function restore(account: Account) {
+  await mutate(`/accounts/${account.id}`, 'PUT', {
+    archived: false,
+    mutationId: crypto.randomUUID()
+  })
 }
 async function archive() {
   if (archiving.value)

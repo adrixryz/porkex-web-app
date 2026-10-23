@@ -71,7 +71,7 @@
       <!-- HEADER -->
       <AppPageHeader>
         <template #title>
-          <div class="text-overline text-on-surface-variant mb-1 d-flex align-center ga-2">
+          <div class="mb-2 d-flex align-center ga-2">
             <AppSelect
               v-model="selectedAccountId"
               :items="balanceOptions"
@@ -112,7 +112,7 @@
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4">
           <AppStatCard
-            label="Total Income"
+            :label="`${selectedAccountName} Income`"
             :value="hideBalances ? '**.**' : `+${cs}${formatMoney(summary.totalIncome)}`"
             :icon="mdiArrowUpCircleOutline"
             color="success"
@@ -121,7 +121,7 @@
         </v-col>
         <v-col cols="12" sm="6" md="4">
           <AppStatCard
-            label="Total Expenses"
+            :label="`${selectedAccountName} Expenses`"
             :value="hideBalances ? '**.**' : `-${cs}${formatMoney(summary.totalExpense)}`"
             :icon="mdiArrowDownCircleOutline"
             color="error"
@@ -130,8 +130,8 @@
         </v-col>
         <v-col cols="12" sm="12" md="4">
           <AppStatCard
-            label="Transactions"
-            :value="hideBalances ? '**.**' : summary.transactionCount"
+            :label="`${selectedAccountName} Transactions`"
+            :value="hideBalances ? '-' : summary.transactionCount"
             :icon="mdiReceiptTextOutline"
             color="primary"
             value-class="text-on-surface"
@@ -196,7 +196,12 @@
 
         <!-- PIE CHART -->
         <v-col cols="12" md="4">
-          <AppCard title="Expense Breakdown" class="fill-height">
+          <AppCard title="Expense Breakdown" subtitle="All accounts" class="fill-height">
+            <template #header-actions
+              ><AppButton variant="text" size="small" color="primary" to="/analytics"
+                >View Stats</AppButton
+              ></template
+            >
             <AppCardBody class="d-flex flex-column align-center justify-center">
               <div
                 v-if="chartData.labels.length === 0"
@@ -238,10 +243,10 @@
       <!-- BUDGETS AT A GLANCE -->
       <v-row v-if="!loading && monthBudgets.length">
         <v-col cols="12">
-          <AppCard title="This month's budgets" class="overflow-hidden">
+          <AppCard title="This month's budgets" subtitle="All accounts" class="overflow-hidden">
             <template #header-actions>
               <AppButton variant="text" size="small" color="primary" to="/budgets">
-                Manage
+                Manage Budgets
               </AppButton>
             </template>
             <AppCardBody>
@@ -372,10 +377,7 @@ const {
 const route = useRoute(),
   router = useRouter()
 const { activeAccounts, run: fetchAccounts } = useAccounts()
-const balanceOptions = computed(() => [
-  { id: 'global', name: 'Global Balance' },
-  ...activeAccounts.value
-])
+const balanceOptions = computed(() => [{ id: 'global', name: 'Total' }, ...activeAccounts.value])
 const selectedAccountId = computed({
   get: () =>
     typeof route.query.accountId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(route.query.accountId)
@@ -388,6 +390,10 @@ const selectedAccountId = computed({
     void router.push({ query })
   }
 })
+const selectedAccountName = computed(
+  () =>
+    balanceOptions.value.find(account => account.id === selectedAccountId.value)?.name ?? 'Account'
+)
 let hidden = false
 try {
   hidden = localStorage.getItem('porkex_hide_balances') === 'true'

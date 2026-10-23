@@ -209,9 +209,10 @@
       @confirm="logout"
     >
       You'll need to sign in again to see your transactions.
-      <span v-if="pendingCount > 0">
-        Your {{ pendingCount }} pending change(s) will stay on this device and sync when you sign in
-        to the same account.</span
+      <span v-if="localPendingCount > 0">
+        Your {{ localPendingCount }} pending change(s) will stay on this device and sync when you
+        sign in to the same account.
+        <AppButton variant="text" @click="reviewPending">Review pending changes</AppButton></span
       >
     </AppConfirmDialog>
   </AppPage>
@@ -220,7 +221,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { canLeaveForms, useUnsavedChanges } from '@/composables/useUnsavedChanges'
-import { pendingCount } from '@/utils/outbox'
+import { localPendingCount, syncCenterOpen } from '@/composables/useSyncCenter'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -545,6 +546,10 @@ const updatePassword = async () => {
 }
 
 const logoutDialog = ref(false)
+const reviewPending = () => {
+  logoutDialog.value = false
+  syncCenterOpen.value = true
+}
 const revokeDialog = ref(false)
 const revokingSessions = ref(false)
 const revokeSessions = async () => {

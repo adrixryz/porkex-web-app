@@ -66,6 +66,22 @@ export const waitingDeletes = computed(() => {
   const userId = isAuthenticated() ? getUser()?.id : undefined
   return entries.value.filter(item => item.userId === userId && item.deadline > clock.value)
 })
+export const scheduledDeletes = computed(() => {
+  void revision.value
+  const userId = isAuthenticated() ? getUser()?.id : undefined
+  return entries.value.filter(item => item.userId === userId)
+})
+export async function undoDelete(id: string) {
+  const userId = getUser()?.id
+  const clickedAt = Date.now()
+  await withOutboxLock(LOCK, async () => {
+    write(
+      read().filter(
+        item => !(item.id === id && item.userId === userId && item.deadline > clickedAt)
+      )
+    )
+  })
+}
 export const hiddenTransactionIds = computed(() => {
   void revision.value
   void outboxRevision.value

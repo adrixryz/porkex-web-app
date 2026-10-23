@@ -361,6 +361,12 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
       userId,
       method,
       path,
+      ...(alreadyAttempted
+        ? {
+            outcome: 'unknown' as const,
+            lastError: 'The response was lost. Retry the original change to confirm its outcome.'
+          }
+        : {}),
       body: typeof body === 'string' ? body : null
     })
     // A logout during a failed request must not lose the old account's write.

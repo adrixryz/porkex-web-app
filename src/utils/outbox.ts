@@ -13,6 +13,7 @@ export interface QueuedMutation {
   attempts: number
   status: 'pending' | 'blocked'
   lastError?: string
+  outcome?: 'unknown' | 'rejected'
 }
 
 type StoredMutation = Omit<QueuedMutation, 'userId' | 'status'> & {
@@ -26,6 +27,7 @@ export interface FlushResult {
 }
 
 export const outboxRevision = ref(0)
+export const sendingId = ref<string | null>(null)
 export const pendingCount = ref(0)
 export const lastFlushError = ref('')
 export const firstBlockedMutation = ref<QueuedMutation | null>(null)
@@ -210,10 +212,19 @@ export async function drainOutbox(
     }
     let response: Response
     try {
+      sendingId.value = item.id
       response = await send(item)
     } catch {
       lastFlushError.value = 'Could not reach the server. Your pending changes are still saved.'
+      await updateItem(item.id, stored => ({
+        ...stored,
+        attempts: stored.attempts + 1,
+        outcome: 'unknown',
+        lastError: lastFlushError.value
+      }))
       return { sent, stopped: canSend() ? 'network' : 'session' }
+    } finally {
+      sendingId.value = null
     }
     if (response.ok || (item.method === 'DELETE' && response.status === 404)) {
       await updateItem(item.id, () => null)
@@ -231,14 +242,81 @@ export async function drainOutbox(
     ) {
       const data = (await response.json().catch(() => null)) as { error?: string } | null
       const message = data?.error || `The server rejected a pending change (${response.status}).`
-      await updateItem(item.id, stored => ({ ...stored, status: 'blocked', lastError: message }))
+      await updateItem(item.id, stored => ({
+        ...stored,
+        attempts: stored.attempts + 1,
+        status: 'blocked',
+        outcome: stored.outcome === 'unknown' ? 'unknown' : 'rejected',
+        lastError: message
+      }))
       return { sent, stopped: 'blocked' }
     }
-    await updateItem(item.id, stored => ({ ...stored, attempts: stored.attempts + 1 }))
     lastFlushError.value = 'The server could not save a change yet. It remains on this device.'
+    await updateItem(item.id, stored => ({
+      ...stored,
+      attempts: stored.attempts + 1,
+      outcome: 'unknown',
+      lastError: lastFlushError.value
+    }))
     return { sent, stopped: 'server' }
   }
   return { sent, stopped: 'session' }
+}
+
+/** Queue edits must never change a payload that may already have reached the server. */
+export async function revisePending(id: string, body: string) {
+  const userId = currentUserId
+  if (userId === null) throw new Error('Sign in to manage pending changes.')
+  await withSendLock(userId, () =>
+    updateItem(id, item => {
+      if (item.userId !== currentUserId || item.userId !== userId)
+        throw new Error('The session changed.')
+      if (item.outcome === 'unknown' || (item.attempts > 0 && item.outcome !== 'rejected'))
+        throw new Error('Retry the original change before editing: its outcome is unknown.')
+      if (item.method === 'DELETE') throw new Error('Deletions cannot be edited.')
+      return { ...item, body, status: 'pending', lastError: undefined }
+    })
+  )
+}
+
+export async function retryPending(id: string) {
+  const userId = currentUserId
+  if (userId === null) return
+  await withSendLock(userId, () =>
+    updateItem(id, item =>
+      item.userId === currentUserId && item.userId === userId
+        ? { ...item, status: 'pending', lastError: undefined }
+        : item
+    )
+  )
+}
+
+/** Keep later operations in place: their references must be resolved explicitly. */
+export async function discardPending(id: string) {
+  const userId = currentUserId
+  if (userId === null) return
+  await withSendLock(userId, async () => {
+    await withOutboxLock(STORAGE_LOCK, async () => {
+      if (currentUserId !== userId) throw new Error('The session changed.')
+      const all = readAll()
+      const item = all.find(value => value.id === id && value.userId === userId)
+      if (!item) return
+      const body = item.body ? JSON.parse(item.body) : {}
+      const reference = body.id ?? body.clientId
+      if (
+        item.method === 'POST' &&
+        reference &&
+        all.some(
+          value =>
+            value.id !== id &&
+            value.userId === userId &&
+            (value.body?.includes(reference) || value.path.includes(reference))
+        )
+      )
+        throw new Error('Discard dependent changes first, then discard this creation.')
+      writeAll(all.filter(value => value !== item))
+    })
+  })
 }
 
 export function flushOutbox(

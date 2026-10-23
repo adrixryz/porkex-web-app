@@ -3,6 +3,7 @@
     <UpdateNotice />
     <UndoNotice />
     <AppSnackbar />
+    <SyncCenter />
     <div v-if="route.name === 'login'" class="fill-height">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -28,6 +29,17 @@
           />
           <span class="text-h6 font-weight-medium text-on-surface">Porkex</span>
         </div>
+        <template #append
+          ><v-badge
+            :content="localPendingCount"
+            :model-value="localPendingCount > 0"
+            color="warning"
+            class="mr-4"
+            ><AppIconButton
+              :icon="mdiSync"
+              label="Pending changes"
+              @click="syncCenterOpen = true" /></v-badge
+        ></template>
       </v-app-bar>
 
       <!-- NAVIGATION DRAWER -->
@@ -162,6 +174,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import UpdateNotice from '@/components/UpdateNotice.vue'
+import SyncCenter from '@/components/SyncCenter.vue'
+import AppIconButton from '@/components/ui/AppIconButton.vue'
+import { localPendingCount, syncCenterOpen } from '@/composables/useSyncCenter'
 import UndoNotice from '@/components/UndoNotice.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
@@ -181,6 +196,7 @@ import {
 import { startRecovery } from '@/utils/recovery'
 import type { User } from '@/types'
 import {
+  mdiSync,
   mdiAccountCircleOutline,
   mdiChartBar,
   mdiPiggyBankOutline,

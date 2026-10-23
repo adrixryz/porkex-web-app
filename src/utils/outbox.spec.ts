@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import {
+  revisePending,
+  discardPending,
+  ownedPending,
   claimLegacyOutbox,
   discardFirstBlocked,
   enqueue,
@@ -228,5 +231,31 @@ describe('HTTP outcomes and explicit recovery', () => {
     await flushOutbox(async () => response(status))
     expect(pendingCount.value).toBe(1)
     expect(firstBlockedMutation.value).toBeNull()
+  })
+})
+
+describe('sync center safety', () => {
+  it('records a network attempt and protects its original payload', async () => {
+    await enqueue(item())
+    await flushOutbox(async () => {
+      throw new TypeError('Offline')
+    })
+    expect(ownedPending(1)[0]).toMatchObject({ attempts: 1, outcome: 'unknown' })
+    await expect(revisePending('a', '{"amount":2}')).rejects.toThrow('outcome is unknown')
+  })
+  it('allows correction after a definitive rejection', async () => {
+    await enqueue(item())
+    await flushOutbox(async () => response(400))
+    await revisePending('a', '{"amount":2}')
+    expect(ownedPending(1)[0]).toMatchObject({ status: 'pending', body: '{"amount":2}' })
+  })
+  it('requires dependents to be removed explicitly before their parent', async () => {
+    await enqueue(item({ body: '{"id":"account-1"}' }))
+    await enqueue(item({ id: 'b', body: '{"accountId":"account-1"}' }))
+    await expect(discardPending('a')).rejects.toThrow('dependent')
+    expect(ownedPending(1)).toHaveLength(2)
+    await discardPending('b')
+    await discardPending('a')
+    expect(ownedPending(1)).toHaveLength(0)
   })
 })

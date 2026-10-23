@@ -53,6 +53,7 @@
 
       <AppSelect
         v-model="form.accountId"
+        :readonly="!!occurrence"
         :items="activeAccounts"
         item-title="name"
         item-value="id"
@@ -153,6 +154,10 @@ const props = withDefaults(
   {
     type: 'EXPENSE',
     transaction: null,
+    draft: null,
+    favorite: null,
+    favoriteMode: false,
+    defaultAccountId: undefined,
     categories: () => [],
     occurrence: undefined
   }
@@ -235,7 +240,7 @@ const reset = () => {
   const tx = props.transaction
   const source = tx ?? props.favorite ?? props.draft
   form.value = {
-    name: props.favorite?.name ?? source?.comment ?? '',
+    name: (props.favorite?.name ?? source?.comment ?? '').slice(0, 60),
     accountId: source?.accountId ?? props.defaultAccountId ?? `main-${getUser()?.id}`,
     amount: source ? String(source.amount) : '',
     description: source?.comment ?? tx?.description ?? '',

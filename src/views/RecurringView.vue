@@ -264,6 +264,7 @@ function editNext(rule: RecurringRule) {
   const exception = rule.nextException
   nextTransaction.value = {
     id: 0,
+    accountId: rule.accountId,
     type: rule.type,
     userId: rule.userId,
     amount: exception?.amount ?? rule.amount,

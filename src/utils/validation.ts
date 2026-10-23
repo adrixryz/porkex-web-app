@@ -43,7 +43,12 @@ export function mutationError(path: string, method: string, body: string | null)
         return 'Name must contain 1–60 characters.'
       if (
         payload.openingBalance !== undefined &&
-        !(Number(payload.openingBalance) === 0 || validAmount(payload.openingBalance))
+        !(
+          (typeof payload.openingBalance === 'number' ||
+            typeof payload.openingBalance === 'string') &&
+          (/^0(?:\.0{1,2})?$/.test(String(payload.openingBalance).trim()) ||
+            validAmount(payload.openingBalance))
+        )
       )
         return 'Enter a nonnegative opening balance with up to two decimals.'
     } else {

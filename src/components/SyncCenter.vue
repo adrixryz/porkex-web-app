@@ -142,7 +142,7 @@
     <AppSelect
       v-if="'type' in draft"
       v-model="draft.type"
-      :items="['INCOME', 'EXPENSE']"
+      :items="['Income', 'Expense']"
       label="Type"
     />
     <AppSelect

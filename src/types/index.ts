@@ -1,7 +1,7 @@
 // Shapes returned by the Porkex API. They mirror the routes in
 // porkex-backend/src/routes (see api.ts and auth.ts).
 
-export type TxType = 'INCOME' | 'EXPENSE'
+export type TxType = 'Income' | 'Expense'
 
 export interface Account {
   isGoal?: boolean

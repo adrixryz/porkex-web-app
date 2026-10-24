@@ -577,7 +577,7 @@ test('offline filters use only their own saved rows', async ({ page, context }) 
     rows: [
       {
         id: 1,
-        type: 'EXPENSE',
+        type: 'Expense',
         amount: 10,
         description: 'Expense row',
         date,
@@ -587,7 +587,7 @@ test('offline filters use only their own saved rows', async ({ page, context }) 
       },
       {
         id: 2,
-        type: 'INCOME',
+        type: 'Income',
         amount: 20,
         description: 'Income row',
         date,
@@ -856,7 +856,7 @@ test('undo survives navigation and an expired deletion survives reload', async (
       {
         id: 1,
         amount: 10,
-        type: 'EXPENSE',
+        type: 'Expense',
         categoryId: 1,
         description: 'Undo me',
         date,
@@ -909,7 +909,7 @@ async function seedToggleRule(page: Page) {
         id: 1,
         userId: 1,
         categoryId: 1,
-        type: 'EXPENSE',
+        type: 'Expense',
         amount: 10,
         description: 'Regular',
         frequency: 'DAY',
@@ -918,7 +918,7 @@ async function seedToggleRule(page: Page) {
         nextDate: '2090-01-01T00:00:00.000Z',
         endDate: null,
         active: true,
-        category: { id: 1, name: 'Food', color: '#EA4335', type: 'EXPENSE' }
+        category: { id: 1, name: 'Food', color: '#EA4335', type: 'Expense' }
       }
     ]
   })
@@ -1020,7 +1020,7 @@ test('next-only edit and skip preserve the rule base and target exact dates', as
         id: 1,
         userId: 1,
         categoryId: 1,
-        type: 'EXPENSE',
+        type: 'Expense',
         amount: 10,
         description: 'Regular',
         frequency: 'DAY',
@@ -1029,7 +1029,7 @@ test('next-only edit and skip preserve the rule base and target exact dates', as
         nextDate: next,
         endDate: null,
         active: true,
-        category: { id: 1, name: 'Food', color: '#EA4335', type: 'EXPENSE' }
+        category: { id: 1, name: 'Food', color: '#EA4335', type: 'Expense' }
       }
     ]
   })
@@ -1073,7 +1073,7 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
       {
         id: 1,
         amount: 123456.78,
-        type: 'EXPENSE',
+        type: 'Expense',
         description:
           'A longer comment that must stay between the category information and the amount without overlapping anything.',
         tags,
@@ -1393,7 +1393,7 @@ test('recent transaction comments and amounts align in fixed columns', async ({ 
         category: { name: 'Transport', color: '#FBBC04' }
       },
       { id: 4, amount: 10000000, description: '', category: { name: 'Food', color: '#EA4335' } }
-    ].map(row => ({ ...row, type: 'EXPENSE', categoryId: 1, date, createdAt: date }))
+    ].map(row => ({ ...row, type: 'Expense', categoryId: 1, date, createdAt: date }))
   })
   await page.goto('/')
   await expect(page.getByText('Morning coffee', { exact: true })).toBeVisible()
@@ -1433,7 +1433,7 @@ test('another tab can undo the same scheduled deletion before it is sent', async
     rows: [
       {
         id: 1,
-        type: 'EXPENSE',
+        type: 'Expense',
         amount: 10,
         description: 'Shared undo',
         categoryId: 1,
@@ -1467,7 +1467,7 @@ test('Undo acknowledges durable cancellation before reload when another tab hold
     rows: [
       {
         id: 1,
-        type: 'EXPENSE',
+        type: 'Expense',
         amount: 10,
         description: 'Locked undo',
         categoryId: 1,

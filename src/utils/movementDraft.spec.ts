@@ -11,7 +11,7 @@ it('copies editable fields without identity, date, edit metadata or recurring li
     accountId: 'cash',
     categoryId: 2,
     amount: 8,
-    type: 'EXPENSE',
+    type: 'Expense',
     description: 'Lunch',
     tags: [{ id: 'food' }]
   } as unknown as Transaction
@@ -19,7 +19,7 @@ it('copies editable fields without identity, date, edit metadata or recurring li
     accountId: 'cash',
     categoryId: 2,
     amount: 8,
-    type: 'EXPENSE',
+    type: 'Expense',
     comment: 'Lunch',
     tagIds: ['food']
   })

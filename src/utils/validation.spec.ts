@@ -24,14 +24,14 @@ describe('local mutation validation', () => {
     await expect(
       api('/transactions', {
         method: 'POST',
-        body: '{"amount":10000001,"type":"EXPENSE","categoryId":1}'
+        body: '{"amount":10000001,"type":"Expense","categoryId":1}'
       })
     ).rejects.toThrow('Amount')
     expect(send).not.toHaveBeenCalled()
     expect(localStorage.getItem('porkex_outbox')).toBeNull()
   })
   it('checks real dates, recurrence bounds and unique tags', () => {
-    const base = { amount: 1, type: 'EXPENSE', categoryId: 1 }
+    const base = { amount: 1, type: 'Expense', categoryId: 1 }
     expect(
       mutationError('/transactions', 'POST', JSON.stringify({ ...base, date: '2026-02-31' }))
     ).toContain('date')

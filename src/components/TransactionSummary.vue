@@ -1,7 +1,7 @@
 <template>
   <div class="summary-row">
     <v-avatar :color="transaction.category?.color || '#777777'" variant="tonal" size="36"
-      ><v-icon :icon="transaction.type === 'INCOME' ? mdiCashPlus : mdiCashMinus"
+      ><v-icon :icon="transaction.type === 'Income' ? mdiCashPlus : mdiCashMinus"
     /></v-avatar>
     <div class="summary-meta">
       <div class="text-white text-body-2 text-truncate">
@@ -30,9 +30,9 @@
     <div class="summary-comment text-caption" :title="comment">{{ comment }}</div>
     <div
       class="summary-amount"
-      :class="transaction.type === 'INCOME' ? 'text-success' : 'text-error'"
+      :class="transaction.type === 'Income' ? 'text-success' : 'text-error'"
     >
-      {{ transaction.type === 'INCOME' ? '+' : '-' }}{{ cs }}{{ formatMoney(transaction.amount)
+      {{ transaction.type === 'Income' ? '+' : '-' }}{{ cs }}{{ formatMoney(transaction.amount)
       }}<slot name="actions" />
     </div>
   </div>

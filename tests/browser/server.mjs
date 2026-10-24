@@ -37,8 +37,8 @@ function state(key) {
 }
 const user = { id: 1, name: 'Personal', email: 'owner@example.com', currency: 'USD' }
 const categories = [
-  { id: 1, userId: 1, name: 'Food', type: 'EXPENSE', color: '#EA4335' },
-  { id: 2, userId: 1, name: 'Salary', type: 'INCOME', color: '#34A853' }
+  { id: 1, userId: 1, name: 'Food', type: 'Expense', color: '#EA4335' },
+  { id: 2, userId: 1, name: 'Salary', type: 'Income', color: '#34A853' }
 ].map(c => ({
   ...c,
   total: 0,
@@ -266,10 +266,10 @@ const server = createServer(async (req, res) => {
         )
       if (url.pathname === '/api/dashboard') {
         const totalExpense = db.rows
-          .filter(r => r.type === 'EXPENSE')
+          .filter(r => r.type === 'Expense')
           .reduce((sum, r) => sum + r.amount, 0)
         const totalIncome = db.rows
-          .filter(r => r.type === 'INCOME')
+          .filter(r => r.type === 'Income')
           .reduce((sum, r) => sum + r.amount, 0)
         return json(
           res,

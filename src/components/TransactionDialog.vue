@@ -142,7 +142,7 @@ import type { Category, Transaction, MovementDraft, Favorite } from '@/types'
 const props = withDefaults(
   defineProps<{
     modelValue: boolean
-    type?: 'INCOME' | 'EXPENSE'
+    type?: 'Income' | 'Expense'
     transaction?: Transaction | null
     draft?: MovementDraft | null
     favorite?: Favorite | null
@@ -152,7 +152,7 @@ const props = withDefaults(
     occurrence?: { ruleId: number; date: string }
   }>(),
   {
-    type: 'EXPENSE',
+    type: 'Expense',
     transaction: null,
     draft: null,
     favorite: null,
@@ -202,7 +202,7 @@ const {
 })
 
 const isEditing = computed(() => !!props.transaction || (props.favoriteMode && !!props.favorite))
-const isIncome = computed(() => props.type === 'INCOME')
+const isIncome = computed(() => props.type === 'Income')
 
 const title = computed(() =>
   props.favoriteMode
@@ -213,7 +213,7 @@ const title = computed(() =>
       ? 'Edit next occurrence'
       : isEditing.value
         ? 'Edit Transaction'
-        : props.type === 'INCOME'
+        : props.type === 'Income'
           ? 'New Income'
           : 'New Expense'
 )

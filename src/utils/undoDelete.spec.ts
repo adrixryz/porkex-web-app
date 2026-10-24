@@ -14,7 +14,7 @@ const row = (id: number): Transaction => ({
   id,
   amount: 10,
   description: '',
-  type: 'EXPENSE',
+  type: 'Expense',
   date: '2026-10-17',
   createdAt: '2026-10-17',
   categoryId: 1,

@@ -14,7 +14,7 @@ const CATEGORIES: Category[] = [
   {
     id: 1,
     name: 'Housing',
-    type: 'EXPENSE',
+    type: 'Expense',
     color: '#5F6368',
     userId: 1,
     transactionCount: 0,
@@ -26,7 +26,7 @@ const CATEGORIES: Category[] = [
   {
     id: 2,
     name: 'Salary',
-    type: 'INCOME',
+    type: 'Income',
     color: '#34A853',
     userId: 1,
     transactionCount: 0,
@@ -41,7 +41,7 @@ const RULE: RecurringRule = {
   id: 7,
   userId: 1,
   categoryId: 1,
-  type: 'EXPENSE',
+  type: 'Expense',
   amount: 800,
   description: 'Rent',
   frequency: 'MONTH',
@@ -52,7 +52,7 @@ const RULE: RecurringRule = {
   active: true,
   createdAt: '2026-01-31T10:00:00.000Z',
   updatedAt: '2026-01-31T10:00:00.000Z',
-  category: { id: 1, name: 'Housing', color: '#5F6368', type: 'EXPENSE' }
+  category: { id: 1, name: 'Housing', color: '#5F6368', type: 'Expense' }
 }
 
 // Vuetify is stubbed down to what the assertions need.
@@ -185,7 +185,7 @@ describe('RecurringDialog form', () => {
     expect(post).toBeTruthy()
     const body = JSON.parse((post![1] as RequestInit).body as string)
     expect(body).toMatchObject({
-      type: 'EXPENSE',
+      type: 'Expense',
       amount: 25,
       description: 'Rent',
       categoryId: 1,
@@ -285,17 +285,17 @@ describe('RecurringDialog form', () => {
     const incomeRule: RecurringRule = {
       ...RULE,
       id: 8,
-      type: 'INCOME',
+      type: 'Income',
       categoryId: 2,
       description: 'Salary',
-      category: { id: 2, name: 'Salary', color: '#34A853', type: 'INCOME' }
+      category: { id: 2, name: 'Salary', color: '#34A853', type: 'Income' }
     }
     const wrapper = await openDialog(incomeRule)
     const vm = wrapper.vm as unknown as { form: { value?: unknown } }
     const form = unwrap(vm.form) as Record<string, unknown>
 
     // The type toggle must not mistake the edit prefill for a user switch.
-    expect(form.type).toBe('INCOME')
+    expect(form.type).toBe('Income')
     expect(form.categoryId).toBe(2)
     vi.unstubAllGlobals()
   })

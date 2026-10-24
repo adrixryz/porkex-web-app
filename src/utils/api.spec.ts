@@ -19,11 +19,11 @@ import { deferred, installTestLocks } from './locks.test-helper'
 function api(path: string, options: RequestInit = {}) {
   if (typeof options.body === 'string') {
     const defaults = path.startsWith('/transactions')
-      ? { amount: 10, type: 'EXPENSE', categoryId: 1 }
+      ? { amount: 10, type: 'Expense', categoryId: 1 }
       : path.startsWith('/recurring')
         ? {
             amount: 10,
-            type: 'EXPENSE',
+            type: 'Expense',
             categoryId: 1,
             frequency: 'MONTH',
             startDate: '2020-01-01'
@@ -31,7 +31,7 @@ function api(path: string, options: RequestInit = {}) {
         : path.startsWith('/budgets')
           ? { amount: 50, categoryId: 4, period: 'MONTH' }
           : path.startsWith('/categories')
-            ? { name: 'Food', type: 'EXPENSE' }
+            ? { name: 'Food', type: 'Expense' }
             : {}
     options = { ...options, body: JSON.stringify({ ...defaults, ...JSON.parse(options.body) }) }
   }
@@ -93,7 +93,7 @@ describe('writes that never reach the server are queued', () => {
 
     const res = await api('/transactions', {
       method: 'POST',
-      body: JSON.stringify({ amount: 10, type: 'EXPENSE' })
+      body: JSON.stringify({ amount: 10, type: 'Expense' })
     })
 
     expect(res.status).toBe(202)
@@ -200,7 +200,7 @@ describe('the idempotency key', () => {
 
     await api('/transactions', {
       method: 'POST',
-      body: JSON.stringify({ amount: 12.34, type: 'EXPENSE' })
+      body: JSON.stringify({ amount: 12.34, type: 'Expense' })
     })
 
     const firstId = JSON.parse(sentBodies[0]).clientId

@@ -91,7 +91,7 @@ export function mutationError(path: string, method: string, body: string | null)
     return 'Amount must be positive, at most 10,000,000 and have at most two decimal places.'
   if (
     (movement || favorite || rule || category) &&
-    !['INCOME', 'EXPENSE'].includes(String(data.type))
+    !['Income', 'Expense'].includes(String(data.type))
   )
     return 'Choose income or expense.'
   if (

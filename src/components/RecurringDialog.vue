@@ -24,8 +24,8 @@
         class="w-100 mb-4"
         aria-label="Rule type"
       >
-        <v-btn value="EXPENSE" class="flex-grow-1">Expense</v-btn>
-        <v-btn value="INCOME" class="flex-grow-1">Income</v-btn>
+        <v-btn value="Expense" class="flex-grow-1">Expense</v-btn>
+        <v-btn value="Income" class="flex-grow-1">Income</v-btn>
       </v-btn-toggle>
 
       <AppTextField
@@ -194,7 +194,7 @@ const cs = useCurrencySymbol()
 const { activeAccounts, run: fetchAccounts } = useAccounts()
 const form = ref({
   accountId: '',
-  type: 'EXPENSE' as TxType,
+  type: 'Expense' as TxType,
   amount: '',
   description: '',
   categoryId: null as number | null,
@@ -223,7 +223,7 @@ const {
 })
 
 const isEditing = computed(() => !!props.rule)
-const isIncome = computed(() => form.value.type === 'INCOME')
+const isIncome = computed(() => form.value.type === 'Income')
 const categoryOptions = computed(() => categories.value.filter(c => c.type === form.value.type))
 
 const frequencyOptions = [
@@ -274,7 +274,7 @@ const reset = () => {
   const rule = props.rule
   form.value = {
     accountId: rule?.accountId ?? `main-${getUser()?.id}`,
-    type: rule?.type ?? 'EXPENSE',
+    type: rule?.type ?? 'Expense',
     amount: rule ? String(rule.amount) : '',
     description: rule?.description ?? '',
     categoryId: rule?.categoryId ?? null,

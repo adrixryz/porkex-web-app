@@ -171,11 +171,11 @@ test('correcting the device clock retries the same edit through the real API', a
   const { token, user } = await registration.json()
   const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
   const categories = await (await page.request.get('/api/categories', { headers })).json()
-  const categoryId = categories.find((item: { type: string }) => item.type === 'EXPENSE').id
+  const categoryId = categories.find((item: { type: string }) => item.type === 'Expense').id
   const movement = await (
     await page.request.post('/api/transactions', {
       headers,
-      data: { amount: 10, type: 'EXPENSE', categoryId, comment: 'Clock correction' }
+      data: { amount: 10, type: 'Expense', categoryId, comment: 'Clock correction' }
     })
   ).json()
   await page.addInitScript(
@@ -286,8 +286,8 @@ test('delayed phone edit keeps a newer server edit and drains the real queue', a
   const { token, user } = await registration.json()
   const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
   const categories = await (await page.request.get('/api/categories', { headers })).json()
-  const categoryId = categories.find((item: { type: string }) => item.type === 'EXPENSE').id
-  const payload = { amount: 10, type: 'EXPENSE', categoryId, comment: 'Device edit order' }
+  const categoryId = categories.find((item: { type: string }) => item.type === 'Expense').id
+  const payload = { amount: 10, type: 'Expense', categoryId, comment: 'Device edit order' }
   const movement = await (
     await page.request.post('/api/transactions', { headers, data: payload })
   ).json()
@@ -345,13 +345,13 @@ test('real analytics totals, net results and averages reach the income and expen
   const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
   const categories = await (await page.request.get('/api/categories', { headers })).json()
   for (const [date, type, amount] of [
-    ['2023-12-01', 'EXPENSE', 999],
-    ['2024-01-01', 'INCOME', 100.1],
-    ['2024-01-02', 'INCOME', 0.2],
-    ['2024-01-01', 'EXPENSE', 40.1],
-    ['2024-01-02', 'EXPENSE', 0.2],
-    ['2024-02-01', 'EXPENSE', 90.99],
-    ['2024-03-01', 'INCOME', 200.05]
+    ['2023-12-01', 'Expense', 999],
+    ['2024-01-01', 'Income', 100.1],
+    ['2024-01-02', 'Income', 0.2],
+    ['2024-01-01', 'Expense', 40.1],
+    ['2024-01-02', 'Expense', 0.2],
+    ['2024-02-01', 'Expense', 90.99],
+    ['2024-03-01', 'Income', 200.05]
   ] as const) {
     const category = categories.find((item: { type: string }) => item.type === type)
     const response = await page.request.post('/api/transactions', {
@@ -537,7 +537,7 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   const response = await page.request.post('/api/recurring', {
     headers,
     data: {
-      type: 'EXPENSE',
+      type: 'Expense',
       amount: 10,
       description: ruleName,
       categoryId: movement.categoryId,
@@ -708,7 +708,7 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
     headers,
     data: {
       clientId: crypto.randomUUID(),
-      type: 'EXPENSE',
+      type: 'Expense',
       amount: 12,
       categoryId: food.id,
       accountId: `main-${user.id}`,

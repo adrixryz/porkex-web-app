@@ -13,7 +13,7 @@ const CATEGORIES: Category[] = [
   {
     id: 1,
     name: 'Food',
-    type: 'EXPENSE',
+    type: 'Expense',
     color: '#EA4335',
     userId: 1,
     transactionCount: 0,
@@ -25,7 +25,7 @@ const CATEGORIES: Category[] = [
   {
     id: 2,
     name: 'Freelance',
-    type: 'INCOME',
+    type: 'Income',
     color: '#4285F4',
     userId: 1,
     transactionCount: 0,
@@ -66,7 +66,7 @@ const networkDown = () =>
 
 async function openDialog() {
   const wrapper = mount(TransactionDialog, {
-    props: { modelValue: false, type: 'EXPENSE' },
+    props: { modelValue: false, type: 'Expense' },
     global: { stubs }
   })
   await wrapper.setProps({ modelValue: true })
@@ -156,12 +156,12 @@ it('edits the pinned next occurrence through its own endpoint', async () => {
     const wrapper = mount(TransactionDialog, {
       props: {
         modelValue: false,
-        type: 'EXPENSE',
+        type: 'Expense',
         occurrence: { ruleId: 7, date: '2090-01-01' },
         transaction: {
           id: 0,
           amount: 10,
-          type: 'EXPENSE',
+          type: 'Expense',
           categoryId: 1,
           category: null,
           description: '',
@@ -214,12 +214,12 @@ it.each([
     const wrapper = mount(TransactionDialog, {
       props: {
         modelValue: false,
-        type: 'EXPENSE',
+        type: 'Expense',
         categories: CATEGORIES,
         transaction: {
           id: 1,
           amount: 10,
-          type: 'EXPENSE',
+          type: 'Expense',
           categoryId: 1,
           category: null,
           description: 'Lunch',

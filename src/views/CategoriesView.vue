@@ -45,8 +45,8 @@
             variant="outlined"
             aria-label="Filter by type"
           >
-            <v-btn value="EXPENSE">Expense</v-btn>
-            <v-btn value="INCOME">Income</v-btn>
+            <v-btn value="Expense">Expense</v-btn>
+            <v-btn value="Income">Income</v-btn>
           </v-btn-toggle>
 
           <v-spacer class="d-none d-sm-block"></v-spacer>
@@ -81,10 +81,10 @@
                   <div class="d-flex align-center ga-2 mt-1">
                     <v-chip
                       size="x-small"
-                      :color="cat.type === 'INCOME' ? 'success' : 'error'"
+                      :color="cat.type === 'Income' ? 'success' : 'error'"
                       variant="tonal"
                     >
-                      {{ cat.type === 'INCOME' ? 'Income' : 'Expense' }}
+                      {{ cat.type === 'Income' ? 'Income' : 'Expense' }}
                     </v-chip>
                     <span class="text-caption text-on-surface-variant">
                       {{ cat.transactionCount }} movement{{ cat.transactionCount === 1 ? '' : 's' }}
@@ -112,7 +112,7 @@
               <span class="text-caption text-on-surface-variant">Total {{ periodLabel }}</span>
               <span
                 class="text-subtitle-1 font-weight-bold"
-                :class="cat.type === 'INCOME' ? 'text-success' : 'text-error'"
+                :class="cat.type === 'Income' ? 'text-success' : 'text-error'"
               >
                 {{ cs }}{{ formatMoney(cat.total) }}
               </span>
@@ -154,7 +154,7 @@
         ></AppTextField>
         <AppSelect
           v-model="catForm.type"
-          :items="['INCOME', 'EXPENSE']"
+          :items="['Income', 'Expense']"
           label="Type"
           class="mb-2"
         ></AppSelect>
@@ -286,8 +286,8 @@ const dialog = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
 const submitting = ref(false)
-const filterType = ref('EXPENSE')
-const filterLabel = computed(() => (filterType.value === 'INCOME' ? 'income' : 'expense'))
+const filterType = ref('Expense')
+const filterLabel = computed(() => (filterType.value === 'Income' ? 'income' : 'expense'))
 const period = ref<PeriodFilter>(getDefaultPeriod())
 const periodLabel = computed(() =>
   period.value === 'day'
@@ -298,7 +298,7 @@ const periodLabel = computed(() =>
         ? 'this month'
         : 'this year'
 )
-const catForm = ref({ name: '', type: 'EXPENSE', color: '#EA4335' })
+const catForm = ref({ name: '', type: 'Expense', color: '#EA4335' })
 const clientId = ref('')
 const cleanForm = ref('')
 useUnsavedChanges(

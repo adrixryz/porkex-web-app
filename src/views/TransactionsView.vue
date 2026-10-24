@@ -38,10 +38,10 @@
       <AppPageHeader title="Transactions">
         <template #actions>
           <AppButton @click="favoritesOpen = true">Favorites</AppButton>
-          <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('EXPENSE')">
+          <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('Expense')">
             Expense
           </AppButton>
-          <AppButton color="success" :prepend-icon="mdiPlus" @click="openDialog('INCOME')">
+          <AppButton color="success" :prepend-icon="mdiPlus" @click="openDialog('Income')">
             Income
           </AppButton>
         </template>
@@ -139,8 +139,8 @@
                 aria-label="Filter by type"
               >
                 <v-btn value="ALL">All</v-btn>
-                <v-btn value="EXPENSE">Expense</v-btn>
-                <v-btn value="INCOME">Income</v-btn>
+                <v-btn value="Expense">Expense</v-btn>
+                <v-btn value="Income">Income</v-btn>
               </v-btn-toggle>
 
               <CategorySelect
@@ -231,7 +231,7 @@
                 closable
                 @click:close="filterType = 'ALL'"
               >
-                {{ filterType === 'INCOME' ? 'Income' : 'Expense' }}
+                {{ filterType === 'Income' ? 'Income' : 'Expense' }}
               </v-chip>
               <v-chip
                 v-if="filterCategory !== null"
@@ -425,9 +425,9 @@
                       </td>
                       <td
                         class="text-right font-weight-bold"
-                        :class="tx.type === 'INCOME' ? 'text-success' : 'text-error'"
+                        :class="tx.type === 'Income' ? 'text-success' : 'text-error'"
                       >
-                        {{ tx.type === 'INCOME' ? '+' : '-' }}{{ cs }}{{ formatMoney(tx.amount) }}
+                        {{ tx.type === 'Income' ? '+' : '-' }}{{ cs }}{{ formatMoney(tx.amount) }}
                       </td>
                       <td class="text-center">
                         <AppIconButton
@@ -477,7 +477,7 @@
                       color="error"
                       variant="outlined"
                       :prepend-icon="mdiMinus"
-                      @click="openDialog('EXPENSE')"
+                      @click="openDialog('Expense')"
                     >
                       Add expense
                     </AppButton>
@@ -485,7 +485,7 @@
                       color="success"
                       variant="outlined"
                       :prepend-icon="mdiPlus"
-                      @click="openDialog('INCOME')"
+                      @click="openDialog('Income')"
                     >
                       Add income
                     </AppButton>
@@ -603,12 +603,12 @@ const cs = useCurrencySymbol()
 const { showSnack } = useSnackbar()
 
 const dialog = ref(false)
-const dialogType = ref<'INCOME' | 'EXPENSE'>('EXPENSE')
+const dialogType = ref<'Income' | 'Expense'>('Expense')
 const editingTx = ref<Transaction | null>(null)
 
 // Search, filters, sorting & pagination (server-side)
 const searchQuery = ref('')
-const filterType = ref<'ALL' | 'INCOME' | 'EXPENSE'>('ALL')
+const filterType = ref<'ALL' | 'Income' | 'Expense'>('ALL')
 const filterTag = ref<string | null>(null)
 const { tags: tagCatalog } = useTags()
 const selectedTagName = computed(
@@ -800,7 +800,7 @@ const periodLabel = computed(() => {
 
 // ── Filters mirrored in the URL ───────────────────────────────────────────
 // They survive a reload, can be bookmarked and the Back button works.
-const TYPES = ['ALL', 'INCOME', 'EXPENSE'] as const
+const TYPES = ['ALL', 'Income', 'Expense'] as const
 
 function readRouteQuery() {
   const q = route.query
@@ -967,7 +967,7 @@ function duplicate(tx: Transaction, favorite = false) {
   dialogType.value = tx.type
   dialog.value = true
 }
-const openDialog = (type: 'INCOME' | 'EXPENSE') => {
+const openDialog = (type: 'Income' | 'Expense') => {
   editingTx.value = null
   draft.value = null
   favoriteMode.value = false

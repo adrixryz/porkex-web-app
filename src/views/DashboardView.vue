@@ -96,10 +96,10 @@
           </h1>
         </template>
         <template #actions>
-          <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('EXPENSE')">
+          <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('Expense')">
             Expense
           </AppButton>
-          <AppButton color="success" :prepend-icon="mdiPlus" @click="openDialog('INCOME')">
+          <AppButton color="success" :prepend-icon="mdiPlus" @click="openDialog('Income')">
             Income
           </AppButton>
         </template>
@@ -166,7 +166,7 @@
                       color="error"
                       variant="outlined"
                       :prepend-icon="mdiMinus"
-                      @click="openDialog('EXPENSE')"
+                      @click="openDialog('Expense')"
                     >
                       Add expense
                     </AppButton>
@@ -174,7 +174,7 @@
                       color="success"
                       variant="outlined"
                       :prepend-icon="mdiPlus"
-                      @click="openDialog('INCOME')"
+                      @click="openDialog('Income')"
                     >
                       Add income
                     </AppButton>
@@ -352,7 +352,7 @@ const cs = useCurrencySymbol()
 const { showSnack } = useSnackbar()
 
 const dialog = ref(false)
-const dialogType = ref<'INCOME' | 'EXPENSE'>('EXPENSE')
+const dialogType = ref<'Income' | 'Expense'>('Expense')
 
 const EMPTY_DASHBOARD: DashboardResponse = {
   globalBalance: 0,
@@ -488,7 +488,7 @@ const loadDashboard = async () => {
   if (dbError.value) showSnack(dbError.value, 'error')
 }
 
-const openDialog = (type: 'INCOME' | 'EXPENSE') => {
+const openDialog = (type: 'Income' | 'Expense') => {
   dialogType.value = type
   dialog.value = true
 }

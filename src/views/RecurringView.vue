@@ -78,9 +78,9 @@
             <div class="d-flex align-baseline justify-space-between">
               <span
                 class="text-h6 font-weight-bold"
-                :class="r.type === 'INCOME' ? 'text-success' : 'text-error'"
+                :class="r.type === 'Income' ? 'text-success' : 'text-error'"
               >
-                {{ r.type === 'INCOME' ? '+' : '-' }}{{ cs }}{{ formatMoney(r.amount) }}
+                {{ r.type === 'Income' ? '+' : '-' }}{{ cs }}{{ formatMoney(r.amount) }}
               </span>
               <span v-if="!isEnded(r)" class="text-body-2 text-on-surface-variant">
                 Next: {{ formatDateOnly(r.nextDate) }}

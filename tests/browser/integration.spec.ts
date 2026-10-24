@@ -1,3 +1,4 @@
+import { quickAction } from './actions'
 import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 
@@ -29,7 +30,7 @@ test('Danger Zone confirmation revokes the phone session and preserves its offli
     await phone.addInitScript(init, { token, user })
     const mobile = await phone.newPage()
     await mobile.goto('http://localhost:4178/transactions')
-    await mobile.getByRole('button', { name: 'Expense', exact: true }).first().click()
+    await quickAction(mobile, 'Expense')
     const draft = mobile.getByRole('dialog')
     await draft.getByLabel('Amount', { exact: true }).fill('13')
     await draft.getByLabel('Comment (optional)', { exact: true }).fill('Offline phone change')
@@ -170,6 +171,14 @@ test('correcting the device clock retries the same edit through the real API', a
   })
   const { token, user } = await registration.json()
   const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 1000 }
+      })
+    ).status()
+  ).toBe(200)
   const categories = await (await page.request.get('/api/categories', { headers })).json()
   const categoryId = categories.find((item: { type: string }) => item.type === 'Expense').id
   const movement = await (
@@ -285,6 +294,14 @@ test('delayed phone edit keeps a newer server edit and drains the real queue', a
   })
   const { token, user } = await registration.json()
   const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 1000 }
+      })
+    ).status()
+  ).toBe(200)
   const categories = await (await page.request.get('/api/categories', { headers })).json()
   const categoryId = categories.find((item: { type: string }) => item.type === 'Expense').id
   const payload = { amount: 10, type: 'Expense', categoryId, comment: 'Device edit order' }
@@ -343,7 +360,20 @@ test('real analytics totals, net results and averages reach the income and expen
   expect(registration.status()).toBe(201)
   const { token, user } = await registration.json()
   const headers = { Authorization: `Bearer ${token}`, 'X-Porkex-Time-Zone': 'America/Lima' }
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 1000 }
+      })
+    ).status()
+  ).toBe(200)
   const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const funding = await page.request.put(`/api/accounts/main-${user.id}`, {
+    headers,
+    data: { openingBalance: 2000 }
+  })
+  expect(funding.status()).toBe(200)
   for (const [date, type, amount] of [
     ['2023-12-01', 'Expense', 999],
     ['2024-01-01', 'Income', 100.1],
@@ -436,7 +466,7 @@ test('real API and temporary SQLite confirm a replay exactly once', async ({
   await page.goto('/transactions')
   await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
   await context.setOffline(true)
-  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  await quickAction(page, 'Expense')
   const dialog = page.getByRole('dialog')
   const description = `SQLite ${info.project.name}`
   await dialog.getByLabel('Amount', { exact: true }).fill('18.76')
@@ -486,19 +516,17 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   }
   const tagName = `Real ${info.project.name}`
   await page.goto('/transactions')
-  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  await quickAction(page, 'Expense')
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Amount', { exact: true }).fill('29.18')
   await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name: 'Food', exact: true }).click()
   await dialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
-  const manager = page
-    .getByRole('dialog')
-    .filter({ has: page.getByText('Edit tags', { exact: true }) })
+  const manager = page.getByRole('dialog', { name: 'Edit tags', exact: true })
   await manager.getByLabel('New tag name', { exact: true }).fill(tagName)
   await manager.getByLabel('New tag name', { exact: true }).press('Enter')
   await expect(manager.getByLabel(`Tag name ${tagName}`, { exact: true })).toBeVisible()
-  await manager.getByRole('button', { name: 'Done', exact: true }).click()
+  await manager.getByRole('button', { name: 'Close dialog', exact: true }).click()
   await dialog.getByRole('button', { name: tagName, exact: true }).click()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).not.toBeVisible()
@@ -517,7 +545,8 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
   )
   expect(movement.comment).toBe('')
   expect(movement.amount).toBe(29.18)
-  await row.getByRole('button', { name: /^Delete/ }).click()
+  await row.getByRole('button', { name: 'Movement shortcuts', exact: true }).click()
+  await page.getByText('Delete', { exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
   await expect
@@ -599,7 +628,7 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
     )
     .toBe('2090-01-02T00:00:00.000Z')
   await page.goto('/analytics')
-  const comparison = page.getByRole('region', { name: 'Category comparison', exact: true })
+  const comparison = page.getByRole('region', { name: 'Category Comparison', exact: true })
   await comparison.locator('.comparison-selector').click()
   await page.getByRole('option', { name: 'Year vs year', exact: true }).click()
   await expect(
@@ -644,30 +673,56 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
   let dialog = page.getByRole('dialog', { name: 'New account', exact: true })
   await dialog.getByLabel('Name', { exact: true }).fill('Cash')
   await dialog.getByLabel('Opening balance', { exact: true }).fill('50')
-  await dialog.getByRole('button', { name: 'Save account', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
-  await page.getByRole('button', { name: 'Transfer', exact: true }).click()
+  const initialHistory = await (
+    await page.request.get('/api/accounts/movements', { headers })
+  ).json()
+  expect(initialHistory.items[0]).toMatchObject({
+    kind: 'opening-balance',
+    accountName: 'Cash',
+    balance: 50
+  })
+  for (const balance of ['55', '50']) {
+    await page
+      .getByRole('button', { name: 'Edit balance adjustment for Cash', exact: true })
+      .click()
+    const adjustment = page.getByRole('dialog', { name: 'Edit balance adjustment', exact: true })
+    await adjustment.getByLabel('Adjusted balance', { exact: true }).fill(balance)
+    await adjustment.getByRole('button', { name: 'Update', exact: true }).click()
+    await expect(adjustment).not.toBeVisible()
+  }
+  await quickAction(page, 'Transfer')
   dialog = page.getByRole('dialog', { name: 'New transfer', exact: true })
   await dialog.locator('.v-select').filter({ hasText: 'From account' }).click()
-  await page.getByRole('option', { name: 'Main', exact: true }).click()
+  await page
+    .getByRole('listbox', { name: 'From account', exact: true })
+    .getByRole('option', { name: 'Main', exact: true })
+    .click()
   await dialog.locator('.v-select').filter({ hasText: 'To account' }).click()
-  await page.getByRole('option', { name: 'Cash', exact: true }).click()
+  await page
+    .getByRole('listbox', { name: 'To account', exact: true })
+    .getByRole('option', { name: 'Cash', exact: true })
+    .click()
   await dialog.getByLabel('Amount', { exact: true }).fill('20')
-  await dialog.getByRole('button', { name: 'Transfer', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
   await page.goto('/goals')
-  await page.getByRole('button', { name: 'New goal', exact: true }).click()
+  await page.getByRole('button', { name: 'New Goal', exact: true }).click()
   dialog = page.getByRole('dialog', { name: 'New goal', exact: true })
   await dialog.getByLabel('Name', { exact: true }).fill('Vacation')
   await dialog.getByLabel('Target amount', { exact: true }).fill('800')
-  await dialog.getByRole('button', { name: 'Save goal', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
   await page.getByRole('button', { name: 'Add funds', exact: true }).click()
   dialog = page.getByRole('dialog', { name: 'New transfer', exact: true })
   await dialog.locator('.v-select').filter({ hasText: 'From account' }).click()
-  await page.getByRole('option', { name: 'Main', exact: true }).click()
+  await page
+    .getByRole('listbox', { name: 'From account', exact: true })
+    .getByRole('option', { name: 'Main', exact: true })
+    .click()
   await dialog.getByLabel('Amount', { exact: true }).fill('30')
-  await dialog.getByRole('button', { name: 'Transfer', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
   const accounts = await (await page.request.get('/api/accounts', { headers })).json()
   const cash = accounts.find((a: { name: string }) => a.name === 'Cash')
@@ -677,28 +732,13 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
   await expect(page).toHaveURL(new RegExp(`accountId=${cash.id}`))
   await expect(page.locator('h1')).toHaveText('$70.00')
   await page.getByRole('button', { name: 'Hide balances', exact: true }).click()
-  await expect(page.getByText('**.**', { exact: true })).toHaveCount(3)
-  await expect(page.getByText('-', { exact: true })).toBeVisible()
+  await expect(page.getByText('****', { exact: true })).toHaveCount(5)
   await page.reload()
-  await expect(page.getByText('**.**', { exact: true })).toHaveCount(3)
-  await expect(page.getByText('-', { exact: true })).toBeVisible()
+  await expect(page.getByText('****', { exact: true })).toHaveCount(5)
   await page.getByRole('button', { name: 'Show balances', exact: true }).click()
   await expect(page.locator('h1')).toHaveText('$70.00')
-  const favoritesCard = page
-    .locator('.v-card')
-    .filter({ has: page.getByText('Favorites', { exact: true }) })
-    .first()
-  const goalsCard = page
-    .locator('.v-card')
-    .filter({ has: page.getByText('Savings goals', { exact: true }) })
-    .first()
-  expect(
-    (await goalsCard.boundingBox())!.y -
-      ((await favoritesCard.boundingBox())!.y + (await favoritesCard.boundingBox())!.height)
-  ).toBeGreaterThanOrEqual(20)
-  await expect(page.getByRole('link', { name: 'Manage goals', exact: true })).toHaveClass(
-    /text-primary/
-  )
+  await expect(page.getByText('Savings goals', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Budget Summary', { exact: true })).toBeVisible()
   await page.screenshot({ path: info.outputPath('dashboard.png'), fullPage: true })
   const categories = await (await page.request.get('/api/categories', { headers })).json()
   const food = categories.find((c: { name: string }) => c.name === 'Food')
@@ -717,6 +757,7 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
     }
   })
   await page.goto('/transactions?period=year')
+  await expect(page.getByText('Feature lunch', { exact: true })).toBeVisible()
   const pill = page.locator('.tag-pill').filter({ hasText: 'Lunch' }).first()
   if (await pill.isVisible()) await pill.click()
   else {
@@ -733,12 +774,12 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
   await expect(dialog).not.toBeVisible()
   await expect(page.getByText('Feature lunch', { exact: true })).toHaveCount(2)
   await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
-  await page.getByText('Save as favorite', { exact: true }).click()
+  await page.getByText('Favorite', { exact: true }).click()
   dialog = page.getByRole('dialog', { name: 'New favorite', exact: true })
   await dialog.getByLabel('Favorite name', { exact: true }).fill('Usual lunch')
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
-  await page.getByRole('button', { name: 'Favorites', exact: true }).click()
+  await quickAction(page, 'Favorites')
   await page.getByRole('button', { name: 'Usual lunch', exact: true }).click()
   dialog = page.getByRole('dialog', { name: 'New Expense', exact: true })
   await expect(dialog.getByLabel('Amount', { exact: true })).toHaveValue('12')
@@ -749,15 +790,15 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
     .getByRole('button', { name: 'Close dialog', exact: true })
     .click()
   await context.setOffline(true)
-  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  await quickAction(page, 'Expense')
   dialog = page.getByRole('dialog', { name: 'New Expense', exact: true })
   await dialog.getByLabel('Amount', { exact: true }).fill('2')
   await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name: 'Food', exact: true }).click()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).not.toBeVisible()
-  await page.getByRole('button', { name: 'Pending changes', exact: true }).click()
-  const center = page.getByRole('dialog', { name: 'Pending changes', exact: true })
+  await page.getByRole('button', { name: 'Pending Changes', exact: true }).click()
+  const center = page.getByRole('dialog', { name: 'Pending Changes', exact: true })
   await expect(center.getByRole('button', { name: 'Retry and edit', exact: true })).toBeVisible()
   await center.getByRole('button', { name: 'Discard', exact: true }).click()
   const confirmation = page.getByRole('dialog', { name: 'Discard pending change?', exact: true })

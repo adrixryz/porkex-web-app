@@ -1,3 +1,4 @@
+import { quickAction } from './actions'
 import { test, expect, type Page } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 
@@ -128,7 +129,7 @@ test('remote week preference updates the visible range together with its request
   await expect(page.getByText('Oct 18 - Oct 24', { exact: true })).toBeVisible()
 })
 async function openExpense(page: Page, description: string) {
-  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  await quickAction(page, 'Expense')
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Amount', { exact: true }).fill('12.34')
   await dialog.getByLabel('Comment (optional)', { exact: true }).fill(description)
@@ -598,7 +599,7 @@ test('offline filters use only their own saved rows', async ({ page, context }) 
     ]
   })
   await page.goto('/transactions')
-  const filter = page.getByLabel('Filter by type', { exact: true })
+  const filter = page.getByRole('group', { name: 'Transaction type', exact: true })
   await filter.getByRole('button', { name: 'Expense', exact: true }).click()
   await expect(page.getByText('Expense row', { exact: true })).toBeVisible()
   await expect(page.getByText('Income row', { exact: true })).not.toBeVisible()
@@ -650,12 +651,101 @@ test('analytics history restores missing ranges to defaults', async ({ page }) =
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
 })
 
+test('analytics insight cards use four columns on desktop and two on small viewports', async ({
+  page
+}, info) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/analytics')
+  const cards = page.locator('.analytics-insights > .v-col')
+  await expect(cards).toHaveCount(4)
+  await expect(page.getByText('This Month Income', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('This Month Expenses', { exact: true })).toHaveCount(0)
+  for (const width of [1280, 820, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect
+      .poll(async () =>
+        cards.evaluateAll(nodes => {
+          const boxes = nodes.map(node => node.getBoundingClientRect())
+          if (window.innerWidth >= 960)
+            return boxes.every(box => Math.abs(box.top - boxes[0]!.top) < 2)
+          return (
+            Math.abs(boxes[0]!.top - boxes[1]!.top) < 2 &&
+            Math.abs(boxes[2]!.top - boxes[3]!.top) < 2 &&
+            boxes[2]!.top > boxes[0]!.top &&
+            boxes[1]!.left > boxes[0]!.left
+          )
+        })
+      )
+      .toBe(true)
+    for (const label of ['Avg Daily Expense', 'Month-over-Month', 'Savings Rate', 'Top Category'])
+      await expect(page.getByText(label, { exact: true })).toBeVisible()
+    if (width === 1280 || width === 320)
+      await page.screenshot({
+        path: info.outputPath(`analytics-${width}.png`),
+        fullPage: true,
+        animations: 'disabled'
+      })
+  }
+  expect(errors).toEqual([])
+})
+
+test('analytics Month-over-Month displays a new spending baseline without a misleading percent', async ({
+  page
+}) => {
+  await state(page, {
+    insights: {
+      currentMonthIncome: 100,
+      currentMonthExpense: 50,
+      lastMonthExpense: 0,
+      expenseChangePercent: null,
+      avgDailyExpense: 5,
+      savingsRate: 50
+    }
+  })
+  await page.goto('/analytics')
+  const card = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Month-over-Month', { exact: true }) })
+  await expect(card.getByText('New', { exact: true })).toBeVisible()
+  await expect(card.getByText('100%', { exact: false })).toHaveCount(0)
+  await expect(card.locator('.stat-card-value')).toHaveClass(/text-error/)
+})
+
+test('analytics range fields and steppers enforce supported limits', async ({ page }) => {
+  await page.goto('/analytics')
+  const months = page.getByLabel('Months', { exact: true })
+  const days = page.getByLabel('Days', { exact: true })
+  await months.fill('99')
+  await months.press('Enter')
+  await expect(months).toHaveValue('12')
+  await days.fill('999')
+  await days.press('Enter')
+  await expect(days).toHaveValue('120')
+  await page.getByRole('button', { name: 'Increase months', exact: true }).click()
+  await expect(months).toHaveValue('12')
+  await months.fill('0')
+  await months.press('Enter')
+  await expect(months).toHaveValue('3')
+  await days.fill('0')
+  await days.press('Enter')
+  await expect(days).toHaveValue('7')
+  await page.getByRole('button', { name: 'Decrease days', exact: true }).click()
+  await expect(days).toHaveValue('7')
+  await page.getByRole('button', { name: 'Increase months', exact: true }).click()
+  await expect(months).toHaveValue('4')
+  await page.getByRole('button', { name: 'Increase days', exact: true }).click()
+  await expect(days).toHaveValue('8')
+  await expect(page).toHaveURL(/months=4/)
+  await expect(page).toHaveURL(/days=8/)
+})
+
 test('analytics spending title wraps inside its card on narrow screens', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 })
   await page.goto('/analytics')
-  const title = page.locator('.analytics-card-title')
+  const title = page.locator('.analytics-spending-card .app-card-title')
   await expect(title).toBeVisible()
-  await expect(title.getByText('Where your money went this month', { exact: true })).toBeVisible()
+  await expect(title.getByText('Monthly Expense Breakdown', { exact: true })).toBeVisible()
   expect(
     await title.evaluate(element => ({
       fits: element.scrollWidth <= element.clientWidth + 1,
@@ -685,19 +775,20 @@ test('category comparison selector keeps Analytics ranges and restores browser h
     }
   })
   await page.goto('/analytics?months=9&days=60&comparison=week')
-  const card = page.getByRole('region', { name: 'Category comparison', exact: true })
+  const card = page.getByRole('region', { name: 'Category Comparison', exact: true })
   const spending = page
     .locator('.v-card')
-    .filter({ has: page.getByText('Where your money went this month', { exact: true }) })
+    .filter({ has: page.getByText('Monthly Expense Breakdown', { exact: true }) })
   for (const name of ['Food', 'Transport', 'Housing', 'Health', 'Shopping'])
     await expect(spending.getByText(name, { exact: true })).toBeVisible()
   const selector = card.locator('.comparison-selector')
   await expect(card.locator('.app-card-title')).toHaveCSS('font-size', '16px')
-  await expect(card.locator('.app-card-subtitle')).toHaveCSS('font-size', '12px')
+  await expect(card.locator('.app-card-subtitle')).toHaveCount(0)
+  await expect(card.locator('.app-card-title')).toHaveCSS('font-weight', '700')
   await expect(card.getByRole('columnheader', { name: 'This week', exact: true })).toBeVisible()
   await expect(
     card.getByText('This week to date vs full previous week', { exact: true })
-  ).toBeVisible()
+  ).toHaveCount(0)
   await expect(card.getByText('Transport', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
   await selector.click()
@@ -706,7 +797,7 @@ test('category comparison selector keeps Analytics ranges and restores browser h
   await expect(card.getByText('Housing', { exact: true })).toBeVisible()
   await expect(
     card.getByText('This year to date vs full previous year', { exact: true })
-  ).toBeVisible()
+  ).toHaveCount(0)
   await expect(card.getByText('New', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Days', { exact: true })).toHaveValue('60')
   await expect(page.getByText('Period comparison', { exact: true })).toHaveCount(0)
@@ -731,9 +822,7 @@ test('tag manager creates, renames, reorders and globally deletes without losing
   await page.goto('/transactions')
   const dialog = await openExpense(page, 'Keep this comment')
   await dialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
-  const manager = page
-    .getByRole('dialog')
-    .filter({ has: page.getByText('Edit tags', { exact: true }) })
+  const manager = page.getByRole('dialog', { name: 'Edit tags', exact: true })
   for (const name of ['First', 'Second', 'Third']) {
     await manager.getByLabel('New tag name', { exact: true }).fill(name)
     await manager.getByLabel('New tag name', { exact: true }).press('Enter')
@@ -781,7 +870,7 @@ test('tag manager creates, renames, reorders and globally deletes without losing
     await page.mouse.up()
   }
   await expect.poll(async () => (await state(page)).tags[0].name).toBe('Second')
-  await manager.getByRole('button', { name: 'Done', exact: true }).click()
+  await manager.getByRole('button', { name: 'Close dialog', exact: true }).click()
   await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue(
     'Keep this comment'
   )
@@ -800,12 +889,10 @@ test('tag manager creates, renames, reorders and globally deletes without losing
     await expect(tagItem).toHaveCSS('border-radius', '8px')
     await page.keyboard.press('Escape')
   } else await expect(page.getByText('Renamed', { exact: true }).first()).toBeVisible()
-  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  await quickAction(page, 'Expense')
   const newDialog = page.getByRole('dialog')
   await newDialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
-  const editor = page
-    .getByRole('dialog')
-    .filter({ has: page.getByText('Edit tags', { exact: true }) })
+  const editor = page.getByRole('dialog', { name: 'Edit tags', exact: true })
   await editor.getByRole('button', { name: 'Delete tag Renamed', exact: true }).click()
   const confirmation = page
     .getByRole('dialog')
@@ -826,13 +913,11 @@ test('offline tags and a commentless movement replay in dependency order', async
   const dialog = await openExpense(page, '')
   await context.setOffline(true)
   await dialog.getByRole('button', { name: 'Edit tags', exact: true }).click()
-  const manager = page
-    .getByRole('dialog')
-    .filter({ has: page.getByText('Edit tags', { exact: true }) })
+  const manager = page.getByRole('dialog', { name: 'Edit tags', exact: true })
   await manager.getByLabel('New tag name', { exact: true }).fill('Offline tag')
   await manager.getByLabel('New tag name', { exact: true }).press('Enter')
   await expect(manager.getByLabel('Tag name Offline tag', { exact: true })).toBeVisible()
-  await manager.getByRole('button', { name: 'Done', exact: true }).click()
+  await manager.getByRole('button', { name: 'Close dialog', exact: true }).click()
   await dialog.getByRole('button', { name: 'Offline tag', exact: true }).click()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).not.toBeVisible()
@@ -866,7 +951,8 @@ test('undo survives navigation and an expired deletion survives reload', async (
     ]
   })
   await page.goto('/transactions')
-  await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
+  await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
+  await page.getByText('Delete', { exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
   const undoSnackbar = page
@@ -891,7 +977,8 @@ test('undo survives navigation and an expired deletion survives reload', async (
   await expect(page.getByText('Undo me', { exact: true }).first()).toBeVisible()
   expect((await state(page)).rows).toHaveLength(1)
   await page.goto('/transactions')
-  await page.getByRole('button', { name: 'Delete Undo me', exact: true }).click()
+  await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
+  await page.getByText('Delete', { exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
   await page.reload()
@@ -1103,98 +1190,54 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
           )
       )
     })
-    expect(bounds).toBe(true)
-    // All/Expense/Income always keep a real horizontal padding: the label must
-    // not eat the pill's own breathing room on any width.
-    const typeButtons = await page
-      .locator('.transaction-filters .v-btn-group')
-      .first()
-      .evaluate(group =>
-        Array.from(group.querySelectorAll('.v-btn')).map(button => {
-          const style = getComputedStyle(button)
-          const content = button.querySelector('.v-btn__content')!.getBoundingClientRect()
-          return {
-            padding: parseFloat(style.paddingLeft),
-            fits:
-              content.width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 2 <=
-              button.getBoundingClientRect().width + 0.5
-          }
-        })
+    expect(bounds, `Filter controls overlap at ${width}px`).toBe(true)
+    const buttons = page
+      .getByRole('group', { name: 'Transaction type', exact: true })
+      .getByRole('button')
+    await expect(buttons).toHaveCount(2)
+    for (const button of await buttons.all()) {
+      expect((await button.boundingBox())!.height).toBe(32)
+    }
+    const layout = await page.locator('.transaction-filters').evaluate(element => {
+      const rects = Array.from(element.children).map(child => child.getBoundingClientRect())
+      const range = element.querySelector('.amount-range')!.getBoundingClientRect()
+      const fields = Array.from(element.querySelectorAll('.amount-range > *')).map(node =>
+        node.getBoundingClientRect()
       )
-    expect(typeButtons).toHaveLength(3)
-    for (const button of typeButtons) {
-      expect(button.padding).toBeGreaterThanOrEqual(12)
-      expect(button.fits).toBe(true)
-    }
-    if (width >= 960) {
-      const layout = await page.locator('.transaction-filters').evaluate(element => {
-        const controls = Array.from(element.children).map(child => child.getBoundingClientRect())
-        const fields = Array.from(element.querySelectorAll('.amount-range > *')).map(node =>
-          node.getBoundingClientRect()
-        )
-        return {
-          centers: controls.map(rect => rect.top + rect.height / 2),
-          widths: controls.map(rect => rect.width),
-          fields: fields.map(rect => ({
-            width: rect.width,
-            top: rect.top,
-            left: rect.left,
-            right: rect.right
-          }))
-        }
-      })
-      expect(Math.max(...layout.centers) - Math.min(...layout.centers)).toBeLessThan(1)
-      expect(layout.widths).toHaveLength(4)
-      // The joined pair spans exactly its two 120px columns plus the 10px gap:
-      // it keeps its own size instead of stretching with the flexible ones.
-      expect(Math.round(layout.widths[3])).toBe(250)
-      // At full width Min and Max keep their own size: 120px each, wide enough
-      // for the currency symbol and the number.
-      expect(layout.fields).toHaveLength(2)
-      for (const field of layout.fields) expect(Math.round(field.width)).toBe(120)
-      expect(Math.abs(layout.fields[0].top - layout.fields[1].top)).toBeLessThan(1)
-      expect(layout.fields[0].right).toBeLessThanOrEqual(layout.fields[1].left + 1)
-    } else {
-      const joined = await page.locator('.transaction-filters').evaluate(element => {
-        const controls = Array.from(element.children).map(child => child.getBoundingClientRect())
-        const range = element.querySelector('.amount-range')!.getBoundingClientRect()
-        const fields = Array.from(element.querySelectorAll('.amount-range > *')).map(node =>
-          node.getBoundingClientRect()
-        )
-        return {
-          category: controls[1].width,
-          range: range.width,
-          fields: fields.map(rect => ({
-            width: rect.width,
-            top: rect.top,
-            left: rect.left,
-            right: rect.right
-          }))
-        }
-      })
-      // Responsive: Min/Max share one cell as wide as Category or Sort by.
-      expect(Math.abs(joined.category - joined.range)).toBeLessThan(1)
-      expect(joined.fields).toHaveLength(2)
-      expect(Math.abs(joined.fields[0].width - joined.fields[1].width)).toBeLessThan(1)
-      expect(Math.abs(joined.fields[0].top - joined.fields[1].top)).toBeLessThan(1)
-      expect(joined.fields[0].right).toBeLessThanOrEqual(joined.fields[1].left + 1)
-    }
-    // The ‹ date › group goes back to the right edge as soon as the period row
-    // is horizontal again (Vuetify's md utilities start at 840px); while it
-    // stacks below that, it stays centered.
-    const navGaps = await page.locator('.transaction-period').evaluate(element => {
-      const period = element.getBoundingClientRect()
-      const navigation = element.querySelector('.period-navigation')!
-      const previous = navigation
-        .querySelector('[aria-label="Previous period"]')!
-        .getBoundingClientRect()
-      const next = navigation.querySelector('[aria-label="Next period"]')!.getBoundingClientRect()
-      return { left: previous.left - period.left, right: period.right - next.right }
+      const card = element.closest('.transactions-filter-card')!
+      const style = getComputedStyle(card)
+      const cardWidth =
+        card.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      return {
+        cardWidth,
+        tops: rects.map(rect => rect.top),
+        widths: rects.map(rect => rect.width),
+        range: range.width,
+        fieldWidths: fields.map(rect => rect.width),
+        fieldTops: fields.map(rect => rect.top),
+        fieldsEnd: fields.at(-1)!.right,
+        rangeEnd: range.right
+      }
     })
-    if (width >= 840) expect(Math.abs(navGaps.right)).toBeLessThan(2)
-    else expect(Math.abs(navGaps.left - navGaps.right)).toBeLessThan(2)
+    expect(layout.widths).toHaveLength(4)
+    expect(Math.abs(layout.fieldWidths[0] - layout.fieldWidths[1])).toBeLessThan(1)
+    expect(Math.abs(layout.fieldsEnd - layout.rangeEnd)).toBeLessThan(1)
+    expect(Math.abs(layout.fieldTops[0] - layout.fieldTops[1])).toBeLessThan(1)
+    if (layout.cardWidth >= 880) {
+      expect(Math.max(...layout.tops) - Math.min(...layout.tops)).toBeLessThan(1)
+    } else if (layout.cardWidth >= 440) {
+      expect(Math.abs(layout.tops[0] - layout.tops[1])).toBeLessThan(1)
+      expect(Math.abs(layout.tops[2] - layout.tops[3])).toBeLessThan(1)
+      expect(layout.tops[2]).toBeGreaterThan(layout.tops[0])
+      expect(Math.abs(layout.widths[1] - layout.range)).toBeLessThan(1)
+    } else {
+      for (let index = 1; index < layout.tops.length; index++)
+        expect(layout.tops[index]).toBeGreaterThan(layout.tops[index - 1])
+      expect(Math.abs(layout.widths[1] - layout.range)).toBeLessThan(1)
+    }
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      `Page overflows at ${width}px`
     ).toBe(true)
     if (width === 1280) {
       const headers = await page.locator('.tx-table th').allTextContents()
@@ -1220,7 +1263,7 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
     })
   }
   await page.setViewportSize({ width: 320, height: 900 })
-  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  await quickAction(page, 'Expense')
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel('Amount', { exact: true })).toBeVisible()
   const amount = await dialog.getByLabel('Amount', { exact: true }).boundingBox()
@@ -1277,7 +1320,7 @@ test('the min/max filter steppers walk back down to an empty box', async ({ page
 
 test('the dialog amount stepper walks back down to an empty box', async ({ page }) => {
   await page.goto('/transactions')
-  await page.getByRole('button', { name: 'Expense', exact: true }).first().click()
+  await quickAction(page, 'Expense')
   const dialog = page.getByRole('dialog')
   const amount = dialog.getByLabel('Amount', { exact: true })
 
@@ -1415,7 +1458,8 @@ test('recent transaction comments and amounts align in fixed columns', async ({ 
         Math.max(...columns.map(row => row[key])) - Math.min(...columns.map(row => row[key]))
       ).toBeLessThan(1)
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      `Page overflows at ${width}px`
     ).toBe(true)
     await card.screenshot({
       path: info.outputPath(`recent-transactions-${width}.png`),
@@ -1446,7 +1490,8 @@ test('another tab can undo the same scheduled deletion before it is sent', async
   await page.goto('/transactions')
   const other = await context.newPage()
   await other.goto('/transactions')
-  await page.getByRole('button', { name: 'Delete Shared undo', exact: true }).click()
+  await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
+  await page.getByText('Delete', { exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(other.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
   await other.getByRole('button', { name: 'Undo', exact: true }).click()
@@ -1480,8 +1525,11 @@ test('Undo acknowledges durable cancellation before reload when another tab hold
   await page.goto('/transactions')
   const other = await context.newPage()
   await other.goto('/transactions')
-  await expect(other.getByRole('button', { name: 'Delete Locked undo', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Delete Locked undo', exact: true }).click()
+  await expect(
+    other.getByRole('button', { name: 'Movement shortcuts', exact: true }).first()
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
+  await page.getByText('Delete', { exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
   const undo = page.getByRole('button', { name: 'Undo', exact: true })
   await expect(undo).toBeVisible()
@@ -1520,10 +1568,368 @@ test('Undo acknowledges durable cancellation before reload when another tab hold
     .toBe(0)
   await expect(undo).not.toBeVisible()
   await page.goto('/transactions')
-  await expect(page.getByRole('button', { name: 'Delete Locked undo', exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first()
+  ).toBeVisible()
   const saved = await state(page)
   expect(saved.rows).toHaveLength(1)
   expect(
     saved.requests.filter((request: { method: string }) => request.method === 'DELETE')
   ).toHaveLength(0)
+})
+
+test('shared dialogs align fields and primary actions with balanced spacing', async ({
+  page
+}, info) => {
+  await page.goto('/accounts')
+  await page.getByRole('button', { name: 'New account', exact: true }).click()
+  const account = page.getByRole('dialog', { name: 'New account', exact: true })
+  const spacing = await account.evaluate(async element => {
+    await Promise.all(
+      element
+        .closest('.v-overlay')!
+        .getAnimations({ subtree: true })
+        .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map(animation => animation.finished.catch(() => {}))
+    )
+    const header = element.querySelector('.v-card-title')!.getBoundingClientRect()
+    const fields = element.querySelectorAll('.v-input__control')
+    const first = fields[0].getBoundingClientRect()
+    const last = fields[fields.length - 1].getBoundingClientRect()
+    const button = element.querySelector('.v-form > .v-btn:last-child')!.getBoundingClientRect()
+    return { top: first.top - header.bottom, bottom: button.top - last.bottom }
+  })
+  expect(spacing.top).toBe(24)
+  expect(spacing.bottom).toBe(24)
+  await account.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await page.goto('/transactions')
+  const movement = await openExpense(page, 'Lunch')
+  await expect(movement.getByRole('button', { name: 'Save', exact: true })).toHaveClass(
+    /bg-primary/
+  )
+  const gaps = await movement.evaluate(async element => {
+    await Promise.all(
+      element
+        .closest('.v-overlay')!
+        .getAnimations({ subtree: true })
+        .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map(animation => animation.finished.catch(() => {}))
+    )
+    const amount = element.querySelector('.amount-date-row')!.getBoundingClientRect()
+    const inputs = element.querySelectorAll('.v-input')
+    const account = inputs[2].getBoundingClientRect()
+    const comment = inputs[4].querySelector('.v-input__control')!.getBoundingClientRect()
+    const tags = inputs[4].nextElementSibling!.getBoundingClientRect()
+    return { amountAccount: account.top - amount.bottom, commentTags: tags.top - comment.bottom }
+  })
+  expect(gaps.amountAccount).toBe(24)
+  expect(gaps.commentTags).toBe(24)
+  const editTags = movement.getByRole('button', { name: 'Edit tags', exact: true })
+  await expect(editTags).not.toHaveClass(/app-button--framed/)
+  await page.screenshot({ path: info.outputPath('movement-spacing.png'), fullPage: true })
+})
+
+test('account restore asks for confirmation and goals use budget-style cards without rounding completion early', async ({
+  page
+}, info) => {
+  const accounts = [
+    {
+      id: 'main-1',
+      userId: 1,
+      name: 'Main',
+      isMain: true,
+      archived: false,
+      balance: 1000,
+      openingBalance: 1000
+    },
+    { id: 'cash', userId: 1, name: 'Cash', archived: true, balance: 0, openingBalance: 0 },
+    {
+      id: 'vacation',
+      userId: 1,
+      name: 'Vacation',
+      isGoal: true,
+      targetAmount: 800,
+      balance: 200,
+      openingBalance: 0
+    },
+    {
+      id: 'ps5',
+      userId: 1,
+      name: 'PS5',
+      isGoal: true,
+      targetAmount: 999,
+      balance: 998,
+      openingBalance: 0
+    }
+  ]
+  let restores = 0
+  await page.route('**/api/accounts**', async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname === '/api/accounts/movements')
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: 'removed-adjustment',
+              kind: 'balance-adjustment',
+              accountId: 'removed-account',
+              accountName: 'Removed',
+              previousBalance: 20,
+              balance: 0,
+              date: '2026-10-24T13:00:00Z'
+            },
+            {
+              id: 'opening-main',
+              kind: 'opening-balance',
+              accountId: 'main-1',
+              accountName: 'Main',
+              previousBalance: 0,
+              balance: 1000,
+              date: '2026-10-24T12:00:00Z'
+            },
+            {
+              id: 'transfer-1',
+              kind: 'transfer',
+              sourceId: 'main-1',
+              destinationId: 'vacation',
+              source: accounts[0],
+              destination: accounts[2],
+              amount: 12.34,
+              date: '2026-10-24',
+              comment: 'Vacation savings'
+            }
+          ],
+          page: 1,
+          totalPages: 1
+        }
+      })
+    if (route.request().method() === 'PUT') {
+      restores++
+      accounts[1].archived = false
+      return route.fulfill({ json: { success: true } })
+    }
+    return route.fulfill({
+      json: url.searchParams.has('includeGoals') ? accounts : accounts.filter(a => !a.isGoal)
+    })
+  })
+  await page.route('**/api/goals', route => route.fulfill({ json: accounts.filter(a => a.isGoal) }))
+  await page.route('**/api/transfers?*', route =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            id: 'transfer-1',
+            sourceId: 'main-1',
+            destinationId: 'vacation',
+            source: accounts[0],
+            destination: accounts[2],
+            amount: 12.34,
+            date: '2026-10-24',
+            comment: 'Vacation savings'
+          }
+        ],
+        page: 1,
+        totalPages: 1
+      }
+    })
+  )
+  await page.goto('/accounts')
+  const restore = page.getByRole('button', { name: 'Restore Cash', exact: true })
+  await expect(restore).toHaveClass(/text-warning/)
+  await page.locator('.history-account-filter').click()
+  await expect(page.getByRole('option', { name: 'Cash (Archived)', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: 'Edit Cash', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Delete Cash', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: 'Delete account?', exact: true })
+    .getByRole('button', { name: 'Cancel', exact: true })
+    .click()
+  expect(restores).toBe(0)
+  await restore.click()
+  const confirmation = page.getByRole('dialog', { name: 'Restore account?', exact: true })
+  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect(restores).toBe(0)
+  await restore.click()
+  await confirmation.getByRole('button', { name: 'Restore', exact: true }).click()
+  await expect(restore).not.toBeVisible()
+  expect(restores).toBe(1)
+  await expect(page.locator('.history-details').last()).toContainText('10/24/26')
+  await expect(page.getByText('Opening balance', { exact: true })).toBeVisible()
+  const disabledEdit = page.getByRole('button', {
+    name: 'Edit balance adjustment for Removed',
+    exact: true
+  })
+  await expect(disabledEdit).toBeDisabled()
+  await expect(disabledEdit).toHaveClass(/text-on-surface-variant/)
+  const historyRows = page.locator('.account-history-row')
+  const heights = await historyRows.evaluateAll(rows =>
+    rows.map(row => row.getBoundingClientRect().height)
+  )
+  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1)
+  await page.screenshot({ path: info.outputPath('account-movements.png'), fullPage: true })
+  await expect(
+    page.getByRole('button', { name: 'Edit balance adjustment for Main', exact: true })
+  ).toBeEnabled()
+  const columns = await page
+    .locator('.account-history-row')
+    .last()
+    .evaluate(element => {
+      const details = element.querySelector('.history-details')!.getBoundingClientRect()
+      const comment = element.querySelector('.history-comment')!.getBoundingClientRect()
+      const amount = element.querySelector('.history-value')!.getBoundingClientRect()
+      return {
+        details: details.right,
+        comment: comment.left,
+        commentEnd: comment.right,
+        amount: amount.left
+      }
+    })
+  expect(columns.details).toBeLessThanOrEqual(columns.comment)
+  expect(columns.commentEnd).toBeLessThanOrEqual(columns.amount)
+  await page.locator('.history-account-filter').click()
+  await expect(page.getByRole('option', { name: 'Vacation (Goal)', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Edit balance adjustment for Main', exact: true }).click()
+  const adjustment = page.getByRole('dialog', { name: 'Edit balance adjustment', exact: true })
+  await expect(adjustment.getByLabel('Adjusted balance', { exact: true })).toHaveValue('1000')
+  await adjustment.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await page.goto('/goals')
+  const cards = page.locator('.goal-card')
+  await expect(cards).toHaveCount(2)
+  await expect(cards.nth(0)).toContainText('Vacation')
+  await expect(cards.nth(1)).toContainText('99%')
+  await expect(cards.nth(1)).toContainText('$1.00 left')
+  await cards.nth(1).getByRole('button', { name: 'Add funds', exact: true }).click()
+  const transfer = page.getByRole('dialog', { name: 'New transfer', exact: true })
+  await transfer.getByLabel('Amount', { exact: true }).fill('2')
+  await expect(
+    transfer.getByText('This amount exceeds the remaining savings goal target.', { exact: true })
+  ).toBeVisible()
+  await expect(transfer.getByRole('button', { name: 'Create', exact: true })).toBeDisabled()
+  await transfer.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('goals-cards.png'), fullPage: true })
+})
+
+test('archived budget accounts are labeled and cannot create budgets; category palette has 27 colors', async ({
+  page
+}) => {
+  await page.route('**/api/accounts', route =>
+    route.fulfill({
+      json: [
+        {
+          id: 'main-1',
+          name: 'Main',
+          isMain: true,
+          archived: false,
+          balance: 0,
+          openingBalance: 0
+        },
+        { id: 'retired', name: 'Savings', archived: true, balance: 0, openingBalance: 0 }
+      ]
+    })
+  )
+  await page.goto('/budgets')
+  await page.locator('.budget-account-filter').click()
+  await page.getByRole('option', { name: 'Savings (Archived)', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'New Budget', exact: true })).toBeDisabled()
+  await page.locator('.budget-account-filter').click()
+  await page.getByRole('option', { name: 'Main', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'New Budget', exact: true })).toBeEnabled()
+  await page.goto('/categories')
+  await page.getByRole('button', { name: 'New Category', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New Category', exact: true })
+  await expect(dialog.getByRole('radio')).toHaveCount(27)
+})
+
+test('quick actions are circular on Dashboard, Transactions and Accounts', async ({ page }) => {
+  for (const path of ['/', '/transactions', '/accounts']) {
+    await page.goto(path)
+    const button = page.getByRole('button', { name: 'Quick actions', exact: true })
+    await expect(button).toHaveCSS('border-radius', '50%')
+    const size = await button.boundingBox()
+    expect(size!.width).toBe(56)
+    expect(size!.height).toBe(56)
+  }
+})
+
+test('favorites show readable amounts and reusable edit controls in a compact dialog', async ({
+  page
+}, info) => {
+  await page.route('**/api/favorites', route =>
+    route.fulfill({
+      json: [
+        {
+          id: 'lunch',
+          name: 'Lunch',
+          type: 'Expense',
+          amount: 12.5,
+          categoryId: 1,
+          accountId: 'main-1',
+          tagIds: [],
+          comment: ''
+        },
+        {
+          id: 'uber',
+          name: 'Uber Eats dinner',
+          type: 'Expense',
+          amount: 30,
+          categoryId: 1,
+          accountId: 'main-1',
+          tagIds: [],
+          comment: ''
+        }
+      ]
+    })
+  )
+  await page.goto('/')
+  await quickAction(page, 'Favorites')
+  const dialog = page.getByRole('dialog', { name: 'Favorites', exact: true })
+  await expect(dialog.locator('.favorite-card')).toHaveCount(2)
+  await expect(dialog.getByText('-$12.50', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('Food · Main', { exact: true })).toHaveCount(2)
+  expect((await dialog.locator('.v-card').first().boundingBox())!.width).toBeLessThanOrEqual(520)
+  await expect
+    .poll(() =>
+      dialog.evaluate(element => {
+        const body = element.querySelector('.app-dialog-body')!.getBoundingClientRect()
+        const intro = element.querySelector('.app-dialog-body p')!.getBoundingClientRect()
+        const header = element.querySelector('.v-card-title')!.getBoundingClientRect()
+        const cards = element.querySelectorAll('.favorite-card')
+        const last = cards[cards.length - 1].getBoundingClientRect()
+        return [Math.round(intro.top - header.bottom), Math.round(body.bottom - last.bottom)]
+      })
+    )
+    .toEqual([24, 24])
+  await page.screenshot({ path: info.outputPath('favorites-dialog.png'), fullPage: true })
+  await dialog.getByRole('button', { name: 'Edit Lunch', exact: true }).click()
+  const edit = page.getByRole('dialog', { name: 'Edit favorite', exact: true })
+  await expect(edit.getByLabel('Amount', { exact: true })).toHaveValue('12.5')
+  await expect(edit.getByRole('button', { name: 'Update', exact: true })).toHaveClass(/bg-primary/)
+})
+
+test('Pending Changes uses balanced content spacing and Settings has its concise title', async ({
+  page
+}, info) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Pending Changes', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Pending Changes', exact: true })
+  await expect(dialog.getByText('No pending changes.', { exact: true })).toBeVisible()
+  const spacing = await dialog.evaluate(async element => {
+    await Promise.all(
+      element
+        .closest('.v-overlay')!
+        .getAnimations({ subtree: true })
+        .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map(animation => animation.finished.catch(() => {}))
+    )
+    const header = element.querySelector('.v-card-title')!.getBoundingClientRect()
+    const intro = element.querySelector('.app-dialog-body > p')!.getBoundingClientRect()
+    return intro.top - header.bottom
+  })
+  expect(spacing).toBeCloseTo(24, 0)
+  await page.screenshot({ path: info.outputPath('pending-changes.png'), fullPage: true })
+  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await page.goto('/settings')
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
 })

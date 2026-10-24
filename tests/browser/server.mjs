@@ -209,6 +209,8 @@ const server = createServer(async (req, res) => {
           headers
         )
       }
+      if (url.pathname === '/api/accounts/movements' || url.pathname === '/api/transfers')
+        return json(res, { items: [], total: 0, page: 1, totalPages: 1 }, 200, headers)
       if (url.pathname === '/api/accounts')
         return json(
           res,
@@ -252,7 +254,7 @@ const server = createServer(async (req, res) => {
             trendData: [],
             topCategories: db.topCategories,
             categoryComparison: [],
-            insights: {
+            insights: db.insights ?? {
               currentMonthIncome: 0,
               currentMonthExpense: 0,
               lastMonthExpense: 0,

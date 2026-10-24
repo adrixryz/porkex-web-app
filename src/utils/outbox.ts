@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { normalizeTransactionBody } from './transactionTypes'
 
 const KEY = 'porkex_outbox'
 const STORAGE_LOCK = 'porkex-outbox-storage'
@@ -59,7 +60,10 @@ function readAll(): StoredMutation[] {
   ) {
     throw new Error('Pending changes are damaged. The stored copy has been preserved.')
   }
-  return parsed as StoredMutation[]
+  return (parsed as StoredMutation[]).map(item => ({
+    ...item,
+    body: item.body === null ? null : normalizeTransactionBody(item.body)
+  }))
 }
 
 function writeAll(items: StoredMutation[]) {

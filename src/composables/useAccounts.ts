@@ -4,9 +4,10 @@ import { fetchJson, getUser } from '@/utils/api'
 import { outboxRevision, pendingForDisplay } from '@/utils/outbox'
 import type { Account } from '@/types'
 
-export function useAccounts() {
-  const query = useAsyncData<Account[]>(signal => fetchJson('/accounts', { signal }), [], {
-    cacheKey: '/accounts'
+export function useAccounts(options: { includeGoals?: boolean } = {}) {
+  const url = options.includeGoals ? '/accounts?includeGoals=true' : '/accounts'
+  const query = useAsyncData<Account[]>(signal => fetchJson(url, { signal }), [], {
+    cacheKey: url
   })
   const accounts = computed(() => {
     void outboxRevision.value
@@ -14,7 +15,14 @@ export function useAccounts() {
     const rows = new Map(query.data.value.map(row => [row.id, { ...row }]))
     if (userId)
       for (const op of pendingForDisplay(userId)) {
-        if (!/^\/accounts(?:\/[^/]+)?$/.test(op.path) || !op.body) continue
+        if (!/^\/(accounts|goals)(?:\/[^/]+)?$/.test(op.path)) continue
+        const isGoal = op.path.startsWith('/goals')
+        if (isGoal && !options.includeGoals) continue
+        if (op.method === 'DELETE') {
+          rows.delete(op.path.split('/')[2]!)
+          continue
+        }
+        if (!op.body) continue
         let body
         try {
           body = JSON.parse(op.body)
@@ -29,10 +37,38 @@ export function useAccounts() {
             id,
             userId,
             isMain: false,
+            isGoal,
             archived: false,
-            balance: Number(body.openingBalance || 0)
+            openingBalance: isGoal ? 0 : Number(body.openingBalance || 0),
+            balance: isGoal ? 0 : Number(body.openingBalance || 0),
+            ...(isGoal ? { targetAmount: Number(body.targetAmount) } : {})
           })
-        else if (rows.has(id)) rows.set(id, { ...rows.get(id)!, ...body, id })
+        else if (rows.has(id)) {
+          const previous = rows.get(id)!
+          rows.set(id, {
+            ...previous,
+            ...body,
+            id,
+            ...(body.balance !== undefined
+              ? {
+                  balance: Number(body.balance),
+                  openingBalance:
+                    Math.round(
+                      (previous.openingBalance + Number(body.balance) - previous.balance) * 100
+                    ) / 100
+                }
+              : body.openingBalance !== undefined
+                ? {
+                    openingBalance: Number(body.openingBalance),
+                    balance:
+                      Math.round(
+                        (previous.balance + Number(body.openingBalance) - previous.openingBalance) *
+                          100
+                      ) / 100
+                  }
+                : {})
+          })
+        }
       }
     return [...rows.values()]
   })

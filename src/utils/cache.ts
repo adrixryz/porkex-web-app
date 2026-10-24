@@ -8,13 +8,22 @@
 //
 // Only GET responses are cached. Writes are handled by the outbox instead.
 
+import { transactionTypeReviver } from './transactionTypes'
+
 const KEY = 'porkex_cache'
 
 // Enough for the views a user moves between, including a few filter
 // combinations of the transaction list. Bounded so browsing many filters cannot
 // grow localStorage without limit.
 const MAX_ENTRIES = 12
-const PINNED = new Set(['/categories', '/accounts', '/tags', '/goals', '/favorites'])
+const PINNED = new Set([
+  '/categories',
+  '/accounts',
+  '/accounts?includeGoals=true',
+  '/tags',
+  '/goals',
+  '/favorites'
+])
 
 // A single response larger than this is not worth keeping: it would eat the
 // quota on its own and JSON.parse on every paint is not free.
@@ -31,7 +40,7 @@ function readAll(): CacheMap {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return {}
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(raw, transactionTypeReviver)
     return parsed && typeof parsed === 'object' ? (parsed as CacheMap) : {}
   } catch {
     return {}

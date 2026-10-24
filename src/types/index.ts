@@ -14,6 +14,15 @@ export interface Account {
   isMain: boolean
   archived: boolean
 }
+export interface BalanceAdjustment {
+  kind: 'opening-balance' | 'balance-adjustment'
+  id: string
+  accountId: string
+  accountName: string
+  previousBalance: number
+  balance: number
+  date: string
+}
 export interface Transfer {
   id: string
   sourceId: string
@@ -136,6 +145,7 @@ export interface DashboardResponse {
   transactionCount: number
   recentTransactions: Transaction[]
   pieChartData: PieSlice[]
+  incomePieChartData?: PieSlice[]
 }
 
 export interface CategorySummary {
@@ -176,7 +186,7 @@ export interface AnalyticsResponse {
     currentMonthIncome: number
     currentMonthExpense: number
     lastMonthExpense: number
-    expenseChangePercent: number
+    expenseChangePercent: number | null
     avgDailyExpense: number
     savingsRate: number
   }
@@ -200,6 +210,8 @@ export type BudgetPeriod = 'WEEK' | 'MONTH'
 
 export interface Budget {
   id: number
+  accountId?: string | null
+  account?: Pick<Account, 'id' | 'name' | 'archived'> | null
   categoryId: number
   amount: number
   period: BudgetPeriod

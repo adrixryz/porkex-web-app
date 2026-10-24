@@ -39,6 +39,7 @@ const DAY_INDEX: Record<WeekDay, number> = {
 const preferencesVersion = ref(0)
 
 export function getDefaultPeriod(): PeriodFilter {
+  void preferencesVersion.value
   const raw = localStorage.getItem(PERIOD_KEY)
   return (PERIOD_FILTERS as readonly string[]).includes(raw ?? '') ? (raw as PeriodFilter) : 'week'
 }

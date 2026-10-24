@@ -35,6 +35,17 @@ export function mutationError(path: string, method: string, body: string | null)
       return 'Enter valid details.'
     if (path.startsWith('/accounts')) {
       if (
+        payload.balance !== undefined &&
+        (method !== 'PUT' ||
+          payload.openingBalance !== undefined ||
+          !(
+            (typeof payload.balance === 'number' || typeof payload.balance === 'string') &&
+            (/^0(?:\.0{1,2})?$/.test(String(payload.balance).trim()) ||
+              validAmount(payload.balance))
+          ))
+      )
+        return 'Enter a nonnegative current balance with up to two decimals.'
+      if (
         payload.name !== undefined &&
         (typeof payload.name !== 'string' ||
           !payload.name.trim() ||
@@ -86,6 +97,12 @@ export function mutationError(path: string, method: string, body: string | null)
     (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 60)
   )
     return 'Favorite name must contain 1–60 characters.'
+  if (
+    budget &&
+    data.accountId !== undefined &&
+    (typeof data.accountId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(data.accountId))
+  )
+    return 'Choose a valid account.'
   if (occurrence && data.kind === 'SKIP') return null
   if (!category && !validAmount(data.amount))
     return 'Amount must be positive, at most 10,000,000 and have at most two decimal places.'

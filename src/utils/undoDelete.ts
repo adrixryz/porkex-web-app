@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue'
+import { transactionTypeReviver } from './transactionTypes'
 import type { Transaction } from '@/types'
 import { activeWrites, getUser, isAuthenticated, syncPendingWrites, USER_CHANGE_EVENT } from './api'
 import { enqueue, outboxRevision, ownedPending, withOutboxLock, withSendLock } from './outbox'
@@ -27,7 +28,7 @@ const clock = ref(Date.now())
 export const deleteError = ref('')
 let transferring: Promise<void> | undefined
 function read(): ScheduledDelete[] {
-  const value: unknown = JSON.parse(localStorage.getItem(KEY) || '[]')
+  const value: unknown = JSON.parse(localStorage.getItem(KEY) || '[]', transactionTypeReviver)
   if (
     !Array.isArray(value) ||
     !value.every(

@@ -2,7 +2,7 @@
   <AppPage>
     <v-row>
       <v-col cols="12" md="8" lg="6" class="mx-auto">
-        <AppPageHeader title="Settings & Profile" />
+        <AppPageHeader title="Settings" />
 
         <!-- LOADING SKELETON -->
         <template v-if="loading">

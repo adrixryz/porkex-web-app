@@ -6,11 +6,9 @@
     :persistent="busy || dragging !== null"
     :close-disabled="busy || dragging !== null"
     :dirty="!!newName || tags.some(tag => names[tag.id] !== tag.name)"
-    :closable="false"
-    content-class="pa-4"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <p class="text-caption mb-3">
+    <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
       Names, order and deletions apply to all your transactions. Hold the handle to drag; use arrow
       keys when focused.
     </p>
@@ -48,6 +46,7 @@
         />
         <AppIconButton
           :icon="mdiCheck"
+          color="primary"
           :label="`Save name ${tag.name}`"
           :disabled="busy || names[tag.id] === tag.name"
           @click="rename(tag)"
@@ -61,7 +60,7 @@
         />
       </div>
     </div>
-    <div class="d-flex ga-2 mt-4 align-center">
+    <v-form class="mt-4" @submit.prevent="create">
       <AppTextField
         v-model="newName"
         label="New tag name"
@@ -69,14 +68,16 @@
         hide-details
         enterkeyhint="done"
         :disabled="busy"
-        @keydown.enter.prevent.stop="create"
       />
-      <AppButton type="button" :disabled="busy || !newName.trim()" @click="create">Add</AppButton>
-    </div>
-    <template #actions>
-      <v-spacer></v-spacer>
-      <AppButton type="button" :disabled="busy" @click="close"> Done </AppButton>
-    </template>
+      <AppButton
+        type="submit"
+        color="primary"
+        size="large"
+        class="w-100 mt-4 font-weight-bold"
+        :disabled="busy || !newName.trim()"
+        >Add tag</AppButton
+      >
+    </v-form>
   </AppDialog>
   <AppConfirmDialog
     :model-value="!!deleting"
@@ -102,24 +103,17 @@ import AppTextField from '@/components/ui/AppTextField.vue'
 import type { Tag } from '@/types'
 import { useTags } from '@/composables/useTags'
 import { api, isQueuedResponse } from '@/utils/api'
-import { confirmDiscard, useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { useSnackbar } from '@/composables/useSnackbar'
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [open: boolean]; removed: [ids: string[]] }>()
 const { tags, refreshTags } = useTags()
+const { showSnack } = useSnackbar()
 const names = ref<Record<string, string>>({})
 const ordered = ref<Tag[]>([])
 const newName = ref('')
 const newId = ref(crypto.randomUUID())
 const busy = ref(false)
-function close() {
-  if (busy.value || dragging.value !== null) return
-  if (
-    (!!newName.value || tags.value.some(tag => names.value[tag.id] !== tag.name)) &&
-    !confirmDiscard()
-  )
-    return
-  emit('update:modelValue', false)
-}
 const message = ref('')
 const messageType = ref<'error' | 'info' | 'success'>('error')
 const deleting = ref<Tag | null>(null)
@@ -161,8 +155,11 @@ async function write(path: string, method: string, body?: object) {
     const response = await api(path, { method, ...(body ? { body: JSON.stringify(body) } : {}) })
     if (!response.ok) throw new Error((await response.json()).error || 'Could not update tags.')
     const queued = isQueuedResponse(response)
-    messageType.value = queued ? 'info' : 'success'
-    message.value = queued ? 'Saved on this device; waiting to sync.' : 'Tags updated.'
+    message.value = ''
+    showSnack(
+      queued ? 'Saved on this device; waiting to sync.' : 'Tags updated.',
+      queued ? 'info' : 'success'
+    )
     if (!queued) await refreshTags(true)
     return true
   } catch (error) {
@@ -273,6 +270,7 @@ onUnmounted(cancelDrag)
   align-items: center;
   gap: 4px;
   padding: 6px 0;
+  border-radius: 24px;
 }
 .tag-row > .v-input {
   min-width: 0;

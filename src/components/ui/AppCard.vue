@@ -4,13 +4,18 @@
       <v-card-title
         v-if="title || subtitle || $slots.title || $slots['header-actions']"
         class="app-card-header px-6 py-4 border-b border-outline-variant d-flex flex-wrap align-center ga-2"
+        :class="{ 'app-card-header--inline': keepActionsInline }"
       >
         <div
           class="app-card-heading"
           :class="{ 'app-card-heading-with-actions': $slots['header-actions'] }"
         >
           <slot name="title">
-            <span class="app-card-title font-weight-medium text-subtitle-1">{{ title }}</span>
+            <span
+              class="app-card-title text-subtitle-1"
+              :class="titleClass || 'font-weight-medium'"
+              >{{ title }}</span
+            >
           </slot>
           <div v-if="subtitle" class="app-card-subtitle text-caption text-on-surface-variant">
             {{ subtitle }}
@@ -32,6 +37,8 @@ defineOptions({ inheritAttrs: false })
 defineProps<{
   title?: string
   subtitle?: string
+  keepActionsInline?: boolean
+  titleClass?: string
 }>()
 </script>
 
@@ -46,10 +53,18 @@ defineProps<{
 .app-card-heading-with-actions {
   flex: 1 1 180px;
 }
+.app-card-header--inline {
+  flex-wrap: nowrap !important;
+}
+.app-card-header--inline .app-card-heading-with-actions {
+  flex: 1 1 0;
+}
+.app-card-header--inline :deep(.v-btn) {
+  flex-shrink: 0;
+}
 .app-card-title {
   font-size: 16px;
   line-height: 24px;
-  font-weight: 500;
 }
 .app-card-subtitle {
   font-size: 12px;

@@ -6,6 +6,7 @@ import { flushPromises, mount, enableAutoUnmount } from '@vue/test-utils'
 import TransactionDialog from './TransactionDialog.vue'
 import { writeCache } from '@/utils/cache'
 import type { Category } from '@/types'
+import { todayInput } from '@/utils/date'
 
 enableAutoUnmount(afterEach)
 
@@ -225,7 +226,7 @@ it.each([
           description: 'Lunch',
           userId: 1,
           recurringId: null,
-          date: new Date(now).toISOString(),
+          date: todayInput(),
           createdAt: new Date(now).toISOString()
         }
       },

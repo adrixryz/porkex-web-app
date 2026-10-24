@@ -8,10 +8,6 @@
           class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
         >
           <v-skeleton-loader type="heading" width="200"></v-skeleton-loader>
-          <div class="d-flex ga-3">
-            <v-skeleton-loader type="button" width="110"></v-skeleton-loader>
-            <v-skeleton-loader type="button" width="110"></v-skeleton-loader>
-          </div>
         </v-col>
       </v-row>
       <v-row class="mb-4">
@@ -35,24 +31,31 @@
       </v-row>
     </template>
     <template v-else>
-      <AppPageHeader title="Transactions">
-        <template #actions>
-          <AppButton @click="favoritesOpen = true">Favorites</AppButton>
-          <AppButton color="error" :prepend-icon="mdiMinus" @click="openDialog('Expense')">
-            Expense
-          </AppButton>
-          <AppButton color="success" :prepend-icon="mdiPlus" @click="openDialog('Income')">
-            Income
-          </AppButton>
+      <AppPageHeader class="transactions-header">
+        <template #title>
+          <div class="transactions-heading">
+            <h1 class="text-h4 font-weight-bold text-on-surface">Transactions</h1>
+            <AppSegmentedControl
+              :model-value="filterType"
+              label="Transaction type"
+              :button-height="32"
+              :items="[
+                { label: 'Expense', value: 'Expense' },
+                { label: 'Income', value: 'Income' }
+              ]"
+              class="transactions-type-toggle"
+              @update:model-value="filterType = $event === 'Income' ? 'Income' : 'Expense'"
+            />
+          </div>
         </template>
       </AppPageHeader>
 
       <!-- DATE FILTER + SEARCH + FILTERS -->
       <v-row class="mb-4">
         <v-col cols="12">
-          <AppCard class="pa-4">
-            <div class="transaction-period d-flex flex-column flex-md-row align-center ga-4">
-              <div class="d-flex justify-center w-100 w-md-auto shrink-0 pb-1">
+          <AppCard class="pa-4 transactions-filter-card">
+            <div class="transaction-period">
+              <div class="period-picker">
                 <v-btn-toggle
                   v-model="periodMode"
                   mandatory
@@ -80,7 +83,7 @@
 
               <div
                 v-if="periodMode !== 'custom'"
-                class="period-navigation d-flex align-center justify-center w-100 w-md-auto ga-2"
+                class="period-navigation d-flex align-center justify-center ga-2"
               >
                 <AppIconButton
                   :icon="mdiChevronLeft"
@@ -101,7 +104,7 @@
               </div>
               <div
                 v-else
-                class="period-navigation d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3 w-100 w-md-auto"
+                class="period-navigation d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3"
               >
                 <AppTextField
                   v-model="customFrom"
@@ -127,21 +130,19 @@
               </div>
             </div>
 
-            <!-- Type / category / amount filters -->
+            <!-- Account / category / sorting / amount filters -->
             <div class="transaction-filters mt-3">
-              <v-btn-toggle
-                v-model="filterType"
-                mandatory
-                color="primary"
+              <AppSelect
+                v-model="filterAccount"
+                :items="accountOptions"
+                item-title="title"
+                item-value="value"
+                label="Account"
+                clearable
                 density="compact"
-                rounded="pill"
-                variant="outlined"
-                aria-label="Filter by type"
-              >
-                <v-btn value="ALL">All</v-btn>
-                <v-btn value="Expense">Expense</v-btn>
-                <v-btn value="Income">Income</v-btn>
-              </v-btn-toggle>
+                hide-details
+                class="account-filter"
+              />
 
               <CategorySelect
                 v-model="filterCategory"
@@ -226,12 +227,13 @@
                 >"{{ searchQuery }}"</v-chip
               >
               <v-chip
-                v-if="filterType !== 'ALL'"
+                v-if="filterAccount !== null"
                 size="x-small"
                 closable
-                @click:close="filterType = 'ALL'"
+                @click:close="filterAccount = null"
               >
-                {{ filterType === 'Income' ? 'Income' : 'Expense' }}
+                {{ accounts.find(account => account.id === filterAccount)?.name || 'Selected' }}
+                Account
               </v-chip>
               <v-chip
                 v-if="filterCategory !== null"
@@ -257,7 +259,13 @@
               >
                 ≤ {{ cs }}{{ formatMoney(maxBound) }}
               </v-chip>
-              <AppButton variant="text" size="x-small" color="primary" @click="clearFilters">
+              <AppButton
+                variant="text"
+                :framed="false"
+                size="x-small"
+                color="white"
+                @click="clearFilters"
+              >
                 Clear all
               </AppButton>
             </div>
@@ -303,6 +311,7 @@
                   <v-list-item class="px-2 px-sm-4 py-3 hover-row">
                     <TransactionSummary
                       :transaction="tx"
+                      compact-spacing
                       selectable-tags
                       :selected-tag-id="filterTag"
                       @select-tag="toggleTag"
@@ -317,12 +326,7 @@
                           <MovementShortcutsMenu
                             @duplicate="duplicate(tx)"
                             @favorite="duplicate(tx, true)"
-                          />
-                          <AppIconButton
-                            :icon="mdiDeleteOutline"
-                            :label="`Delete ${tx.description || tx.category?.name}`"
-                            color="error"
-                            @click="confirmDelete(tx)"
+                            @delete="confirmDelete(tx)"
                           /></div></template
                     ></TransactionSummary>
                   </v-list-item>
@@ -391,7 +395,7 @@
                   <tbody>
                     <tr v-for="tx in transactions" :key="tx.id" class="hover-row">
                       <td class="text-on-surface-variant">{{ formatDateOnly(tx.date) }}</td>
-                      <td>
+                      <td class="py-2">
                         <v-chip
                           size="small"
                           :color="tx.category?.color ?? undefined"
@@ -400,7 +404,9 @@
                           :style="`color: ${textOn(tx.category?.color)}`"
                           >{{ tx.category?.name }}</v-chip
                         >
-                        <div class="text-caption">{{ tx.account?.name || 'Main' }}</div>
+                        <div class="text-caption mt-1">
+                          {{ tx.account?.name || 'Main' }} Account
+                        </div>
                       </td>
                       <td>
                         <TagChips
@@ -439,12 +445,7 @@
                         <MovementShortcutsMenu
                           @duplicate="duplicate(tx)"
                           @favorite="duplicate(tx, true)"
-                        />
-                        <AppIconButton
-                          :icon="mdiDeleteOutline"
-                          :label="`Delete ${tx.comment || tx.description || tx.category?.name}`"
-                          color="error"
-                          @click="confirmDelete(tx)"
+                          @delete="confirmDelete(tx)"
                         />
                       </td>
                     </tr>
@@ -462,9 +463,8 @@
                 "
                 padding="12"
               >
-                <template #actions>
+                <template v-if="hasActiveFilters" #actions>
                   <AppButton
-                    v-if="hasActiveFilters"
                     color="primary"
                     variant="outlined"
                     :prepend-icon="mdiFilterOffOutline"
@@ -472,24 +472,6 @@
                   >
                     Clear filters
                   </AppButton>
-                  <template v-else>
-                    <AppButton
-                      color="error"
-                      variant="outlined"
-                      :prepend-icon="mdiMinus"
-                      @click="openDialog('Expense')"
-                    >
-                      Add expense
-                    </AppButton>
-                    <AppButton
-                      color="success"
-                      variant="outlined"
-                      :prepend-icon="mdiPlus"
-                      @click="openDialog('Income')"
-                    >
-                      Add income
-                    </AppButton>
-                  </template>
                 </template>
               </AppEmptyState>
             </AppCardBody>
@@ -513,9 +495,7 @@
     </template>
 
     <!-- ADD/EDIT DIALOG -->
-    <AppDialog v-model="favoritesOpen" title="Favorites" max-width="720"
-      ><FavoritesPanel manage
-    /></AppDialog>
+    <QuickActions :default-account-id="filterAccount || undefined" />
     <TransactionDialog
       :draft="draft"
       :favorite-mode="favoriteMode"
@@ -541,14 +521,14 @@
 
 <script setup lang="ts">
 import MovementShortcutsMenu from '@/components/MovementShortcutsMenu.vue'
-import FavoritesPanel from '@/components/FavoritesPanel.vue'
-import AppDialog from '@/components/ui/AppDialog.vue'
+import QuickActions from '@/components/QuickActions.vue'
 import { movementDraft } from '@/utils/movementDraft'
 import type { MovementDraft } from '@/types'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAsyncData } from '@/composables/useAsyncData'
+import { useAccounts } from '@/composables/useAccounts'
 import { scheduleDelete, hiddenTransactionIds } from '@/utils/undoDelete'
 import TransactionSummary from '@/components/TransactionSummary.vue'
 import { useTags } from '@/composables/useTags'
@@ -565,6 +545,8 @@ import AppEmptyState from '@/components/ui/AppEmptyState.vue'
 import AppIconButton from '@/components/ui/AppIconButton.vue'
 import AppPage from '@/components/ui/AppPage.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
+import { normalizeTransactionType } from '@/utils/transactionTypes'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 import { fetchJson } from '@/utils/api'
@@ -586,12 +568,9 @@ import {
   mdiArrowUp,
   mdiChevronLeft,
   mdiChevronRight,
-  mdiDeleteOutline,
   mdiFilterOffOutline,
   mdiMagnify,
-  mdiMinus,
   mdiPencilOutline,
-  mdiPlus,
   mdiReceiptTextClockOutline,
   mdiRepeat
 } from '@mdi/js'
@@ -608,7 +587,7 @@ const editingTx = ref<Transaction | null>(null)
 
 // Search, filters, sorting & pagination (server-side)
 const searchQuery = ref('')
-const filterType = ref<'ALL' | 'Income' | 'Expense'>('ALL')
+const filterType = ref<'Income' | 'Expense'>('Expense')
 const filterTag = ref<string | null>(null)
 const { tags: tagCatalog } = useTags()
 const selectedTagName = computed(
@@ -625,6 +604,14 @@ function toggleTag(id: string) {
   filterTag.value = current === id ? null : id
 }
 const filterCategory = ref<number | null>(null)
+const filterAccount = ref<string | null>(null)
+const { accounts, run: fetchAccounts } = useAccounts()
+const accountOptions = computed(() =>
+  accounts.value.map(account => ({
+    title: account.archived ? `${account.name} (Archived)` : account.name,
+    value: account.id
+  }))
+)
 const minAmount = ref('')
 const maxAmount = ref('')
 const sortBy = ref<'date' | 'amount'>('date')
@@ -678,8 +665,9 @@ const transactionsUrl = () => {
   const search = searchQuery.value.trim()
   if (search) params.set('search', search)
   if (filterTag.value) params.set('tagId', filterTag.value)
-  if (filterType.value !== 'ALL') params.set('type', filterType.value)
+  params.set('type', filterType.value)
   if (filterCategory.value !== null) params.set('categoryId', String(filterCategory.value))
+  if (filterAccount.value !== null) params.set('accountId', filterAccount.value)
   if (minBound.value !== null) params.set('min', String(minBound.value))
   if (maxBound.value !== null) params.set('max', String(maxBound.value))
   return `/transactions?${params}`
@@ -740,8 +728,8 @@ const maxBound = computed(() => parseBound(maxAmount.value))
 const hasActiveFilters = computed(
   () =>
     !!searchQuery.value.trim() ||
-    filterType.value !== 'ALL' ||
     filterCategory.value !== null ||
+    filterAccount.value !== null ||
     !!filterTag.value ||
     minBound.value !== null ||
     maxBound.value !== null
@@ -749,8 +737,8 @@ const hasActiveFilters = computed(
 
 const clearFilters = () => {
   searchQuery.value = ''
-  filterType.value = 'ALL'
   filterCategory.value = null
+  filterAccount.value = null
   filterTag.value = null
   minAmount.value = ''
   maxAmount.value = ''
@@ -800,14 +788,15 @@ const periodLabel = computed(() => {
 
 // ── Filters mirrored in the URL ───────────────────────────────────────────
 // They survive a reload, can be bookmarked and the Back button works.
-const TYPES = ['ALL', 'Income', 'Expense'] as const
+const TYPES = ['Income', 'Expense'] as const
 
 function readRouteQuery() {
   const q = route.query
   periodMode.value = getDefaultPeriod()
-  filterType.value = 'ALL'
+  filterType.value = 'Expense'
   searchQuery.value = ''
   filterCategory.value = null
+  filterAccount.value = null
   filterTag.value = null
   minAmount.value = ''
   maxAmount.value = ''
@@ -820,12 +809,15 @@ function readRouteQuery() {
   if (typeof q.period === 'string' && (PERIODS as readonly string[]).includes(q.period)) {
     periodMode.value = q.period as typeof periodMode.value
   }
-  if (typeof q.type === 'string' && (TYPES as readonly string[]).includes(q.type)) {
-    filterType.value = q.type as typeof filterType.value
+  const type = normalizeTransactionType(q.type)
+  if (typeof type === 'string' && (TYPES as readonly string[]).includes(type)) {
+    filterType.value = type as typeof filterType.value
   }
   if (typeof q.tagId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(q.tagId))
     filterTag.value = q.tagId
   if (typeof q.search === 'string') searchQuery.value = q.search
+  if (typeof q.accountId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(q.accountId))
+    filterAccount.value = q.accountId
   if (typeof q.category === 'string') {
     const id = Number(q.category)
     if (Number.isInteger(id) && id > 0) filterCategory.value = id
@@ -853,9 +845,10 @@ function readRouteQuery() {
 async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
   const query: Record<string, string> = { period: periodMode.value }
   if (filterTag.value) query.tagId = filterTag.value
-  if (filterType.value !== 'ALL') query.type = filterType.value
+  query.type = filterType.value
   if (searchQuery.value.trim()) query.search = searchQuery.value.trim()
   if (filterCategory.value !== null) query.category = String(filterCategory.value)
+  if (filterAccount.value !== null) query.accountId = filterAccount.value
   if (minBound.value !== null) query.min = String(minBound.value)
   if (maxBound.value !== null) query.max = String(maxBound.value)
   query.sort = `${sortBy.value}:${order.value}`
@@ -948,7 +941,7 @@ watch([searchQuery, minAmount, maxAmount], () => {
   searchTimer = window.setTimeout(() => reload(undefined, 'replace'), 350)
 })
 
-watch([filterType, filterCategory, filterTag, sortOption], () => reload())
+watch([filterType, filterAccount, filterCategory, filterTag, sortOption], () => reload())
 watch(page, () => {
   if (!hydrating) reload(undefined, 'push', false)
 })
@@ -957,7 +950,6 @@ onUnmounted(() => {
   window.clearTimeout(navigationTimer)
 })
 
-const favoritesOpen = ref(false)
 const draft = ref<MovementDraft | null>(null)
 const favoriteMode = ref(false)
 function duplicate(tx: Transaction, favorite = false) {
@@ -967,14 +959,6 @@ function duplicate(tx: Transaction, favorite = false) {
   dialogType.value = tx.type
   dialog.value = true
 }
-const openDialog = (type: 'Income' | 'Expense') => {
-  editingTx.value = null
-  draft.value = null
-  favoriteMode.value = false
-  dialogType.value = type
-  dialog.value = true
-}
-
 const editTx = (tx: Transaction) => {
   draft.value = null
   favoriteMode.value = false
@@ -1053,11 +1037,41 @@ watch(
   }
 )
 onMounted(async () => {
-  await Promise.all([restoreRoute(), fetchCategories()])
+  await Promise.all([restoreRoute(), fetchCategories(), fetchAccounts()])
 })
 </script>
 
 <style scoped>
+.transactions-header :deep(.v-col > div) {
+  width: 100%;
+  min-width: 0;
+}
+.transactions-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.transactions-type-toggle {
+  width: 220px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.transactions-type-toggle :deep(.v-btn) {
+  font-size: 0.875rem;
+}
+@media (max-width: 599px) {
+  .transactions-heading {
+    gap: 8px;
+  }
+  .transactions-type-toggle {
+    width: 170px;
+  }
+  .transactions-type-toggle :deep(.v-btn) {
+    padding-inline: 4px;
+    font-size: 0.8125rem;
+  }
+}
 .hover-row {
   transition: background-color 0.2s;
 }
@@ -1072,6 +1086,7 @@ onMounted(async () => {
   user-select: none;
 }
 
+.account-filter,
 .category-filter {
   max-width: 220px;
 }
@@ -1079,7 +1094,7 @@ onMounted(async () => {
   max-width: 200px;
 }
 .amount-filter {
-  max-width: 122px;
+  max-width: none;
 }
 
 /* Table header: darker band so the column titles read apart from the rows */
@@ -1195,47 +1210,51 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 960px) {
-  .category-filter,
-  .sort-filter,
-  .amount-filter {
-    max-width: none;
-    width: 100%;
-  }
+.transactions-filter-card {
+  container-type: inline-size;
+  container-name: transaction-filters;
 }
-
+.transaction-period {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.period-picker {
+  display: flex;
+  justify-content: center;
+  width: min(100%, 380px);
+  min-width: 0;
+  flex-shrink: 0;
+}
+.period-navigation {
+  max-width: 100%;
+  min-width: 0;
+  margin-left: 0;
+}
 .transaction-filters {
   display: grid;
-  /* 230px is what the All/Expense/Income group needs to keep its own padding
-     (labels + 12px per side + the 8px gaps between pills): with a narrower
-     cell the pills would spill sideways. */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: center;
 }
-/* Vuetify's md utilities start at 840px, not at the 960px the grid below
-   uses: from 840 the period row is horizontal again, and the ‹ date › group
-   goes back to the right edge. Below that it stacks and stays centered. */
-@media (min-width: 840px) {
+@container transaction-filters (min-width: 440px) {
+  .transaction-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container transaction-filters (min-width: 880px) {
+  .transaction-period {
+    flex-direction: row;
+    justify-content: space-between;
+  }
   .period-navigation {
     margin-left: auto;
   }
-}
-@media (min-width: 960px) {
-  .transaction-period {
-    justify-content: space-between;
-  }
   .transaction-filters {
-    grid-template-columns:
-      minmax(230px, 1fr) minmax(110px, 1.15fr) minmax(140px, 1.15fr)
-      120px 120px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(200px, 0.95fr);
     gap: 10px;
-  }
-  /* The joined Min/Max takes the two 120px columns, so at full width each
-     field is as wide as it was as a separate control, with room for the
-     currency symbol the number now shares the box with. */
-  .amount-range {
-    grid-column: span 2;
   }
   .transaction-filters :deep(.v-field) {
     --v-field-padding-start: 12px;
@@ -1257,17 +1276,6 @@ onMounted(async () => {
 .amount-range > * {
   flex: 1 1 0;
   min-width: 0;
-}
-.transaction-filters :deep(.v-btn-toggle) {
-  flex-shrink: 0;
-}
-.transaction-filters :deep(.v-btn) {
-  /* Content, not an equal share: an equal share would squeeze the shorter
-     labels into their own padding. The pill still stretches to fill the cell
-     when there is room, and never shrinks below its label plus the padding. */
-  flex: 1 1 auto;
-  min-width: max-content;
-  padding-inline: 12px;
 }
 .col-tags {
   width: 22%;

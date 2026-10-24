@@ -154,7 +154,7 @@
         ></AppTextField>
         <AppSelect
           v-model="catForm.type"
-          :items="['Income', 'Expense']"
+          :items="transactionTypeOptions"
           label="Type"
           class="mb-2"
         ></AppSelect>
@@ -251,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import { transactionTypeOptions } from '@/utils/transactionTypes'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted, computed, watch } from 'vue'
@@ -359,7 +360,20 @@ const colorOptions = [
   '#D7AEFB',
   '#FDCFE8',
   '#78909C',
-  '#FF7043'
+  '#FF7043',
+  '#00ACC1',
+  '#00897B',
+  '#7CB342',
+  '#C0CA33',
+  '#FDD835',
+  '#FFB74D',
+  '#EC407A',
+  '#D81B60',
+  '#AB47BC',
+  '#7E57C2',
+  '#5C6BC0',
+  '#29B6F6',
+  '#A1887F'
 ]
 
 const filteredCategories = computed(() => categories.value.filter(c => c.type === filterType.value))

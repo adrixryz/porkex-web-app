@@ -10,12 +10,11 @@
   >
     <v-form @submit.prevent="submit">
       <AppTextField v-if="favoriteMode" v-model="form.name" label="Favorite name" maxlength="60" />
-      <div class="amount-date-row">
+      <div class="amount-date-row mb-6">
         <div>
-          <div class="text-caption mb-1">Amount</div>
           <AppTextField
             v-model="form.amount"
-            aria-label="Amount"
+            label="Amount"
             type="number"
             inputmode="decimal"
             :error-messages="
@@ -28,7 +27,7 @@
             step="0.01"
             hide-spin-buttons
             autofocus
-            class="mb-2"
+            hide-details="auto"
           >
             <template #append-inner>
               <AmountStepper
@@ -39,14 +38,13 @@
           </AppTextField>
         </div>
         <div>
-          <div class="text-caption mb-1">Date</div>
           <AppTextField
             v-model="form.date"
-            aria-label="Date"
+            label="Date"
             type="date"
             :max="occurrence ? undefined : todayInput()"
             :readonly="!!occurrence"
-            class="mb-2"
+            hide-details="auto"
           ></AppTextField>
         </div>
       </div>
@@ -66,9 +64,9 @@
         label="Comment (optional)"
         maxlength="200"
         :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Grocery shopping'"
-        class="mb-2"
+        hide-details="auto"
       ></AppTextField>
-      <TagPicker v-model="form.tagIds" />
+      <TagPicker v-model="form.tagIds" class="mt-6" />
 
       <v-alert
         v-if="!categoryOptions.length && categoriesError"
@@ -92,17 +90,15 @@
         {{ error }}
       </v-alert>
 
-      <!-- Editing an existing movement is neutral (blue); creating one
-           keeps the income/expense colour. -->
       <AppButton
         type="submit"
-        :color="isEditing ? 'primary' : isIncome ? 'success' : 'error'"
+        color="primary"
         size="large"
         class="w-100 mt-4 font-weight-bold"
         :loading="submitting"
         :disabled="!isValid"
       >
-        {{ isEditing ? 'Update' : 'Save' }}
+        {{ isEditing ? 'Update' : favoriteMode ? 'Create' : 'Save' }}
       </AppButton>
 
       <!-- Record metadata: only meaningful for an existing movement -->

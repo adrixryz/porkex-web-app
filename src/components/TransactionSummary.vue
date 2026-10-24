@@ -1,10 +1,10 @@
 <template>
-  <div class="summary-row">
+  <div class="summary-row" :class="{ 'summary-row--compact-spacing': compactSpacing }">
     <v-avatar :color="transaction.category?.color || '#777777'" variant="tonal" size="36"
       ><v-icon :icon="transaction.type === 'Income' ? mdiCashPlus : mdiCashMinus"
     /></v-avatar>
     <div class="summary-meta">
-      <div class="text-white text-body-2 text-truncate">
+      <div class="text-white text-body-2" :class="{ 'text-truncate': !compactSpacing }">
         {{ transaction.category?.name || 'Category' }}
         <span class="text-caption"> · {{ transaction.account?.name || 'Main' }}</span>
         <v-icon
@@ -32,7 +32,10 @@
       class="summary-amount"
       :class="transaction.type === 'Income' ? 'text-success' : 'text-error'"
     >
-      {{ transaction.type === 'Income' ? '+' : '-' }}{{ cs }}{{ formatMoney(transaction.amount)
+      {{
+        hideAmounts
+          ? '****'
+          : (transaction.type === 'Income' ? '+' : '-') + cs + formatMoney(transaction.amount)
       }}<slot name="actions" />
     </div>
   </div>
@@ -48,6 +51,8 @@ const props = defineProps<{
   transaction: Transaction
   selectableTags?: boolean
   selectedTagId?: string | null
+  compactSpacing?: boolean
+  hideAmounts?: boolean
 }>()
 const emit = defineEmits<{ selectTag: [id: string] }>()
 const cs = useCurrencySymbol()
@@ -114,6 +119,29 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
   }
   .summary-amount {
     font-size: 12px;
+  }
+}
+@media (max-width: 599px) {
+  .summary-row--compact-spacing {
+    grid-template-columns: 36px minmax(112px, 2fr) minmax(0, 1fr) clamp(104px, 26vw, 126px);
+    gap: 6px 8px;
+  }
+  .summary-row--compact-spacing .summary-meta > :first-child {
+    overflow-wrap: anywhere;
+  }
+  .summary-row--compact-spacing :deep(.v-avatar) {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .summary-row--compact-spacing .summary-amount {
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 359px) {
+  .summary-row--compact-spacing {
+    gap: 6px;
   }
 }
 </style>

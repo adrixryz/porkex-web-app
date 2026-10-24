@@ -3,7 +3,7 @@
     <div class="text-caption mb-2">
       Tags <span class="text-on-surface-variant">({{ modelValue.length }}/5)</span>
     </div>
-    <div class="d-flex flex-wrap ga-2">
+    <div class="d-flex flex-wrap align-center ga-2">
       <v-chip
         v-for="tag in tags"
         :key="tag.id"
@@ -28,6 +28,7 @@
         type="button"
         size="small"
         variant="text"
+        :framed="false"
         :prepend-icon="mdiPencilOutline"
         @click="editing = true"
       >

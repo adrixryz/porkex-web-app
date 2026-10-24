@@ -37,7 +37,7 @@
             class="mr-4"
             ><AppIconButton
               :icon="mdiSync"
-              label="Pending changes"
+              label="Pending Changes"
               @click="syncCenterOpen = true" /></v-badge
         ></template>
       </v-app-bar>

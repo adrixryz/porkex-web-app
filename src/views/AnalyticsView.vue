@@ -9,7 +9,7 @@
         </v-col>
       </v-row>
       <v-row class="mb-6">
-        <v-col cols="12" sm="6" md="4" v-for="n in 6" :key="n">
+        <v-col cols="6" md="3" v-for="n in 4" :key="n">
           <AppCard class="pa-4">
             <v-skeleton-loader type="text" width="100" class="mb-2"></v-skeleton-loader>
             <v-skeleton-loader type="heading" width="140"></v-skeleton-loader>
@@ -36,26 +36,8 @@
       <AppPageHeader title="Analytics" subtitle="Track your financial trends and patterns" />
 
       <!-- INSIGHT CARDS -->
-      <v-row class="mb-6">
-        <v-col cols="12" sm="6" md="4">
-          <AppStatCard
-            label="This Month Income"
-            :value="`+${cs}${formatMoney(insights.currentMonthIncome)}`"
-            value-class="text-success"
-            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
-            class="fill-height"
-          />
-        </v-col>
-        <v-col cols="12" sm="6" md="4">
-          <AppStatCard
-            label="This Month Expenses"
-            :value="`-${cs}${formatMoney(insights.currentMonthExpense)}`"
-            value-class="text-error"
-            label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
-            class="fill-height"
-          />
-        </v-col>
-        <v-col cols="12" sm="6" md="4">
+      <v-row class="mb-6 analytics-insights">
+        <v-col cols="6" md="3">
           <AppStatCard
             label="Avg Daily Expense"
             :value="`${cs}${formatMoney(insights.avgDailyExpense)}`"
@@ -64,28 +46,28 @@
             class="fill-height"
           />
         </v-col>
-        <v-col cols="12" sm="6" md="4">
+        <v-col cols="6" md="3">
           <AppStatCard
             label="Month-over-Month"
             value=""
-            :value-class="insights.expenseChangePercent > 0 ? 'text-error' : 'text-success'"
+            :value-class="expenseIncreased ? 'text-error' : 'text-success'"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           >
             <template #value>
               <v-icon
-                :icon="insights.expenseChangePercent > 0 ? mdiTrendingUp : mdiTrendingDown"
+                :icon="expenseIncreased ? mdiTrendingUp : mdiTrendingDown"
                 size="20"
                 class="mr-1"
               ></v-icon>
-              {{ insights.expenseChangePercent > 0 ? '+' : '' }}{{ insights.expenseChangePercent }}%
+              {{ expenseChangeLabel }}
             </template>
             <template #caption>
               was {{ cs }}{{ formatMoney(insights.lastMonthExpense) }} last month
             </template>
           </AppStatCard>
         </v-col>
-        <v-col cols="12" sm="6" md="4">
+        <v-col cols="6" md="3">
           <AppStatCard
             label="Savings Rate"
             :value="`${insights.savingsRate > 0 ? '+' : ''}${insights.savingsRate}%`"
@@ -95,7 +77,7 @@
             class="fill-height"
           />
         </v-col>
-        <v-col cols="12" sm="6" md="4">
+        <v-col cols="6" md="3">
           <AppStatCard
             label="Top Category"
             value=""
@@ -122,7 +104,7 @@
       <v-row class="mb-6">
         <!-- BAR CHART: Income / Expenses / Profit-Loss per month -->
         <v-col cols="12" md="7">
-          <AppCard title="Income vs Expenses" class="fill-height">
+          <AppCard title="Income vs Expenses" title-class="font-weight-bold" class="fill-height">
             <template #header-actions>
               <AppTextField
                 v-model="monthsInput"
@@ -158,7 +140,7 @@
 
         <!-- LINE CHART: Balance Trend -->
         <v-col cols="12" md="5">
-          <AppCard title="Balance Trend" class="fill-height">
+          <AppCard title="Balance Trend" title-class="font-weight-bold" class="fill-height">
             <template #header-actions>
               <AppTextField
                 v-model="daysInput"
@@ -196,14 +178,11 @@
       <!-- TOP CATEGORIES + CATEGORY COMPARISON -->
       <v-row>
         <v-col cols="12" md="5">
-          <AppCard class="fill-height">
-            <template #title>
-              <div class="analytics-card-title d-flex flex-wrap align-baseline">
-                <span class="font-weight-medium text-subtitle-1"
-                  >Where your money went this month</span
-                >
-              </div>
-            </template>
+          <AppCard
+            title="Monthly Expense Breakdown"
+            title-class="font-weight-bold"
+            class="fill-height analytics-spending-card"
+          >
             <AppCardBody>
               <div v-if="!topCategories.length" class="text-center text-on-surface-variant py-8">
                 <v-icon :icon="mdiChartPie" size="40" class="mb-2 opacity-50"></v-icon>
@@ -352,6 +331,13 @@ const monthlyData = computed(() => analytics.value.monthlyData)
 const trendData = computed(() => analytics.value.trendData)
 const topCategories = computed(() => analytics.value.topCategories)
 const insights = computed(() => analytics.value.insights)
+const expenseIncreased = computed(
+  () => insights.value.currentMonthExpense > insights.value.lastMonthExpense
+)
+const expenseChangeLabel = computed(() => {
+  const value = insights.value.expenseChangePercent
+  return value === null ? 'New' : `${value > 0 ? '+' : ''}${value}%`
+})
 
 // Chart tooltips show the raw numbers unless a formatter is provided. The
 // parameter stays structural so the same formatter serves the bar and the
@@ -565,11 +551,11 @@ onMounted(restoreRange)
 </script>
 
 <style scoped>
-.analytics-card-title {
-  min-width: 0;
-  white-space: normal;
-  gap: 0 8px;
+.analytics-insights :deep(.stat-card-content) {
+  width: 100%;
+  overflow-wrap: anywhere;
 }
+
 .hover-row {
   transition: background-color 0.2s;
 }

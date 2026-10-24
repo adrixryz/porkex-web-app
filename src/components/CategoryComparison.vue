@@ -2,9 +2,9 @@
   <AppCard
     class="fill-height category-comparison"
     role="region"
-    aria-label="Category comparison"
-    title="Category comparison"
-    :subtitle="subtitle"
+    aria-label="Category Comparison"
+    title="Category Comparison"
+    title-class="font-weight-bold"
   >
     <template #header-actions>
       <AppSelect
@@ -130,13 +130,6 @@ const { data, loading, error, run } = useAsyncData<Comparison>(
   { cacheKey: () => `full-previous:${key()}` }
 )
 const rows = computed(() => (data.value?.mode === mode.value ? data.value.categoryComparison : []))
-const subtitle = computed(() =>
-  mode.value === 'month'
-    ? 'This month vs last month'
-    : data.value?.partial
-      ? `This ${mode.value} to date vs full previous ${mode.value}`
-      : `This ${mode.value} vs last ${mode.value}`
-)
 function selectMode(value: unknown) {
   if (!['month', 'week', 'year'].includes(String(value)) || value === mode.value) return
   const query: LocationQueryRaw = { ...route.query, comparison: String(value) }
@@ -162,6 +155,14 @@ onMounted(() => {
 .comparison-table :deep(td),
 .comparison-table :deep(th) {
   padding-inline: 12px;
+}
+.comparison-table :deep(th:first-child),
+.comparison-table :deep(td:first-child) {
+  padding-left: 24px;
+}
+.comparison-table :deep(th:last-child),
+.comparison-table :deep(td:last-child) {
+  padding-right: 24px;
 }
 @media (max-width: 599px) {
   .comparison-selector {

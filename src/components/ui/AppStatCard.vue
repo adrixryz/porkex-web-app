@@ -1,11 +1,11 @@
 <template>
-  <AppCard class="pa-4 d-flex align-center">
+  <AppCard class="pa-4 d-flex align-center" :class="{ 'stat-card-responsive': responsive }">
     <v-avatar v-if="icon" :color="color" size="56" variant="tonal" class="mr-4">
       <v-icon :icon="icon" size="32"></v-icon>
     </v-avatar>
-    <div>
-      <div :class="labelClass">{{ label }}</div>
-      <div class="text-h5 font-weight-bold" :class="valueClass">
+    <div class="stat-card-content">
+      <div class="stat-card-label" :class="labelClass">{{ label }}</div>
+      <div class="stat-card-value text-h5 font-weight-bold" :class="valueClass">
         <slot name="value">{{ value }}</slot>
       </div>
       <div v-if="caption || $slots.caption" class="text-caption text-on-surface-variant">
@@ -27,6 +27,7 @@ withDefaults(
     labelClass?: string
     valueClass?: string
     caption?: string
+    responsive?: boolean
   }>(),
   {
     icon: '',
@@ -37,3 +38,51 @@ withDefaults(
   }
 )
 </script>
+
+<style scoped>
+.stat-card-content {
+  min-width: 0;
+}
+.stat-card-responsive {
+  height: 100%;
+  flex-direction: column;
+  align-items: center !important;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+.stat-card-responsive :deep(.v-avatar) {
+  margin-right: 0 !important;
+}
+.stat-card-responsive .stat-card-content {
+  width: 100%;
+}
+.stat-card-responsive .stat-card-content > div {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 599px) {
+  .stat-card-responsive {
+    padding: 12px 8px !important;
+    gap: 6px;
+  }
+  .stat-card-responsive :deep(.v-avatar) {
+    width: 40px !important;
+    height: 40px !important;
+    flex-basis: 40px !important;
+  }
+  .stat-card-responsive :deep(.v-avatar .v-icon) {
+    font-size: 24px !important;
+    width: 24px;
+    height: 24px;
+  }
+  .stat-card-responsive .stat-card-label {
+    font-size: clamp(10px, 2.8vw, 14px) !important;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .stat-card-responsive .stat-card-value {
+    font-size: clamp(14px, 3.6vw, 20px) !important;
+    line-height: 1.5;
+  }
+}
+</style>

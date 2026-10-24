@@ -20,20 +20,34 @@
 
     <template v-else>
       <!-- HEADER -->
-      <AppPageHeader
-        title="Budgets"
-        subtitle="Set a limit per category and watch how much is left."
-      >
+      <AppPageHeader title="Budgets" subtitle="Set limits per account and category.">
         <template #actions>
-          <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
+          <AppButton
+            color="primary"
+            :prepend-icon="mdiPlus"
+            :disabled="selectedAccountArchived"
+            @click="openDialog()"
+          >
             New Budget
           </AppButton>
         </template>
       </AppPageHeader>
+      <v-alert v-if="loadError || accountsError" type="error" class="mb-4">{{
+        loadError || accountsError
+      }}</v-alert>
 
       <!-- PERIOD TOGGLE -->
       <v-row class="mb-4">
-        <v-col cols="12" class="d-flex align-center">
+        <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
+          <AppSelect
+            v-model="accountFilter"
+            :items="accountOptions"
+            item-title="name"
+            item-value="id"
+            label="Account"
+            hide-details
+            class="budget-account-filter"
+          />
           <v-btn-toggle
             v-model="period"
             mandatory
@@ -42,6 +56,7 @@
             rounded="pill"
             variant="outlined"
             aria-label="Budget period"
+            class="ml-auto"
           >
             <v-btn value="MONTH">This month</v-btn>
             <v-btn value="WEEK">This week</v-btn>
@@ -55,7 +70,7 @@
           <AppStatCard
             label="Total limit"
             :value="`${cs}${formatMoney(totals.amount)}`"
-            :caption="`across ${totals.count} ${totals.count === 1 ? 'category' : 'categories'}`"
+            :caption="`across ${totals.count} ${totals.count === 1 ? 'budget' : 'budgets'}`"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
@@ -95,13 +110,7 @@
             :title="`No budgets for ${period === 'MONTH' ? 'this month' : 'this week'}`"
             description="Set a limit on a category to know when you are getting close to the limit."
             padding="12"
-          >
-            <template #actions>
-              <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
-                Create your first budget
-              </AppButton>
-            </template>
-          </AppEmptyState>
+          />
         </v-col>
       </v-row>
 
@@ -118,6 +127,7 @@
                   {{ b.category.name }}
                 </div>
                 <div class="text-caption text-on-surface-variant">
+                  {{ b.account?.name || 'Main' }} ·
                   {{ b.period === 'MONTH' ? 'Monthly' : 'Weekly' }} limit
                 </div>
               </div>
@@ -183,6 +193,14 @@
       :close-disabled="submitting"
     >
       <v-form @submit.prevent="submit">
+        <AppSelect
+          v-model="form.accountId"
+          :items="activeAccounts"
+          item-title="name"
+          item-value="id"
+          label="Account"
+          class="mb-2"
+        />
         <CategorySelect
           v-model="form.categoryId"
           :items="availableCategories"
@@ -264,6 +282,8 @@
 
 <script setup lang="ts">
 import { validAmount } from '@/utils/validation'
+import { useRoute, useRouter } from 'vue-router'
+import { useAccounts } from '@/composables/useAccounts'
 import { occupiedBudgetCategories } from '@/utils/budgetCategories'
 import { ownedPending, outboxRevision } from '@/utils/outbox'
 import { getUser } from '@/utils/api'
@@ -300,10 +320,32 @@ import {
 
 const cs = useCurrencySymbol()
 const { showSnack } = useSnackbar()
+const { accounts, activeAccounts, run: fetchAccounts, error: accountsError } = useAccounts()
+const route = useRoute(),
+  router = useRouter()
+const accountFilter = computed({
+  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : 'all'),
+  set: (value: string) => {
+    const query = { ...route.query }
+    if (value === 'all') delete query.accountId
+    else query.accountId = value
+    void router.push({ query })
+  }
+})
+const accountOptions = computed(() => [
+  { id: 'all', name: 'All accounts' },
+  ...accounts.value.map(account => ({
+    ...account,
+    name: account.archived ? `${account.name} (Archived)` : account.name
+  }))
+])
+const selectedAccountArchived = computed(() =>
+  accounts.value.some(account => account.id === accountFilter.value && account.archived)
+)
 
 const EMPTY_BUDGETS: BudgetsResponse = { budgets: [], totals: [] }
 
-const period = ref<BudgetPeriod>('MONTH')
+const period = ref<BudgetPeriod>(route.query.period === 'WEEK' ? 'WEEK' : 'MONTH')
 
 // `today` anchors the weekly/monthly window to the user's own calendar day:
 // the backend computes the range in UTC but starts from this day, so the
@@ -326,8 +368,23 @@ const {
   { cacheKey: () => `/budgets?weekStart=${getFirstDayOfWeek()}` }
 )
 
-const budgets = computed(() => data.value.budgets.filter(b => b.period === period.value))
-const totals = computed(() => data.value.totals.find(t => t.period === period.value) ?? null)
+const budgets = computed(() =>
+  data.value.budgets.filter(
+    b =>
+      b.period === period.value &&
+      (accountFilter.value === 'all' ||
+        (b.accountId ?? `main-${getUser()?.id}`) === accountFilter.value)
+  )
+)
+const totals = computed(() =>
+  budgets.value.length
+    ? {
+        amount: round2(budgets.value.reduce((sum, b) => sum + b.amount, 0)),
+        spent: round2(budgets.value.reduce((sum, b) => sum + b.spent, 0)),
+        count: budgets.value.length
+      }
+    : null
+)
 const remainingTotal = computed(() =>
   totals.value ? round2(totals.value.amount - totals.value.spent) : 0
 )
@@ -357,7 +414,12 @@ const editingBudget = ref<Budget | null>(null)
 const clientId = ref('')
 const submitting = ref(false)
 const error = ref('')
-const form = ref({ categoryId: null as number | null, amount: '', period: 'MONTH' as BudgetPeriod })
+const form = ref({
+  accountId: '',
+  categoryId: null as number | null,
+  amount: '',
+  period: 'MONTH' as BudgetPeriod
+})
 const cleanForm = ref('')
 useUnsavedChanges(
   () => dialog.value && JSON.stringify(form.value) !== cleanForm.value,
@@ -392,10 +454,11 @@ const availableCategories = computed(() => {
     /* Outbox warning preserves damaged data. */
   }
   const used = occupiedBudgetCategories(
-    data.value.budgets,
+    data.value.budgets.map(b => ({ ...b, accountId: b.accountId ?? `main-${getUser()?.id}` })),
     pending,
     form.value.period,
-    editingBudget.value?.id
+    editingBudget.value?.id,
+    form.value.accountId
   )
   return (categories.value ?? []).filter(c => !used.has(c.id))
 })
@@ -403,7 +466,7 @@ const availableCategories = computed(() => {
 // Switching the period can leave the chosen category unusable. Not while editing:
 // the category is fixed then, since the API only accepts amount and period.
 watch(
-  () => form.value.period,
+  () => [form.value.period, form.value.accountId],
   () => {
     if (isEditing.value) return
     if (!availableCategories.value.some(c => c.id === form.value.categoryId)) {
@@ -412,14 +475,34 @@ watch(
   }
 )
 
-const isValid = computed(() => validAmount(form.value.amount) && form.value.categoryId !== null)
+const isValid = computed(
+  () =>
+    validAmount(form.value.amount) &&
+    form.value.categoryId !== null &&
+    activeAccounts.value.some(a => a.id === form.value.accountId) &&
+    availableCategories.value.some(c => c.id === form.value.categoryId)
+)
 
 const openDialog = (budget?: Budget) => {
+  if (!budget && selectedAccountArchived.value) return
   clientId.value = crypto.randomUUID()
   editingBudget.value = budget ?? null
   form.value = budget
-    ? { categoryId: budget.categoryId, amount: String(budget.amount), period: budget.period }
-    : { categoryId: null, amount: '', period: period.value }
+    ? {
+        accountId: budget.accountId ?? `main-${getUser()?.id}`,
+        categoryId: budget.categoryId,
+        amount: String(budget.amount),
+        period: budget.period
+      }
+    : {
+        accountId:
+          accountFilter.value !== 'all'
+            ? accountFilter.value
+            : (activeAccounts.value.find(a => a.isMain)?.id ?? ''),
+        categoryId: null,
+        amount: '',
+        period: period.value
+      }
   cleanForm.value = JSON.stringify(form.value)
   error.value = ''
   dialog.value = true
@@ -497,10 +580,15 @@ const loadBudgets = async () => {
 
 watch(period, loadBudgets)
 onMounted(loadBudgets)
+onMounted(() => void fetchAccounts())
 </script>
 
 <style scoped>
 .cursor-pointer {
   cursor: pointer;
+}
+.budget-account-filter {
+  max-width: 260px;
+  min-width: 180px;
 }
 </style>

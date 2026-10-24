@@ -1,71 +1,133 @@
 <template>
-  <AppCard v-bind="$attrs" title="Savings goals" subtitle="Money set aside across all accounts">
-    <template #header-actions
-      ><AppButton v-if="!compact" @click="newGoal">New goal</AppButton
-      ><AppButton v-else to="/goals" variant="text" size="small" color="primary"
-        >Manage goals</AppButton
-      ></template
-    >
-    <AppCardBody>
-      <v-alert v-if="error || loadError" type="error" class="mb-3">{{
-        error || loadError
-      }}</v-alert>
-      <p v-if="!goals.length">No savings goals yet.</p>
-      <div v-for="goal in goals" :key="goal.id" class="mb-5">
-        <div class="d-flex flex-wrap justify-space-between ga-2">
-          <strong>{{ goal.name }}</strong
-          ><span
-            >{{ cs }}{{ formatMoney(goal.balance) }} / {{ cs
-            }}{{ formatMoney(goal.targetAmount || 0) }}</span
-          >
-        </div>
-        <v-progress-linear
-          :model-value="Math.min(100, (goal.balance / (goal.targetAmount || 1)) * 100)"
-          color="primary"
-          height="8"
-          rounded
-          class="my-3"
-          :aria-label="`${goal.name} progress`"
-        />
-        <div class="d-flex flex-wrap ga-2">
-          <AppButton size="small" @click="fund(goal, false)">Add funds</AppButton
-          ><AppButton
-            size="small"
-            variant="text"
-            :disabled="goal.balance <= 0"
-            @click="fund(goal, true)"
-            >Withdraw</AppButton
-          ><template v-if="!compact"
-            ><AppButton size="small" variant="text" @click="edit(goal)">Edit</AppButton
-            ><AppButton size="small" variant="text" @click="deleting = goal"
-              >Remove</AppButton
-            ></template
-          >
-        </div>
-      </div>
-    </AppCardBody>
-  </AppCard>
+  <div v-bind="$attrs">
+    <v-alert v-if="error || loadError" type="error" class="mb-4">{{ error || loadError }}</v-alert>
+    <AppEmptyState
+      v-if="!goals.length"
+      :icon="mdiBullseyeArrow"
+      title="No savings goals yet"
+      description="Create a goal to start setting money aside."
+      padding="12"
+    />
+    <v-row v-else>
+      <v-col v-for="goal in goals" :key="goal.id" cols="12" md="6">
+        <AppCard class="fill-height goal-card">
+          <AppCardBody padding="pa-5">
+            <div class="d-flex align-center ga-3 mb-3">
+              <v-avatar color="primary" size="40">
+                <v-icon :icon="mdiBullseyeArrow" color="white" />
+              </v-avatar>
+              <div class="flex-grow-1 goal-name text-body-1 font-weight-medium">
+                {{ goal.name }}
+              </div>
+              <div class="d-flex flex-shrink-0">
+                <AppIconButton
+                  :icon="mdiPencilOutline"
+                  :label="`Edit ${goal.name}`"
+                  color="primary"
+                  @click="edit(goal)"
+                />
+                <AppIconButton
+                  :icon="mdiDeleteOutline"
+                  :label="`Remove ${goal.name}`"
+                  color="error"
+                  @click="deleting = goal"
+                />
+              </div>
+            </div>
+            <div class="d-flex flex-wrap align-baseline justify-space-between ga-2 mb-2">
+              <span class="text-h6 font-weight-bold">{{ cs }}{{ formatMoney(goal.balance) }}</span>
+              <span class="text-body-2 text-on-surface-variant"
+                >of {{ cs }}{{ formatMoney(goal.targetAmount || 0) }}</span
+              >
+            </div>
+            <v-progress-linear
+              :model-value="Math.min(100, (goal.balance / (goal.targetAmount || 1)) * 100)"
+              color="primary"
+              bg-color="surface-bright"
+              height="8"
+              rounded
+              :aria-label="`${goal.name} progress`"
+            />
+            <div
+              class="d-flex align-center justify-space-between ga-2 mt-2 text-caption text-on-surface-variant"
+            >
+              <span
+                >{{ cs
+                }}{{ formatMoney(Math.max(0, (goal.targetAmount || 0) - goal.balance)) }} left</span
+              >
+              <span>{{ Math.floor((goal.balance / (goal.targetAmount || 1)) * 100) }}%</span>
+            </div>
+            <div class="d-flex flex-wrap ga-2 mt-3">
+              <AppButton
+                size="small"
+                color="primary"
+                variant="tonal"
+                :prepend-icon="mdiPlus"
+                :disabled="goal.balance >= (goal.targetAmount || 0)"
+                @click="fund(goal, false)"
+                >Add funds</AppButton
+              >
+              <AppButton
+                size="small"
+                color="primary"
+                variant="tonal"
+                :prepend-icon="mdiMinus"
+                :disabled="goal.balance <= 0"
+                @click="fund(goal, true)"
+                >Withdraw</AppButton
+              >
+            </div>
+          </AppCardBody>
+        </AppCard>
+      </v-col>
+    </v-row>
+  </div>
   <AppDialog
     v-model="dialog"
     :title="editing ? 'Edit goal' : 'New goal'"
     :close-disabled="busy"
     :dirty="JSON.stringify(form) !== clean"
   >
-    <v-form @submit.prevent="save"
-      ><AppTextField v-model="form.name" label="Name" maxlength="60" /><AppTextField
+    <v-form @submit.prevent="save">
+      <AppTextField v-model="form.name" label="Name" maxlength="60" class="mb-2" />
+      <AppTextField
         v-model="form.targetAmount"
         label="Target amount"
         type="number"
+        inputmode="decimal"
+        :prefix="cs"
+        :error-messages="
+          form.targetAmount && !validAmount(form.targetAmount)
+            ? 'Use up to two decimals, from 0.01 to 10,000,000.'
+            : editing && Number(form.targetAmount) < editing.balance
+              ? 'The target cannot be lower than the amount already saved.'
+              : []
+        "
         min="0.01"
         step="0.01"
-      /><v-alert v-if="error" type="error" class="mb-3">{{ error }}</v-alert
-      ><AppButton
+        hide-spin-buttons
+        class="mb-2"
+      >
+        <template #append-inner>
+          <AmountStepper label="target amount" @step="stepTargetAmount" />
+        </template>
+      </AppTextField>
+      <v-alert v-if="error" type="error" class="mb-3">{{ error }}</v-alert>
+      <AppButton
         type="submit"
+        color="primary"
+        size="large"
+        class="w-100 mt-4 font-weight-bold"
         :loading="busy"
-        :disabled="!form.name.trim() || !validAmount(form.targetAmount)"
-        >Save goal</AppButton
-      ></v-form
-    >
+        :disabled="
+          !form.name.trim() ||
+          !validAmount(form.targetAmount) ||
+          !!(editing && Number(form.targetAmount) < editing.balance)
+        "
+      >
+        {{ editing ? 'Update' : 'Create' }}
+      </AppButton>
+    </v-form>
   </AppDialog>
   <TransferDialog
     v-model="transferOpen"
@@ -88,6 +150,7 @@
 <script setup lang="ts">
 defineOptions({ inheritAttrs: false })
 import { onMounted, ref } from 'vue'
+import { mdiPlus, mdiMinus, mdiPencilOutline, mdiDeleteOutline, mdiBullseyeArrow } from '@mdi/js'
 import type { Account } from '@/types'
 import { usePendingCatalog } from '@/composables/usePendingCatalog'
 import { getUser } from '@/utils/api'
@@ -100,12 +163,14 @@ import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AppCard from './ui/AppCard.vue'
 import AppCardBody from './ui/AppCardBody.vue'
+import AppEmptyState from './ui/AppEmptyState.vue'
 import AppDialog from './ui/AppDialog.vue'
 import AppConfirmDialog from './ui/AppConfirmDialog.vue'
 import AppButton from './ui/AppButton.vue'
+import AppIconButton from './ui/AppIconButton.vue'
 import AppTextField from './ui/AppTextField.vue'
+import AmountStepper from './AmountStepper.vue'
 import TransferDialog from './TransferDialog.vue'
-defineProps<{ compact?: boolean }>()
 const { activeAccounts, run } = useAccounts(),
   cs = useCurrencySymbol(),
   { showSnack } = useSnackbar()
@@ -150,6 +215,13 @@ function edit(goal: Account | null) {
 function newGoal() {
   edit(null)
 }
+function stepTargetAmount(delta: number) {
+  const current = Number.parseFloat(form.value.targetAmount)
+  const base = Number.isFinite(current) ? current : 0
+  const next = Math.round((base + delta) * 100) / 100
+  form.value.targetAmount = next >= 0.01 ? String(next) : ''
+}
+defineExpose({ newGoal })
 function fund(goal: Account, out: boolean) {
   selected.value = goal
   withdraw.value = out
@@ -195,3 +267,10 @@ onMounted(() => {
   void run()
 })
 </script>
+
+<style scoped>
+.goal-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+</style>

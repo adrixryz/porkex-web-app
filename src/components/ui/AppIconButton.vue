@@ -1,5 +1,13 @@
 <template>
-  <v-btn icon :aria-label="label" :size="size" :variant="variant" :type="type" v-bind="$attrs">
+  <v-btn
+    icon
+    :aria-label="label"
+    :title="label"
+    :size="size"
+    :variant="variant"
+    :type="type"
+    v-bind="$attrs"
+  >
     <v-icon :icon="icon"></v-icon>
   </v-btn>
 </template>

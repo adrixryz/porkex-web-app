@@ -21,7 +21,7 @@
           @click="close"
         ></AppIconButton>
       </v-card-title>
-      <AppCardBody :padding="contentClass">
+      <AppCardBody :padding="contentClass" class="app-dialog-body">
         <slot></slot>
       </AppCardBody>
       <v-card-actions v-if="$slots.actions" :class="actionsClass">
@@ -82,3 +82,20 @@ function close() {
   if (!open.value) emit('close')
 }
 </script>
+
+<style scoped>
+.app-dialog-body :deep(.v-form > .v-btn:last-child) {
+  margin-top: 24px !important;
+}
+.app-dialog-body :deep(.v-form > .v-input:has(+ .v-btn:last-child)) {
+  margin-bottom: 0 !important;
+}
+.app-dialog-body
+  :deep(
+    .v-form
+      > .v-input:has(+ .v-btn:last-child)
+      > .v-input__details:has(> .v-messages:only-child):not(:has(.v-messages__message))
+  ) {
+  display: none;
+}
+</style>

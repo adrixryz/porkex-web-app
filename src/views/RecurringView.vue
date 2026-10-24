@@ -39,13 +39,7 @@
             title="No recurring rules yet"
             description="Recreate the rent, the salary or any movement that comes back on its own."
             padding="12"
-          >
-            <template #actions>
-              <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
-                Create your first rule
-              </AppButton>
-            </template>
-          </AppEmptyState>
+          />
         </v-col>
       </v-row>
 
@@ -101,9 +95,23 @@
                 · {{ r.nextException.comment }}</span
               ></v-alert
             >
-            <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-1 mt-2">
-              <AppButton size="small" variant="tonal" @click="skipRule = r">Skip next</AppButton>
-              <AppButton size="small" variant="tonal" @click="editNext(r)">Edit next</AppButton>
+            <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-2 mt-2">
+              <AppButton
+                size="small"
+                color="primary"
+                variant="tonal"
+                :prepend-icon="mdiSkipNextOutline"
+                @click="skipRule = r"
+                >Skip next</AppButton
+              >
+              <AppButton
+                size="small"
+                color="primary"
+                variant="tonal"
+                :prepend-icon="mdiPencilOutline"
+                @click="editNext(r)"
+                >Edit next</AppButton
+              >
             </div>
             <div class="d-flex align-center justify-space-between mt-2">
               <span class="text-caption text-on-surface-variant">
@@ -151,7 +159,7 @@
       :model-value="!!skipRule"
       title="Skip next occurrence?"
       confirm-label="Skip"
-      color="warning"
+      color="primary"
       :icon="mdiRepeat"
       max-width="400"
       :loading="skipping"
@@ -223,6 +231,7 @@ import {
   mdiDeleteOutline,
   mdiPause,
   mdiPencilOutline,
+  mdiSkipNextOutline,
   mdiPlayOutline,
   mdiPlus,
   mdiRepeat

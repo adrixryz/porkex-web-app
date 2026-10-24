@@ -1,8 +1,10 @@
 <template>
-  <AppDialog v-model="syncCenterOpen" title="Pending changes" max-width="720">
-    <p class="text-caption mb-4">Changes are sent in order. Confirmed changes leave this list.</p>
+  <AppDialog v-model="syncCenterOpen" title="Pending Changes" max-width="720">
+    <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
+      Changes are sent in order. Confirmed changes leave this list.
+    </p>
     <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
-    <p v-if="!items.length && !scheduledDeletes.length">No pending changes.</p>
+    <p v-if="!items.length && !scheduledDeletes.length" class="mb-0">No pending changes.</p>
     <AppCard v-for="item in items" :key="item.id" class="mb-3">
       <AppCardBody>
         <strong class="text-break">{{ describe(item) }}</strong>
@@ -92,11 +94,29 @@
         :type="
           field.toLowerCase().includes('date')
             ? 'date'
-            : ['amount', 'interval'].includes(field)
+            : [...amountFields, 'interval'].includes(field)
               ? 'number'
               : 'text'
         "
-      />
+        :inputmode="amountFields.includes(field) ? 'decimal' : undefined"
+        :prefix="amountFields.includes(field) ? cs : undefined"
+        :min="
+          ['openingBalance', 'balance'].includes(field)
+            ? 0
+            : amountFields.includes(field)
+              ? 0.01
+              : field === 'interval'
+                ? 1
+                : undefined
+        "
+        :step="amountFields.includes(field) ? 0.01 : field === 'interval' ? 1 : undefined"
+        :hide-spin-buttons="amountFields.includes(field)"
+        class="mb-2"
+      >
+        <template v-if="amountFields.includes(field)" #append-inner>
+          <AmountStepper :label="labels[field]" @step="stepAmount(field, $event)" />
+        </template>
+      </AppTextField>
     </template>
     <CategorySelect
       v-if="'categoryId' in draft"
@@ -130,19 +150,27 @@
     <AppSelect
       v-if="'frequency' in draft"
       v-model="draft.frequency"
-      :items="['DAY', 'WEEK', 'MONTH', 'YEAR']"
+      :items="[
+        { title: 'Day', value: 'DAY' },
+        { title: 'Week', value: 'WEEK' },
+        { title: 'Month', value: 'MONTH' },
+        { title: 'Year', value: 'YEAR' }
+      ]"
       label="Frequency"
     />
     <AppSelect
       v-if="'period' in draft"
       v-model="draft.period"
-      :items="['WEEK', 'MONTH']"
+      :items="[
+        { title: 'Week', value: 'WEEK' },
+        { title: 'Month', value: 'MONTH' }
+      ]"
       label="Period"
     />
     <AppSelect
       v-if="'type' in draft"
       v-model="draft.type"
-      :items="['Income', 'Expense']"
+      :items="transactionTypeOptions"
       label="Type"
     />
     <AppSelect
@@ -163,13 +191,26 @@
     <AppSelect
       v-if="'defaultPeriod' in draft"
       v-model="draft.defaultPeriod"
-      :items="['day', 'week', 'month', 'year']"
+      :items="[
+        { title: 'Day', value: 'day' },
+        { title: 'Week', value: 'week' },
+        { title: 'Month', value: 'month' },
+        { title: 'Year', value: 'year' }
+      ]"
       label="Default period"
     />
     <AppSelect
       v-if="'firstDayOfWeek' in draft"
       v-model="draft.firstDayOfWeek"
-      :items="['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']"
+      :items="[
+        { title: 'Monday', value: 'MONDAY' },
+        { title: 'Tuesday', value: 'TUESDAY' },
+        { title: 'Wednesday', value: 'WEDNESDAY' },
+        { title: 'Thursday', value: 'THURSDAY' },
+        { title: 'Friday', value: 'FRIDAY' },
+        { title: 'Saturday', value: 'SATURDAY' },
+        { title: 'Sunday', value: 'SUNDAY' }
+      ]"
       label="First day of week"
     />
     <AppSelect
@@ -198,7 +239,14 @@
       :model-value="draft.tagIds || []"
       @update:model-value="draft.tagIds = $event"
     />
-    <AppButton :loading="busy" @click="save">Save pending change</AppButton>
+    <AppButton
+      color="primary"
+      size="large"
+      class="w-100 mt-4 font-weight-bold"
+      :loading="busy"
+      @click="save"
+      >Update</AppButton
+    >
   </AppDialog>
   <TransactionDialog
     v-model="confirmedMovementOpen"
@@ -209,6 +257,7 @@
   <RecurringDialog v-model="confirmedRuleOpen" :rule="confirmedRule" />
 </template>
 <script setup lang="ts">
+import { transactionTypeOptions } from '@/utils/transactionTypes'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { syncCenterOpen } from '@/composables/useSyncCenter'
 import {
@@ -223,6 +272,8 @@ import {
 import { getUser, syncPendingWrites, fetchJson } from '@/utils/api'
 import { scheduledDeletes, undoDelete } from '@/utils/undoDelete'
 import { mutationError } from '@/utils/validation'
+import { useCurrencySymbol } from '@/utils/currency'
+import AmountStepper from './AmountStepper.vue'
 import { readCache } from '@/utils/cache'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useAccounts } from '@/composables/useAccounts'
@@ -246,6 +297,18 @@ const editing = ref<QueuedMutation | null>(null)
 // Values retain their original JSON types except for editable scalar inputs.
 const draft = ref<{ [key: string]: unknown; categoryId?: number; tagIds?: string[] }>({})
 const cleanDraft = ref('')
+const cs = useCurrencySymbol()
+const amountFields = ['amount', 'openingBalance', 'balance', 'targetAmount']
+function stepAmount(field: string, delta: number) {
+  const current = Number.parseFloat(String(draft.value[field] ?? ''))
+  const base = Number.isFinite(current) ? current : 0
+  const next = Math.round((base + delta) * 100) / 100
+  draft.value[field] = ['openingBalance', 'balance'].includes(field)
+    ? String(Math.max(0, next))
+    : next >= 0.01
+      ? String(next)
+      : ''
+}
 useUnsavedChanges(
   () => !!editing.value && JSON.stringify(draft.value) !== cleanDraft.value,
   () => busy.value
@@ -318,6 +381,7 @@ const labels: Record<string, string> = {
   endDate: 'End date',
   interval: 'Interval',
   openingBalance: 'Opening balance',
+  balance: 'Current balance',
   targetAmount: 'Target amount',
   color: 'Category color'
 }

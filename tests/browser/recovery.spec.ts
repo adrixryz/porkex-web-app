@@ -1814,7 +1814,7 @@ test('account restore asks for confirmation and goals use budget-style cards wit
 test('archived budget accounts are labeled and cannot create budgets; category palette has 27 colors', async ({
   page
 }) => {
-  await page.route('**/api/accounts', route =>
+  await page.route(/\/api\/accounts(?:\?.*)?$/, route =>
     route.fulfill({
       json: [
         {
@@ -1932,4 +1932,73 @@ test('Pending Changes uses balanced content spacing and Settings has its concise
   await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
   await page.goto('/settings')
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
+})
+
+test('accounts and goals separate confirmed balances from queued transfers', async ({
+  page
+}, info) => {
+  await page.route(/\/api\/accounts(?:\?.*)?$/, route =>
+    route.fulfill({
+      json: [
+        {
+          id: 'main-1',
+          userId: 1,
+          name: 'Main',
+          isMain: true,
+          archived: false,
+          balance: 100,
+          openingBalance: 100
+        },
+        {
+          id: 'goal',
+          userId: 1,
+          name: 'Trip',
+          isGoal: true,
+          archived: false,
+          balance: 20,
+          openingBalance: 0,
+          targetAmount: 100
+        }
+      ]
+    })
+  )
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'porkex_outbox',
+      JSON.stringify([
+        {
+          id: 'blocked',
+          userId: 1,
+          method: 'PUT',
+          path: '/profile',
+          body: '{"name":"Personal"}',
+          createdAt: 1,
+          attempts: 1,
+          status: 'blocked',
+          outcome: 'rejected',
+          lastError: 'Review this change.'
+        },
+        {
+          id: 'transfer',
+          userId: 1,
+          method: 'POST',
+          path: '/transfers',
+          body: JSON.stringify({
+            id: 'pending-transfer',
+            sourceId: 'main-1',
+            destinationId: 'goal',
+            amount: 5
+          }),
+          createdAt: 2,
+          attempts: 0,
+          status: 'pending'
+        }
+      ])
+    )
+  })
+  await page.goto('/accounts')
+  await expect(page.getByText('-$5.00 pending · Expected $95.00', { exact: true })).toBeVisible()
+  await page.goto('/goals')
+  await expect(page.getByText('+$5.00 pending · Expected $25.00', { exact: true })).toBeVisible()
+  await page.screenshot({ path: info.outputPath('pending-goal-balance.png'), fullPage: true })
 })

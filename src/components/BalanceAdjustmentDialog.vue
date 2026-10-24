@@ -38,6 +38,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { BalanceAdjustment } from '@/types'
+import { createEditStamp } from '@/utils/editStamp'
 import { api, isQueuedResponse } from '@/utils/api'
 import { validAmount } from '@/utils/validation'
 import { useCurrencySymbol } from '@/utils/currency'
@@ -56,7 +57,7 @@ const amount = ref(''),
   clean = ref(''),
   busy = ref(false),
   error = ref('')
-let mutationId = ''
+let editStamp = createEditStamp()
 const valid = computed(
   () => /^0(?:\.0{1,2})?$/.test(amount.value.trim()) || validAmount(amount.value)
 )
@@ -66,7 +67,7 @@ watch(
     if (!open) return
     amount.value = String(props.adjustment?.balance ?? 0)
     clean.value = amount.value
-    mutationId = crypto.randomUUID()
+    editStamp = createEditStamp()
     error.value = ''
   }
 )
@@ -89,7 +90,7 @@ async function save() {
       `/accounts/balance-adjustments/${encodeURIComponent(props.adjustment.id)}`,
       {
         method: 'PUT',
-        body: JSON.stringify({ balance: amount.value, mutationId })
+        body: JSON.stringify({ balance: amount.value, ...editStamp(amount.value) })
       }
     )
     if (!response.ok) throw new Error((await response.json()).error)

@@ -54,6 +54,7 @@ import { validAmount } from '@/utils/validation'
 import { useCurrencySymbol } from '@/utils/currency'
 import AmountStepper from './AmountStepper.vue'
 import type { Account } from '@/types'
+import { createEditStamp } from '@/utils/editStamp'
 import { api, isQueuedResponse } from '@/utils/api'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useSnackbar } from '@/composables/useSnackbar'
@@ -78,14 +79,14 @@ function stepOpeningBalance(delta: number) {
   const base = Number.isFinite(current) ? current : 0
   form.value.openingBalance = String(Math.max(0, Math.round((base + delta) * 100) / 100))
 }
-let id = '',
-  mutationId = ''
+let id = ''
+let editStamp = createEditStamp()
 watch(
   () => props.modelValue,
   open => {
     if (open) {
       id = crypto.randomUUID()
-      mutationId = crypto.randomUUID()
+      editStamp = createEditStamp()
       form.value = {
         name: props.account?.name ?? '',
         openingBalance: String(props.account?.balance ?? 0)
@@ -111,7 +112,7 @@ async function save() {
           ? { balance: form.value.openingBalance }
           : { openingBalance: form.value.openingBalance }),
         id,
-        mutationId
+        ...editStamp(JSON.stringify(form.value))
       })
     })
     if (!res.ok) throw new Error((await res.json()).error)

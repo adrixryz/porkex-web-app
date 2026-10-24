@@ -90,6 +90,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { Account, Transfer } from '@/types'
+import { createEditStamp } from '@/utils/editStamp'
 import { api, isQueuedResponse } from '@/utils/api'
 import { todayInput, toDateInput } from '@/utils/date'
 import { validAmount } from '@/utils/validation'
@@ -120,8 +121,8 @@ const form = ref({ sourceId: '', destinationId: '', amount: '', date: todayInput
   busy = ref(false),
   confirming = ref(false),
   error = ref('')
-let id = '',
-  mutationId = ''
+let id = ''
+let editStamp = createEditStamp()
 function stepAmount(delta: number) {
   const current = Number.parseFloat(form.value.amount)
   const base = Number.isFinite(current) ? current : 0
@@ -143,7 +144,12 @@ const goalLimit = computed(() => {
   const reversal = old
     ? (old.destinationId === goal.id ? old.amount : 0) - (old.sourceId === goal.id ? old.amount : 0)
     : 0
-  return Math.max(0, Math.round(((goal.targetAmount || 0) - goal.balance + reversal) * 100) / 100)
+  return Math.max(
+    0,
+    Math.round(
+      ((goal.targetAmount || 0) - (goal.projectedBalance ?? goal.balance) + reversal) * 100
+    ) / 100
+  )
 })
 const exceedsGoal = computed(
   () =>
@@ -174,7 +180,7 @@ watch(
     if (!open) return
     if (!props.sourceAccounts || !props.destinationAccounts) void run()
     id = crypto.randomUUID()
-    mutationId = crypto.randomUUID()
+    editStamp = createEditStamp()
     const t = props.transfer
     form.value = {
       sourceId: t?.sourceId ?? props.sourceId ?? '',
@@ -211,7 +217,12 @@ async function save() {
   try {
     const res = await api(props.transfer ? `/transfers/${props.transfer.id}` : '/transfers', {
       method: props.transfer ? 'PUT' : 'POST',
-      body: JSON.stringify({ ...form.value, id, mutationId })
+      body: JSON.stringify({
+        ...form.value,
+        id,
+        ...editStamp(JSON.stringify(form.value)),
+        ...(props.transfer ? { previousTransfer: props.transfer } : {})
+      })
     })
     if (!res.ok) throw new Error((await res.json()).error)
     showSnack(

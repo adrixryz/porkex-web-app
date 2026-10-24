@@ -4,6 +4,9 @@
 export type TxType = 'Income' | 'Expense'
 
 export interface Account {
+  pendingBalanceDelta?: number
+  projectedBalance?: number
+  pendingBalanceUnknown?: boolean
   isGoal?: boolean
   targetAmount?: number | null
   id: string

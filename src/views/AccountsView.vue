@@ -31,6 +31,7 @@
                   >
                 </div>
                 <p class="text-h6 mt-1">{{ cs }}{{ formatMoney(account.balance) }}</p>
+                <PendingBalance :account="account" />
               </div>
               <div class="d-flex flex-shrink-0">
                 <AppIconButton
@@ -247,6 +248,7 @@ import { api, fetchJson } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import type { Account, Transfer, BalanceAdjustment } from '@/types'
 import BalanceAdjustmentDialog from '@/components/BalanceAdjustmentDialog.vue'
+import PendingBalance from '@/components/PendingBalance.vue'
 import AccountDialog from '@/components/AccountDialog.vue'
 import QuickActions from '@/components/QuickActions.vue'
 import TransferDialog from '@/components/TransferDialog.vue'
@@ -338,13 +340,15 @@ async function mutate(path: string, method: string, body?: unknown) {
   }
 }
 async function remove() {
-  if (deleting.value) await mutate(`/transfers/${deleting.value.id}`, 'DELETE')
+  if (deleting.value)
+    await mutate(`/transfers/${deleting.value.id}`, 'DELETE', { previousTransfer: deleting.value })
 }
 async function restore() {
   if (restoring.value)
     await mutate(`/accounts/${restoring.value.id}`, 'PUT', {
       archived: false,
-      mutationId: crypto.randomUUID()
+      mutationId: crypto.randomUUID(),
+      editedAt: new Date().toISOString()
     })
 }
 async function removeAccount() {
@@ -361,7 +365,8 @@ async function archive() {
   if (archiving.value)
     await mutate(`/accounts/${archiving.value.id}`, 'PUT', {
       archived: true,
-      mutationId: crypto.randomUUID()
+      mutationId: crypto.randomUUID(),
+      editedAt: new Date().toISOString()
     })
 }
 </script>

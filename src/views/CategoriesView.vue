@@ -216,6 +216,13 @@
         in total. Choose which category takes them, or cancel to keep the category.
       </template>
       <template v-else>This action cannot be undone.</template>
+      <p class="mt-2">
+        {{
+          needsReassignment
+            ? 'Linked favorites will use the replacement category.'
+            : 'Favorites using this category will also be removed.'
+        }}
+      </p>
       <template v-if="(deletingCat?.budgetCount ?? 0) > 0">
         <br />
         <span class="text-warning">

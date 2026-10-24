@@ -35,6 +35,14 @@
       <v-alert v-if="loadError || accountsError" type="error" class="mb-4">{{
         loadError || accountsError
       }}</v-alert>
+      <v-alert
+        v-if="budgets.some(budget => budget.category.type !== 'Expense')"
+        type="warning"
+        class="mb-4"
+      >
+        Some older budgets use income categories. Remove them and create spending limits for expense
+        categories.
+      </v-alert>
 
       <!-- PERIOD TOGGLE -->
       <v-row class="mb-4">
@@ -460,7 +468,7 @@ const availableCategories = computed(() => {
     editingBudget.value?.id,
     form.value.accountId
   )
-  return (categories.value ?? []).filter(c => !used.has(c.id))
+  return (categories.value ?? []).filter(c => c.type === 'Expense' && !used.has(c.id))
 })
 
 // Switching the period can leave the chosen category unusable. Not while editing:

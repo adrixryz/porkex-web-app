@@ -171,7 +171,11 @@ export async function retryFirstBlocked() {
   await withSendLock(item.userId, async () => {
     await updateItem(item.id, stored => {
       let body = stored.body
-      if (stored.method === 'PUT' && /^\/transactions\/\d+$/.test(stored.path) && body) {
+      if (
+        stored.method === 'PUT' &&
+        /^\/(transactions|accounts|transfers|goals|favorites)\//.test(stored.path) &&
+        body
+      ) {
         const payload = JSON.parse(body) as Record<string, unknown>
         if (!payload.mutationId || !payload.editedAt) {
           if (
@@ -299,7 +303,11 @@ export async function revisePending(id: string, body: string) {
       if (item.outcome === 'unknown' || (item.attempts > 0 && item.outcome !== 'rejected'))
         throw new Error('Retry the original change before editing: its outcome is unknown.')
       if (item.method === 'DELETE') throw new Error('Deletions cannot be edited.')
-      if (item.method === 'PUT' && /^\/transactions\/\d+$/.test(item.path) && body !== item.body) {
+      if (
+        item.method === 'PUT' &&
+        /^\/(transactions|accounts|transfers|goals|favorites)\//.test(item.path) &&
+        body !== item.body
+      ) {
         body = JSON.stringify({
           ...JSON.parse(body),
           mutationId: crypto.randomUUID(),

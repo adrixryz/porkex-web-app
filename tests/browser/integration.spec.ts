@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { quickAction } from './actions'
 import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
@@ -16,7 +17,7 @@ test('Danger Zone confirmation revokes the phone session and preserves its offli
   const { token, user } = await registration.json()
   await page.request.put(`/api/accounts/main-${user.id}`, {
     headers: { Authorization: `Bearer ${token}` },
-    data: { openingBalance: 1000 }
+    data: { openingBalance: 1000, mutationId: randomUUID(), editedAt: new Date().toISOString() }
   })
   const init = ({ token, user }: { token: string; user: object }) => {
     if (sessionStorage.getItem('sessions-initialized')) return
@@ -175,7 +176,7 @@ test('correcting the device clock retries the same edit through the real API', a
     (
       await page.request.put(`/api/accounts/main-${user.id}`, {
         headers,
-        data: { openingBalance: 1000 }
+        data: { openingBalance: 1000, mutationId: randomUUID(), editedAt: new Date().toISOString() }
       })
     ).status()
   ).toBe(200)
@@ -298,7 +299,7 @@ test('delayed phone edit keeps a newer server edit and drains the real queue', a
     (
       await page.request.put(`/api/accounts/main-${user.id}`, {
         headers,
-        data: { openingBalance: 1000 }
+        data: { openingBalance: 1000, mutationId: randomUUID(), editedAt: new Date().toISOString() }
       })
     ).status()
   ).toBe(200)
@@ -364,14 +365,14 @@ test('real analytics totals, net results and averages reach the income and expen
     (
       await page.request.put(`/api/accounts/main-${user.id}`, {
         headers,
-        data: { openingBalance: 1000 }
+        data: { openingBalance: 1000, mutationId: randomUUID(), editedAt: new Date().toISOString() }
       })
     ).status()
   ).toBe(200)
   const categories = await (await page.request.get('/api/categories', { headers })).json()
   const funding = await page.request.put(`/api/accounts/main-${user.id}`, {
     headers,
-    data: { openingBalance: 2000 }
+    data: { openingBalance: 2000, mutationId: randomUUID(), editedAt: new Date().toISOString() }
   })
   expect(funding.status()).toBe(200)
   for (const [date, type, amount] of [
@@ -657,7 +658,7 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
     (
       await page.request.put(`/api/accounts/main-${user.id}`, {
         headers,
-        data: { openingBalance: 500 }
+        data: { openingBalance: 500, mutationId: randomUUID(), editedAt: new Date().toISOString() }
       })
     ).status()
   ).toBe(200)

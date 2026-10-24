@@ -221,7 +221,10 @@ function confirmedWrite(path: string, notify = true) {
 
 async function sendQueued(mutation: QueuedMutation, session: Session): Promise<Response> {
   assertCurrent(session)
-  if (mutation.method === 'PUT' && /^\/transactions\/\d+$/.test(mutation.path)) {
+  if (
+    mutation.method === 'PUT' &&
+    /^\/(transactions|accounts|transfers|goals|favorites)\//.test(mutation.path)
+  ) {
     const payload = JSON.parse(mutation.body ?? '{}') as Record<string, unknown>
     if (!payload.mutationId || !payload.editedAt) {
       return new Response(

@@ -293,7 +293,7 @@ const submit = async () => {
 
   try {
     const stamp =
-      isEditing.value && !props.occurrence && !props.favoriteMode
+      isEditing.value && !props.occurrence
         ? editStamp(JSON.stringify({ ...form.value, type: props.type }))
         : {}
     const res = await api(url, {

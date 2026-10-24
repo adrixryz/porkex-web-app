@@ -40,6 +40,7 @@
                 >of {{ cs }}{{ formatMoney(goal.targetAmount || 0) }}</span
               >
             </div>
+            <PendingBalance :account="goal" class="mb-2" />
             <v-progress-linear
               :model-value="Math.min(100, (goal.balance / (goal.targetAmount || 1)) * 100)"
               color="primary"
@@ -63,7 +64,10 @@
                 color="primary"
                 variant="tonal"
                 :prepend-icon="mdiPlus"
-                :disabled="goal.balance >= (goal.targetAmount || 0)"
+                :disabled="
+                  goal.pendingBalanceUnknown ||
+                  (goal.projectedBalance ?? goal.balance) >= (goal.targetAmount || 0)
+                "
                 @click="fund(goal, false)"
                 >Add funds</AppButton
               >
@@ -149,15 +153,13 @@
 </template>
 <script setup lang="ts">
 defineOptions({ inheritAttrs: false })
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { mdiPlus, mdiMinus, mdiPencilOutline, mdiDeleteOutline, mdiBullseyeArrow } from '@mdi/js'
 import type { Account } from '@/types'
-import { usePendingCatalog } from '@/composables/usePendingCatalog'
-import { getUser } from '@/utils/api'
 import { useAccounts } from '@/composables/useAccounts'
-import { useAsyncData } from '@/composables/useAsyncData'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
-import { api, fetchJson, isQueuedResponse } from '@/utils/api'
+import { createEditStamp } from '@/utils/editStamp'
+import { api, isQueuedResponse } from '@/utils/api'
 import { validAmount } from '@/utils/validation'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { useSnackbar } from '@/composables/useSnackbar'
@@ -171,26 +173,15 @@ import AppIconButton from './ui/AppIconButton.vue'
 import AppTextField from './ui/AppTextField.vue'
 import AmountStepper from './AmountStepper.vue'
 import TransferDialog from './TransferDialog.vue'
-const { activeAccounts, run } = useAccounts(),
-  cs = useCurrencySymbol(),
-  { showSnack } = useSnackbar()
-const {
-  data: savedGoals,
-  run: load,
-  error: loadError
-} = useAsyncData<Account[]>(signal => fetchJson('/goals', { signal }), [], { cacheKey: '/goals' })
-const goals = usePendingCatalog(savedGoals, '/goals', body => ({
-  ...body,
-  id: String(body.id),
-  userId: getUser()!.id,
-  name: String(body.name),
-  isMain: false,
-  isGoal: true,
-  archived: false,
-  openingBalance: 0,
-  balance: Number(body.balance || 0),
-  targetAmount: Number(body.targetAmount)
-}))
+import PendingBalance from './PendingBalance.vue'
+const { accounts, run: load, error: loadError } = useAccounts({ includeGoals: true })
+const activeAccounts = computed(() =>
+  accounts.value.filter(account => !account.isGoal && !account.archived)
+)
+const goals = computed(() => accounts.value.filter(account => account.isGoal && !account.archived))
+const run = load
+const cs = useCurrencySymbol()
+const { showSnack } = useSnackbar()
 const dialog = ref(false),
   editing = ref<Account | null>(null),
   deleting = ref<Account | null>(null),
@@ -201,12 +192,12 @@ const dialog = ref(false),
   error = ref(''),
   clean = ref(''),
   form = ref({ name: '', targetAmount: '' })
-let id = '',
-  mutationId = ''
+let id = ''
+let editStamp = createEditStamp()
 function edit(goal: Account | null) {
   editing.value = goal
   id = crypto.randomUUID()
-  mutationId = crypto.randomUUID()
+  editStamp = createEditStamp()
   form.value = { name: goal?.name ?? '', targetAmount: goal ? String(goal.targetAmount) : '' }
   clean.value = JSON.stringify(form.value)
   error.value = ''
@@ -256,7 +247,7 @@ async function save() {
   await send(
     editing.value ? `/goals/${editing.value.id}` : '/goals',
     editing.value ? 'PUT' : 'POST',
-    { ...form.value, id, mutationId }
+    { ...form.value, id, ...editStamp(JSON.stringify(form.value)) }
   )
 }
 async function remove() {
@@ -264,7 +255,6 @@ async function remove() {
 }
 onMounted(() => {
   void load()
-  void run()
 })
 </script>
 

@@ -259,3 +259,23 @@ describe('sync center safety', () => {
     expect(ownedPending(1)).toHaveLength(0)
   })
 })
+
+it.each([
+  '/accounts/id',
+  '/goals/id',
+  '/transfers/id',
+  '/favorites/id',
+  '/accounts/balance-adjustments/id'
+])('requires explicit confirmation before restamping legacy financial edits for %s', async path => {
+  await enqueue(item({ method: 'PUT', path, body: '{"amount":1}' }))
+  await flushOutbox(async () => response(428))
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  await retryFirstBlocked()
+  expect(ownedPending(1)[0]!.status).toBe('blocked')
+  confirm.mockReturnValue(true)
+  await retryFirstBlocked()
+  const saved = JSON.parse(ownedPending(1)[0]!.body!)
+  expect(saved.mutationId).toBeTruthy()
+  expect(saved.editedAt).toBeTruthy()
+  expect(ownedPending(1)[0]!.status).toBe('pending')
+})

@@ -6,6 +6,8 @@ import {
   getSessionIdentity,
   isQueuedResponse,
   onlineApi,
+  readJson,
+  fetchJson,
   recurringState,
   setToken,
   setUser,
@@ -40,6 +42,37 @@ function api(path: string, options: RequestInit = {}) {
 }
 
 const TOKEN = 'test-token'
+
+it('never shares a pre-write response with a read started after confirmation', async () => {
+  const old = deferred<Response>()
+  let reads = 0
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      if (url.endsWith('/dashboard'))
+        return ++reads === 1 ? old.promise : new Response('{"balance":20}')
+      return new Response('{}')
+    })
+  )
+  try {
+    const before = fetchJson('/dashboard')
+    await Promise.resolve()
+    await api('/transactions', { method: 'POST', body: '{"amount":10}' })
+    await expect(fetchJson('/dashboard')).resolves.toEqual({ balance: 20 })
+    old.resolve(new Response('{"balance":10}'))
+    await expect(before).resolves.toEqual({ balance: 10 })
+    expect(reads).toBe(2)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it.each(['<html>proxy failure</html>', '', 'null', 'true'])(
+  'rejects invalid successful API responses instead of caching %s',
+  async body => {
+    await expect(readJson(new Response(body))).rejects.toThrow('invalid response')
+  }
+)
 
 describe('online CSV transfers', () => {
   it('never queues failed previews, confirmations or exports', async () => {
@@ -601,8 +634,12 @@ describe('ordered writes and session boundaries', () => {
 
 describe('confirmed synchronization and response metadata', () => {
   it('invalidates cached reads and asks active views to refresh after replay', async () => {
-    await enqueue({ id: 'replay', userId: 1, method: 'PUT', path: '/profile', body: '{}' })
-    await enqueue({ id: 'replay-2', userId: 1, method: 'PUT', path: '/transactions/1', body: '{}' })
+    const body = JSON.stringify({
+      mutationId: crypto.randomUUID(),
+      editedAt: new Date().toISOString()
+    })
+    await enqueue({ id: 'replay', userId: 1, method: 'PUT', path: '/profile', body })
+    await enqueue({ id: 'replay-2', userId: 1, method: 'PUT', path: '/transactions/1', body })
     writeCache('/dashboard', { balance: 10 })
     writeCache('/profile', { name: 'Old' })
     const revalidate = vi.fn()

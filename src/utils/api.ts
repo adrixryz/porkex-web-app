@@ -1,3 +1,4 @@
+import { requiresEditStamp } from './editStamp'
 import { ref } from 'vue'
 import { mutationError } from './validation'
 import { showSnack } from '@/composables/useSnackbar'
@@ -16,6 +17,7 @@ import {
   type QueuedMutation
 } from './outbox'
 import { requestRevalidation } from './revalidation'
+import { sharedRead } from './sharedReads'
 
 const API_ORIGIN = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 const API_BASE = `${API_ORIGIN}/api`
@@ -31,6 +33,7 @@ export const activeProfileChanges = new Map<
 >()
 export const recurringState = ref<'ready' | 'pending' | 'failed' | 'blocked'>('ready')
 let sessionGeneration = 0
+let readGeneration = 0
 
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -215,16 +218,14 @@ export function isQueuedResponse(response: Response): boolean {
 }
 
 function confirmedWrite(path: string, notify = true) {
+  readGeneration++
   invalidateCache(...WRITE_INVALIDATES, ...(path === '/profile' ? ['/profile'] : []))
   if (notify) requestRevalidation()
 }
 
 async function sendQueued(mutation: QueuedMutation, session: Session): Promise<Response> {
   assertCurrent(session)
-  if (
-    mutation.method === 'PUT' &&
-    /^\/(transactions|accounts|transfers|goals|favorites)\//.test(mutation.path)
-  ) {
+  if (requiresEditStamp(mutation.method, mutation.path)) {
     const payload = JSON.parse(mutation.body ?? '{}') as Record<string, unknown>
     if (!payload.mutationId || !payload.editedAt) {
       return new Response(
@@ -332,7 +333,15 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
   const session = captureSession()
   const method = (options.method ?? 'GET').toUpperCase()
   const isRead = method === 'GET' || method === 'HEAD'
-  const body = withClientId(method, path, options.body ?? null)
+  let body = withClientId(method, path, options.body ?? null)
+  if (requiresEditStamp(method, path) && typeof body === 'string') {
+    const payload = JSON.parse(body)
+    body = JSON.stringify({
+      ...payload,
+      mutationId: payload.mutationId ?? crypto.randomUUID(),
+      editedAt: payload.editedAt ?? new Date().toISOString()
+    })
+  }
   if (
     (path === '/password' && method === 'PUT') ||
     (path === '/sessions/revoke' && method === 'POST')
@@ -559,12 +568,21 @@ export async function readJson<T>(response: Response): Promise<T> {
     throw Object.assign(new Error(data?.error || `Request failed (${response.status})`), {
       status: response.status
     })
+  if (data === null || typeof data !== 'object')
+    throw new Error('The server returned an invalid response. Please retry.')
   return data as T
 }
 
 export async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const identity = getSessionIdentity()
-  const result = await readJson<T>(await api(path, options))
+  const fetcher = async (signal?: AbortSignal) =>
+    readJson<T>(await api(path, { ...options, ...(signal ? { signal } : {}) }))
+  const shareable =
+    (options.method ?? 'GET').toUpperCase() === 'GET' &&
+    Object.keys(options).every(key => key === 'signal' || key === 'method')
+  const result = shareable
+    ? await sharedRead(`${identity}:${readGeneration}:${path}`, fetcher, options.signal)
+    : await fetcher()
   if (identity !== getSessionIdentity()) throw new Error('Session changed. Please try again.')
   return result
 }

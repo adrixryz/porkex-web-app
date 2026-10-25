@@ -58,6 +58,10 @@
     </v-alert>
 
     <v-alert v-if="error" type="error" density="compact" class="mt-4 mb-4">{{ error }}</v-alert>
+    <v-alert v-if="recoveringImport" type="warning" density="compact" class="mt-4 mb-4">
+      A previous import needs confirmation. Select the same CSV file to safely retry its original
+      selection.
+    </v-alert>
 
     <v-progress-linear v-if="busy" indeterminate color="primary" class="mt-4 mb-4" />
 
@@ -218,6 +222,15 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import {
+  pendingImport,
+  rememberImport,
+  completeImport,
+  csvFingerprint
+} from '@/utils/importRecovery'
+import { getSessionIdentity, onlineApi, readJson } from '@/utils/api'
+import type { ImportAttempt } from '@/utils/importRecovery'
+import type { CsvImportResult } from '@/utils/movementCsv'
 
 import { catalogNameKey as normalize } from '@/utils/catalogNames'
 
@@ -259,9 +272,34 @@ const busy = ref(false)
 
 const error = ref('')
 
-const importId = ref(crypto.randomUUID())
+const importId = ref<string>(crypto.randomUUID())
 
 const attemptLocked = ref(false)
+const recoveringImport = ref(false)
+
+async function recoverImport() {
+  try {
+    const pending = pendingImport()
+    recoveringImport.value = !!pending
+    if (!pending || isOffline.value) return
+    busy.value = true
+    const identity = getSessionIdentity()
+    const receipt = await readJson<{ state: string; result?: CsvImportResult }>(
+      await onlineApi(`/transactions/import/${pending.importId}`)
+    )
+    if (identity !== getSessionIdentity()) throw new Error('Session changed. Please try again.')
+    if (receipt.state === 'confirmed' && receipt.result) {
+      completeImport(pending.importId)
+      recoveringImport.value = false
+      showSnack(`Imported ${receipt.result.imported} transactions.`, 'success')
+      emit('imported')
+    }
+  } catch (cause) {
+    error.value = (cause as Error).message
+  } finally {
+    busy.value = false
+  }
+}
 
 const headers = [
   { title: 'Row', key: 'line' },
@@ -370,6 +408,7 @@ useUnsavedChanges(
 )
 
 watch(open, value => {
+  if (value) void recoverImport()
   if (!value) {
     csv.value = ''
 
@@ -420,7 +459,25 @@ async function chooseFile(file: File) {
     busy.value = false
   }
 
-  if (csv.value) await refreshPreview()
+  if (csv.value) {
+    try {
+      const pending = pendingImport()
+      if (pending && pending.fingerprint !== (await csvFingerprint(csv.value))) {
+        csv.value = ''
+        throw new Error('Select the original CSV file to confirm the previous import first.')
+      }
+      await refreshPreview()
+      const restored = preview.value as CsvPreview | null
+      if (pending && restored) {
+        restored.version = pending.version
+        selectedLines.value = pending.selectedLines
+        importId.value = pending.importId
+        attemptLocked.value = true
+      }
+    } catch (cause) {
+      error.value = (cause as Error).message
+    }
+  }
 }
 
 async function refreshPreview() {
@@ -465,8 +522,21 @@ async function confirmImport() {
   error.value = ''
 
   attemptLocked.value = true
+  let previousAttempt: ImportAttempt | null = null
+  let receiptSaved = false
 
   try {
+    previousAttempt = pendingImport()
+    const identity = getSessionIdentity()
+    const fingerprint = await csvFingerprint(csv.value)
+    if (identity !== getSessionIdentity()) throw new Error('Session changed. Please try again.')
+    rememberImport({
+      importId: importId.value,
+      fingerprint,
+      version: preview.value.version,
+      selectedLines: [...selectedLines.value]
+    })
+    receiptSaved = true
     const result = await importMovementsCsv(
       csv.value,
 
@@ -477,6 +547,8 @@ async function confirmImport() {
       importId.value
     )
 
+    completeImport(importId.value)
+    recoveringImport.value = false
     csv.value = ''
 
     preview.value = null
@@ -491,7 +563,15 @@ async function confirmImport() {
   } catch (cause) {
     const { status, notSent } = cause as { status?: number; notSent?: boolean }
 
-    if (notSent || (status && status >= 400 && status < 500)) attemptLocked.value = false
+    if (
+      !receiptSaved ||
+      (notSent && !previousAttempt) ||
+      (status && [400, 409, 422].includes(status))
+    ) {
+      if (receiptSaved) completeImport(importId.value)
+      attemptLocked.value = false
+      recoveringImport.value = false
+    }
 
     error.value =
       (cause as Error).message +

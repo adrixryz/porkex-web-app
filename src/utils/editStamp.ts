@@ -3,6 +3,15 @@ export interface EditStamp {
   editedAt: string
 }
 
+export function requiresEditStamp(method: string, path: string): boolean {
+  return (
+    method === 'PUT' &&
+    /^\/(?:profile|(?:transactions|categories|budgets|recurring)\/\d+|(?:accounts|transfers|goals|favorites)\/.+)$/.test(
+      path
+    )
+  )
+}
+
 /** Keep the original intent time when the same save is retried. */
 export function createEditStamp() {
   let previous = ''

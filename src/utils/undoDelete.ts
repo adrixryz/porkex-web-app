@@ -3,6 +3,7 @@ import { transactionTypeReviver } from './transactionTypes'
 import type { Transaction } from '@/types'
 import { activeWrites, getUser, isAuthenticated, syncPendingWrites, USER_CHANGE_EVENT } from './api'
 import { enqueue, outboxRevision, ownedPending, withOutboxLock, withSendLock } from './outbox'
+import { ensurePersistentStorage } from './storagePersistence'
 
 const KEY = 'porkex_scheduled_deletes'
 const LOCK = 'porkex-scheduled-deletes'
@@ -106,6 +107,7 @@ export const hiddenTransactionIds = computed(() => {
   return new Set(ids)
 })
 export async function scheduleDelete(transaction: Transaction) {
+  void ensurePersistentStorage()
   const userId = getUser()?.id
   if (!isAuthenticated() || !userId) throw new Error('Sign in before deleting a movement.')
   activeWrites.value++

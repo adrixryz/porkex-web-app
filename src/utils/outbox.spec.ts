@@ -265,6 +265,10 @@ it.each([
   '/goals/id',
   '/transfers/id',
   '/favorites/id',
+  '/profile',
+  '/categories/1',
+  '/budgets/1',
+  '/recurring/1',
   '/accounts/balance-adjustments/id'
 ])('requires explicit confirmation before restamping legacy financial edits for %s', async path => {
   await enqueue(item({ method: 'PUT', path, body: '{"amount":1}' }))

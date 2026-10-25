@@ -14,6 +14,7 @@
           v-if="favoriteMode"
           v-model="form.name"
           label="Favorite name"
+          autofocus
           maxlength="60"
           :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
         />
@@ -22,7 +23,7 @@
             <AppMoneyField
               v-model="form.amount"
               :step-label="isIncome ? 'income amount' : 'expense amount'"
-              autofocus
+              :autofocus="!favoriteMode"
             />
           </div>
           <div>

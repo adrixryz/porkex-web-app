@@ -4,6 +4,16 @@
       Changes are sent in order. Confirmed changes leave this list.
     </p>
     <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
+    <p
+      v-if="items.length || scheduledDeletes.length"
+      class="text-caption text-on-surface-variant mb-4"
+    >
+      {{
+        storagePersistence === 'persistent'
+          ? 'Persistent device storage is enabled.'
+          : 'Device storage is managed by your browser. Keep pending changes here until synchronization completes.'
+      }}
+    </p>
     <p v-if="!items.length && !scheduledDeletes.length" class="mb-0">No pending changes.</p>
     <AppCard v-for="item in items" :key="item.id" class="mb-3">
       <AppCardBody>
@@ -248,6 +258,7 @@
 </template>
 <script setup lang="ts">
 import AppFormFields from '@/components/ui/AppFormFields.vue'
+import { storagePersistence } from '@/utils/storagePersistence'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { transactionTypeOptions } from '@/utils/transactionTypes'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'

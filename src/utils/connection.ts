@@ -37,14 +37,18 @@ if (typeof window !== 'undefined') {
 // from a stale view) cleared the banner while another view was still showing
 // cached numbers.
 let nextToken = 0
-const staleOwners = new Set<number>()
+const staleOwners = new Map<number, number>()
+
+function updateAge() {
+  staleSavedAt.value = staleOwners.size ? Math.min(...staleOwners.values()) : null
+}
 
 /** Registers a stale owner and raises the banner. Returns its token. */
 export function markStale(savedAt: number): number {
   const token = ++nextToken
-  staleOwners.add(token)
+  staleOwners.set(token, savedAt)
   hasStaleData.value = true
-  staleSavedAt.value = savedAt
+  updateAge()
   return token
 }
 
@@ -55,6 +59,7 @@ export function markStale(savedAt: number): number {
 export function markFresh(token?: number) {
   if (token === undefined) staleOwners.clear()
   else staleOwners.delete(token)
+  updateAge()
 
   if (staleOwners.size === 0) {
     hasStaleData.value = false

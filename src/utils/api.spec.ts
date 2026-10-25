@@ -5,6 +5,7 @@ import {
   clearAuth,
   getSessionIdentity,
   isQueuedResponse,
+  onlineApi,
   recurringState,
   setToken,
   setUser,
@@ -39,6 +40,72 @@ function api(path: string, options: RequestInit = {}) {
 }
 
 const TOKEN = 'test-token'
+
+describe('online CSV transfers', () => {
+  it('never queues failed previews, confirmations or exports', async () => {
+    vi.stubGlobal('fetch', networkDown())
+    try {
+      for (const path of [
+        '/transactions/import/preview',
+        '/transactions/import',
+        '/transactions/export'
+      ]) {
+        await expect(
+          onlineApi(path, {
+            method: path.endsWith('export') ? 'GET' : 'POST',
+            body: path.endsWith('export') ? undefined : '{}'
+          })
+        ).rejects.toThrow('Failed to fetch')
+        expect(pendingCount.value).toBe(0)
+        expect(activeWrites.value).toBe(0)
+      }
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+  it('blocks confirmations behind pending writes and rejects offline requests before sending', async () => {
+    vi.stubGlobal('fetch', networkDown())
+    try {
+      await api('/transactions', { method: 'POST', body: '{}' })
+      const fetchMock = vi.mocked(fetch)
+      fetchMock.mockClear()
+      await expect(
+        onlineApi('/transactions/import', { method: 'POST', body: '{}' })
+      ).rejects.toMatchObject({ notSent: true })
+      expect(fetchMock).not.toHaveBeenCalled()
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      await expect(onlineApi('/transactions/export')).rejects.toMatchObject({ notSent: true })
+      expect(fetchMock).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    }
+  })
+  it('invalidates confirmed data and protects an in-flight import from session changes', async () => {
+    const revalidate = vi.fn()
+    window.addEventListener(DATA_REVALIDATE_EVENT, revalidate)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{"imported":1}'))
+    )
+    try {
+      await onlineApi('/transactions/import', { method: 'POST', body: '{}' })
+      expect(revalidate).toHaveBeenCalled()
+      const pending = deferred<Response>()
+      vi.mocked(fetch).mockImplementationOnce(() => pending.promise)
+      const request = onlineApi('/transactions/import/preview', { method: 'POST', body: '{}' })
+      expect(activeWrites.value).toBe(1)
+      setUser({ id: 2, name: 'Other', email: 'other@example.com' })
+      pending.resolve(new Response('{}'))
+      await expect(request).rejects.toThrow()
+      expect(activeWrites.value).toBe(0)
+      expect(pendingCount.value).toBe(0)
+    } finally {
+      window.removeEventListener(DATA_REVALIDATE_EVENT, revalidate)
+      vi.unstubAllGlobals()
+    }
+  })
+})
 
 // A fetch that fails the way a dead network does: fetch() itself rejects.
 const networkDown = () =>

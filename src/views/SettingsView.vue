@@ -112,6 +112,30 @@
             ></AppSelect>
           </AppCard>
 
+          <!-- BACKUP -->
+          <AppCard title="Backup" class="mb-4">
+            <AppCardBody>
+              <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
+                Import or export your complete transaction history as CSV.
+              </p>
+              <div class="d-flex flex-wrap ga-3">
+                <AppActionButton
+                  :icon="mdiUpload"
+                  :disabled="isOffline || exportingCsv"
+                  @click="csvImportOpen = true"
+                  >Import CSV</AppActionButton
+                >
+                <AppActionButton
+                  :icon="mdiDownload"
+                  :loading="exportingCsv"
+                  :disabled="isOffline || exportingCsv"
+                  @click="csvExportOpen = true"
+                  >Export CSV</AppActionButton
+                >
+              </div>
+            </AppCardBody>
+          </AppCard>
+
           <!-- SECURITY -->
           <AppCard class="pa-6 mb-4">
             <div class="text-subtitle-1 font-weight-medium mb-4">Security</div>
@@ -189,6 +213,13 @@
       </v-col>
     </v-row>
 
+    <MovementCsvImportDialog v-model="csvImportOpen" />
+    <MovementCsvExportDialog
+      v-model="csvExportOpen"
+      v-model:busy="exportingCsv"
+      :selection="backupSelection"
+    />
+
     <!-- LOG OUT CONFIRM -->
     <AppConfirmDialog
       v-model="revokeDialog"
@@ -219,6 +250,12 @@
 </template>
 
 <script setup lang="ts">
+import MovementCsvImportDialog from '@/components/MovementCsvImportDialog.vue'
+import MovementCsvExportDialog from '@/components/MovementCsvExportDialog.vue'
+import AppActionButton from '@/components/ui/AppActionButton.vue'
+import AppCardBody from '@/components/ui/AppCardBody.vue'
+import { isOffline } from '@/utils/connection'
+import type { CsvExportSelection } from '@/utils/movementCsv'
 import { ref, computed, onMounted, watch } from 'vue'
 import { canLeaveForms, useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { localPendingCount, syncCenterOpen } from '@/composables/useSyncCenter'
@@ -248,6 +285,8 @@ import {
 } from '@/utils/preferences'
 import { formatDate } from '@/utils/date'
 import {
+  mdiUpload,
+  mdiDownload,
   mdiAccountOutline,
   mdiCalendarRange,
   mdiCalendarWeekBegin,
@@ -261,6 +300,17 @@ import {
 } from '@mdi/js'
 
 const router = useRouter()
+const csvImportOpen = ref(false)
+const csvExportOpen = ref(false)
+const exportingCsv = ref(false)
+const backupSelection: CsvExportSelection = {
+  url: '/transactions?type=ALL',
+  scope: 'all',
+  filters: [
+    { label: 'Period', value: 'Entire history, from start to finish' },
+    { label: 'Type', value: 'Income and Expense' }
+  ]
+}
 
 const currentCurrency = getCurrency()
 const selectedCurrency = ref<CurrencyOption>(

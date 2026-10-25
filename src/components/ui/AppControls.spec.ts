@@ -5,6 +5,8 @@ import { createVuetify } from 'vuetify'
 import { mdiPencil } from '@mdi/js'
 import { mdi, aliases } from '@/plugins/mdiSvg'
 import AppButton from './AppButton.vue'
+import AppActionButton from './AppActionButton.vue'
+import AppFilePicker from './AppFilePicker.vue'
 import AppIconButton from './AppIconButton.vue'
 import AppSelect from './AppSelect.vue'
 import AppTextField from './AppTextField.vue'
@@ -49,6 +51,45 @@ const stubs = {
   'v-text-field': VTextFieldStub,
   'v-select': VSelectStub
 }
+
+it('shares outlined action buttons and forwards disabled state and clicks', async () => {
+  const click = vi.fn()
+  const wrapper = mount(AppActionButton, {
+    props: { icon: mdiPencil },
+    attrs: { disabled: true, onClick: click },
+    slots: { default: 'Import CSV' },
+    global: { stubs }
+  })
+  const button = wrapper.get('button')
+  expect(button.attributes('variant')).toBe('outlined')
+  expect(button.attributes('disabled')).toBeDefined()
+  expect(button.text()).toBe('Import CSV')
+  wrapper.unmount()
+  const enabled = mount(AppActionButton, {
+    props: { icon: mdiPencil },
+    attrs: { onClick: click },
+    global: { stubs }
+  })
+  await enabled.get('button').trigger('click')
+  expect(click).toHaveBeenCalledOnce()
+  enabled.unmount()
+})
+
+it('supports selecting the same file twice and prevents selection while disabled', async () => {
+  const wrapper = mount(AppFilePicker, {
+    props: { label: 'CSV file', accept: '.csv' },
+    global: { stubs }
+  })
+  const input = wrapper.get('input')
+  const file = new File(['Date;Type'], 'backup.csv', { type: 'text/csv' })
+  Object.defineProperty(input.element, 'files', { configurable: true, value: [file] })
+  await input.trigger('change')
+  await input.trigger('change')
+  expect(wrapper.emitted('select')).toEqual([[file], [file]])
+  await wrapper.setProps({ disabled: true })
+  await input.trigger('change')
+  expect(wrapper.emitted('select')).toHaveLength(2)
+})
 
 const realVuetify = createVuetify({
   icons: { defaultSet: 'mdi', aliases, sets: { mdi } } as never

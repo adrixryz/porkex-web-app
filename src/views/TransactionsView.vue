@@ -1,5 +1,11 @@
 <template>
   <AppPage>
+    <MovementCsvImportDialog v-model="csvImportOpen" />
+    <MovementCsvExportDialog
+      v-model="csvExportOpen"
+      v-model:busy="exporting"
+      :selection="csvExportSelection"
+    />
     <!-- LOADING SKELETON -->
     <template v-if="loading && !initialLoadComplete">
       <v-row class="mb-2">
@@ -490,6 +496,21 @@
               ></v-pagination>
             </div>
           </AppCard>
+          <div class="transactions-csv-actions mt-4">
+            <AppActionButton
+              :icon="mdiUpload"
+              :disabled="isOffline || exporting"
+              @click="csvImportOpen = true"
+              >Import CSV</AppActionButton
+            >
+            <AppActionButton
+              :icon="mdiDownload"
+              :loading="exporting"
+              :disabled="isOffline || exporting"
+              @click="prepareCsvExport"
+              >Export CSV</AppActionButton
+            >
+          </div>
         </v-col>
       </v-row>
     </template>
@@ -520,6 +541,10 @@
 </template>
 
 <script setup lang="ts">
+import MovementCsvImportDialog from '@/components/MovementCsvImportDialog.vue'
+import MovementCsvExportDialog from '@/components/MovementCsvExportDialog.vue'
+import type { CsvExportSelection } from '@/utils/movementCsv'
+import { isOffline } from '@/utils/connection'
 import MovementShortcutsMenu from '@/components/MovementShortcutsMenu.vue'
 import QuickActions from '@/components/QuickActions.vue'
 import { movementDraft } from '@/utils/movementDraft'
@@ -537,6 +562,7 @@ import { useSnackbar } from '@/composables/useSnackbar'
 import AmountStepper from '@/components/AmountStepper.vue'
 import CategorySelect from '@/components/CategorySelect.vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
+import AppActionButton from '@/components/ui/AppActionButton.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
@@ -564,6 +590,8 @@ import { textOn } from '@/utils/color'
 import type { Category, Transaction, TransactionsResponse } from '@/types'
 import { useDisplay } from 'vuetify'
 import {
+  mdiDownload,
+  mdiUpload,
   mdiArrowDown,
   mdiArrowUp,
   mdiChevronLeft,
@@ -580,6 +608,55 @@ const router = useRouter()
 const { mobile } = useDisplay()
 const cs = useCurrencySymbol()
 const { showSnack } = useSnackbar()
+
+const csvImportOpen = ref(false)
+const csvExportOpen = ref(false)
+const csvExportSelection = ref<CsvExportSelection | null>(null)
+const exporting = ref(false)
+function prepareCsvExport() {
+  if (exporting.value) return
+  const url = transactionsUrl()
+  const query = new URLSearchParams(url.split('?')[1])
+  const accountId = query.get('accountId')
+  const categoryId = query.get('categoryId')
+  const min = query.get('min')
+  const max = query.get('max')
+  const money = (amount: string) => `${cs.value}${formatMoney(Number(amount))}`
+  csvExportSelection.value = {
+    url,
+    filters: [
+      { label: 'Period', value: `${query.get('from')} — ${query.get('to')}` },
+      { label: 'Type', value: query.get('type') || 'Income and Expense' },
+      {
+        label: 'Account',
+        value: accountId
+          ? accounts.value.find(account => account.id === accountId)?.name || accountId
+          : 'All accounts'
+      },
+      {
+        label: 'Category',
+        value: categoryId
+          ? categories.value?.find(category => category.id === Number(categoryId))?.name ||
+            categoryId
+          : 'All categories'
+      },
+      { label: 'Tag', value: query.get('tagId') ? selectedTagName.value : 'All tags' },
+      { label: 'Search', value: query.get('search') || 'Any comment or category' },
+      {
+        label: 'Amount',
+        value:
+          min !== null && max !== null
+            ? `${money(min)} – ${money(max)}`
+            : min !== null
+              ? `At least ${money(min)}`
+              : max !== null
+                ? `Up to ${money(max)}`
+                : 'Any amount'
+      }
+    ]
+  }
+  csvExportOpen.value = true
+}
 
 const dialog = ref(false)
 const dialogType = ref<'Income' | 'Expense'>('Expense')
@@ -1046,6 +1123,12 @@ onMounted(async () => {
   width: 100%;
   min-width: 0;
 }
+.transactions-csv-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 .transactions-heading {
   display: flex;
   align-items: center;
@@ -1061,6 +1144,9 @@ onMounted(async () => {
   font-size: 0.875rem;
 }
 @media (max-width: 599px) {
+  .transactions-csv-actions > .v-btn {
+    flex: 1;
+  }
   .transactions-heading {
     gap: 8px;
   }

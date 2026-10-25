@@ -2,6 +2,121 @@ import { randomUUID } from 'node:crypto'
 import { quickAction } from './actions'
 import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
+import { readFile } from 'node:fs/promises'
+
+test('CSV backup previews, imports, detects duplicates and exports filtered or complete history', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'CSV owner',
+      email: `csv-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  const { token, user } = await registration.json()
+  await page.addInitScript(
+    ({ token, user }) => {
+      if (sessionStorage.getItem('csv-initialized')) return
+      sessionStorage.setItem('csv-initialized', 'yes')
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  const csv = [
+    'Date;Type;Account;Category;Tags;Comment;Amount',
+    '2020-01-01;Income;Main;Salary;;;100.00',
+    '2020-01-02;Expense;Pocket;Snacks;Daily;Coffee;4.75',
+    '2020-01-02;Expense;Pocket;Snacks;Daily;Coffee;4.75',
+    ...Array.from(
+      { length: 15 },
+      (_, index) => `2020-01-01;Income;Main;Salary;;Entry ${index};1.00`
+    )
+  ].join('\n')
+  await page.goto('/settings')
+  const cards = page.locator('.v-card').filter({ has: page.getByText('Backup', { exact: true }) })
+  await cards.getByRole('button', { name: 'Import CSV', exact: true }).click()
+  const modal = page.getByRole('dialog', { name: 'Import Transactions', exact: true })
+  await expect(modal.getByRole('button', { name: 'Cancel', exact: true })).toHaveCount(0)
+  await modal
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'empty.csv', mimeType: 'text/csv', buffer: Buffer.from('') })
+  await expect(modal.getByText('The CSV file is empty.', { exact: true })).toBeVisible()
+  await modal
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'history.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
+  await expect(modal.getByText('Transaction Preview', { exact: true })).toBeVisible()
+  await expect(modal.getByText('17 of 18 selected', { exact: true })).toBeVisible()
+  await expect(modal.locator('tbody tr')).toHaveCount(15)
+  await expect(modal.locator('.v-pagination')).toBeVisible()
+  await expect(modal.getByText('1 possible duplicates', { exact: true })).toBeVisible()
+  await expect(modal.getByText('Items per page:', { exact: true })).toHaveCount(0)
+  await modal.screenshot({ path: info.outputPath('csv-import.png'), animations: 'disabled' })
+  await expect(
+    modal.getByText('Historical imports can leave accounts with negative balances.', {
+      exact: false
+    })
+  ).toBeVisible()
+  await expect
+    .poll(
+      async () =>
+        (
+          await (
+            await page.request.get('/api/transactions', {
+              headers: { Authorization: `Bearer ${token}` }
+            })
+          ).json()
+        ).total
+    )
+    .toBe(0)
+  await modal.getByRole('button', { name: 'Import 17 transactions', exact: true }).click()
+  await expect(modal).not.toBeVisible()
+  await cards.getByRole('button', { name: 'Import CSV', exact: true }).click()
+  await modal
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'history.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
+  await expect(modal.getByText('0 of 18 selected', { exact: true })).toBeVisible()
+  await expect(
+    modal.getByRole('button', { name: 'Import transactions', exact: true })
+  ).toBeDisabled()
+  page.once('dialog', dialog => dialog.accept())
+  await modal.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await cards.getByRole('button', { name: 'Export CSV', exact: true }).click()
+  const exportModal = page.getByRole('dialog', { name: 'Export Transactions', exact: true })
+  await expect(
+    exportModal.getByText('Entire history, from start to finish', { exact: true })
+  ).toBeVisible()
+  await expect(exportModal.getByText('Income and Expense', { exact: true })).toBeVisible()
+  const downloadEvent = page.waitForEvent('download')
+  await exportModal.getByRole('button', { name: 'Export CSV', exact: true }).click()
+  const download = await downloadEvent
+  expect(download.suggestedFilename()).toMatch(/^porkex-backup-\d{4}-\d{2}-\d{2}\.csv$/)
+  const content = await readFile((await download.path())!, 'utf8')
+  expect(content).toContain('2020-01-01;Income;Main;Salary;;;100.00')
+  expect(content).toContain('2020-01-02;Expense;Pocket;Snacks;Daily;Coffee;4.75')
+  await page.goto('/transactions?period=custom&from=2020-01-02&to=2020-01-02&type=Expense')
+  await page.getByRole('button', { name: 'Export CSV', exact: true }).click()
+  await expect(exportModal.getByText('2020-01-02 — 2020-01-02', { exact: true })).toBeVisible()
+  const filteredDownload = page.waitForEvent('download')
+  await exportModal.getByRole('button', { name: 'Export CSV', exact: true }).click()
+  const filteredContent = await readFile((await (await filteredDownload).path())!, 'utf8')
+  expect(filteredContent).toContain('Coffee;4.75')
+  expect(filteredContent).not.toContain(';Income;')
+  await page.goto('/accounts')
+  await page.getByRole('button', { name: 'Edit Pocket', exact: true }).click()
+  const accountModal = page.getByRole('dialog', { name: 'Edit account', exact: true })
+  await expect(accountModal.getByLabel('Current balance', { exact: true })).toHaveValue('-4.75')
+  await accountModal.getByLabel('Name', { exact: true }).fill('Pocket Saved')
+  await accountModal.getByRole('button', { name: 'Update', exact: true }).click()
+  await expect(accountModal).not.toBeVisible()
+  const accounts = await (
+    await page.request.get('/api/accounts', { headers: { Authorization: `Bearer ${token}` } })
+  ).json()
+  expect(
+    accounts.find((account: { name: string }) => account.name === 'Pocket Saved').balance
+  ).toBe(-4.75)
+})
 
 test('Danger Zone confirmation revokes the phone session and preserves its offline changes', async ({
   page,

@@ -328,6 +328,7 @@ async function verifyLegacyOwner(session: Session) {
 
 /** Authenticated API calls preserve their Response/202 contract. */
 export async function api(path: string, options: RequestInit = {}): Promise<Response> {
+  if (/^\/transactions\/(?:export|import)(?:[/?]|$)/.test(path)) return onlineApi(path, options)
   const session = captureSession()
   const method = (options.method ?? 'GET').toUpperCase()
   const isRead = method === 'GET' || method === 'HEAD'
@@ -429,6 +430,42 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
   } finally {
     if (profileWrite) activeProfileChanges.delete(profileWrite)
     activeWrites.value -= 1
+  }
+}
+
+/** CSV transfers require a live response and must never enter the offline outbox. */
+export async function onlineApi(path: string, options: RequestInit = {}): Promise<Response> {
+  const session = captureSession()
+  const notSent = (message: string) => Object.assign(new Error(message), { notSent: true })
+  if (navigator.onLine === false)
+    throw notSent('Connect to the internet to import or export CSV files.')
+  if (!session.token || session.userId === null)
+    throw notSent('Sign in before transferring CSV files.')
+  const confirmation = path === '/transactions/import' && options.method?.toUpperCase() === 'POST'
+  const send = async () => {
+    assertCurrent(session)
+    if (confirmation && (pendingCount.value > 0 || hasLegacyOutbox()))
+      throw notSent('Sync your pending changes before importing movements.')
+    const response = handleResponse(
+      await fetch(`${API_BASE}${path}`, {
+        ...options,
+        cache: 'no-store',
+        headers: requestHeaders(session, options.headers),
+        signal: withTimeout(
+          options.signal,
+          path.startsWith('/transactions/import') ? 360_000 : 180_000
+        )
+      }),
+      session
+    )
+    if (confirmation && response.ok) confirmedWrite('/transactions')
+    return response
+  }
+  activeWrites.value++
+  try {
+    return confirmation ? await withSendLock(session.userId, send) : await send()
+  } finally {
+    activeWrites.value--
   }
 }
 

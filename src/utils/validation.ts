@@ -1,3 +1,4 @@
+import { validCatalogName, catalogNameHint } from './catalogNames'
 import { parseDateOnly, todayInput } from './date'
 
 export function validAmount(value: unknown): boolean {
@@ -9,15 +10,21 @@ export function validAmount(value: unknown): boolean {
 /** Local shape checks only; account ownership and live references belong to the API. */
 export function mutationError(path: string, method: string, body: string | null): string | null {
   if (!['POST', 'PUT'].includes(method)) return null
+  if (/^\/tags(?:\/[^/]+)?$/.test(path) && path !== '/tags/order') {
+    try {
+      if (!validCatalogName(JSON.parse(body || '{}').name, 20))
+        return `Tag name must contain 1–20 characters. ${catalogNameHint}`
+    } catch {
+      return 'Enter a valid tag name.'
+    }
+    return null
+  }
   if (path.startsWith('/goals')) {
     try {
       const value = JSON.parse(body || '{}')
-      if (
-        typeof value.name !== 'string' ||
-        !value.name.trim() ||
-        value.name.trim().length > 60 ||
-        !validAmount(value.targetAmount)
-      )
+      if (!validCatalogName(value.name, 60))
+        return `Goal name must contain 1–60 characters. ${catalogNameHint}`
+      if (!validAmount(value.targetAmount))
         return 'Enter a goal name and a positive target with up to two decimals.'
     } catch {
       return 'Enter valid goal details.'
@@ -45,13 +52,8 @@ export function mutationError(path: string, method: string, body: string | null)
           ))
       )
         return 'Enter a nonnegative current balance with up to two decimals.'
-      if (
-        payload.name !== undefined &&
-        (typeof payload.name !== 'string' ||
-          !payload.name.trim() ||
-          payload.name.trim().length > 60)
-      )
-        return 'Name must contain 1–60 characters.'
+      if (payload.name !== undefined && !validCatalogName(payload.name, 60))
+        return `Account name must contain 1–60 characters. ${catalogNameHint}`
       if (
         payload.openingBalance !== undefined &&
         !(
@@ -92,11 +94,8 @@ export function mutationError(path: string, method: string, body: string | null)
   } catch {
     return 'The change must contain valid JSON.'
   }
-  if (
-    favorite &&
-    (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 60)
-  )
-    return 'Favorite name must contain 1–60 characters.'
+  if (favorite && !validCatalogName(data.name, 60))
+    return `Favorite name must contain 1–60 characters. ${catalogNameHint}`
   if (
     budget &&
     data.accountId !== undefined &&
@@ -164,8 +163,8 @@ export function mutationError(path: string, method: string, body: string | null)
   if (budget && !['WEEK', 'MONTH'].includes(String(data.period)))
     return 'Choose a weekly or monthly budget.'
   if (category) {
-    if (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 60)
-      return 'Category name must contain 1–60 characters.'
+    if (!validCatalogName(data.name, 60))
+      return `Category name must contain 1–60 characters. ${catalogNameHint}`
     if (
       data.color !== undefined &&
       data.color !== null &&

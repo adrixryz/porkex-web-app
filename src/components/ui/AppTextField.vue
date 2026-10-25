@@ -9,9 +9,3 @@
 <script setup lang="ts">
 defineOptions({ inheritAttrs: false })
 </script>
-
-<style scoped>
-.app-text-field.v-input--error :deep(.v-input__details) {
-  padding-bottom: 12px;
-}
-</style>

@@ -1,36 +1,7 @@
 <template>
   <AppPage>
     <!-- LOADING SKELETON -->
-    <template v-if="loading">
-      <v-row class="mb-6">
-        <v-col cols="12">
-          <v-skeleton-loader type="heading" width="160"></v-skeleton-loader>
-          <v-skeleton-loader type="text" width="280" class="mt-2"></v-skeleton-loader>
-        </v-col>
-      </v-row>
-      <v-row class="mb-6">
-        <v-col cols="6" md="3" v-for="n in 4" :key="n">
-          <AppCard class="pa-4">
-            <v-skeleton-loader type="text" width="100" class="mb-2"></v-skeleton-loader>
-            <v-skeleton-loader type="heading" width="140"></v-skeleton-loader>
-          </AppCard>
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col cols="12" md="7">
-          <AppCard class="pa-6">
-            <v-skeleton-loader type="text" width="200" class="mb-4"></v-skeleton-loader>
-            <v-skeleton-loader type="image" height="320"></v-skeleton-loader>
-          </AppCard>
-        </v-col>
-        <v-col cols="12" md="5">
-          <AppCard class="pa-6">
-            <v-skeleton-loader type="text" width="160" class="mb-4"></v-skeleton-loader>
-            <v-skeleton-loader type="image" height="320"></v-skeleton-loader>
-          </AppCard>
-        </v-col>
-      </v-row>
-    </template>
+    <AppPageSkeleton v-if="loading && !hasLoaded" page="analytics" />
 
     <template v-else>
       <AppPageHeader title="Analytics" subtitle="Track your financial trends and patterns" />
@@ -185,6 +156,7 @@
 </template>
 
 <script setup lang="ts">
+import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import CategoryComparison from '@/components/CategoryComparison.vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
@@ -287,6 +259,7 @@ const analyticsUrl = () =>
 const {
   data: analytics,
   loading,
+  hasLoaded,
   error: analyticsError,
   run: fetchAnalytics
 } = useAsyncData<AnalyticsResponse>(

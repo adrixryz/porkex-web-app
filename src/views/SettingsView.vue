@@ -2,114 +2,101 @@
   <AppPage>
     <v-row>
       <v-col cols="12" md="8" lg="6" class="mx-auto">
-        <AppPageHeader title="Settings" />
-
         <!-- LOADING SKELETON -->
-        <template v-if="loading">
-          <AppCard class="pa-6 mb-4">
-            <div class="d-flex align-center">
-              <v-skeleton-loader type="avatar" class="mr-5"></v-skeleton-loader>
-              <div class="flex-grow-1">
-                <v-skeleton-loader type="text" width="160" class="mb-2"></v-skeleton-loader>
-                <v-skeleton-loader type="text" width="220" class="mb-2"></v-skeleton-loader>
-                <v-skeleton-loader type="text" width="120"></v-skeleton-loader>
-              </div>
-            </div>
-            <v-divider class="my-6"></v-divider>
-            <v-skeleton-loader type="text" width="140" class="mb-4"></v-skeleton-loader>
-            <v-skeleton-loader type="text" width="100%"></v-skeleton-loader>
-          </AppCard>
-        </template>
+        <AppPageSkeleton v-if="loading && !hasLoaded" page="settings" />
 
         <template v-else>
+          <AppPageHeader title="Settings" />
           <!-- PROFILE CARD -->
-          <AppCard class="pa-6 mb-4">
-            <div class="d-flex align-center mb-6">
-              <v-avatar color="primary" variant="tonal" size="64" class="mr-5">
-                <span class="text-h5 font-weight-bold">{{ userInitial }}</span>
-              </v-avatar>
-              <div class="flex-grow-1">
-                <div class="text-h6 font-weight-medium">{{ profile.name }}</div>
-                <div class="text-caption text-on-surface-variant mt-1">
-                  Member since
-                  {{ formatDate(profile.createdAt, { month: 'long', year: 'numeric' }) }}
+          <AppCard title="Profile" class="mb-4">
+            <AppCardBody>
+              <div class="d-flex align-center mb-6">
+                <v-avatar color="primary" variant="tonal" size="64" class="mr-5">
+                  <span class="text-h5 font-weight-bold">{{ userInitial }}</span>
+                </v-avatar>
+                <div class="flex-grow-1">
+                  <div class="text-h6 font-weight-medium">{{ profile.name }}</div>
+                  <div class="text-caption text-on-surface-variant mt-1">
+                    Member since
+                    {{ formatDate(profile.createdAt, { month: 'long', year: 'numeric' }) }}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <v-divider class="mb-6"></v-divider>
+              <v-divider class="mb-6"></v-divider>
 
-            <div class="text-subtitle-1 font-weight-medium mb-4">Edit Profile</div>
-            <v-form @submit.prevent="updateProfile">
-              <AppTextField
-                v-model="editName"
-                label="Display Name"
-                maxlength="80"
-                :prepend-inner-icon="mdiAccountOutline"
-                class="mb-2"
-              ></AppTextField>
-              <AppTextField
-                :model-value="profile.email"
-                label="Email"
-                :prepend-inner-icon="mdiEmailOutline"
-                disabled
-                hint="Email cannot be changed"
-                persistent-hint
-                hide-details="false"
-                class="mb-2"
-              ></AppTextField>
-              <AppButton
-                type="submit"
-                color="primary"
-                :loading="saving"
-                :disabled="!editName.trim() || editName.trim() === profile.name"
-                class="mt-2"
-              >
-                Save Changes
-              </AppButton>
-            </v-form>
+              <div class="text-subtitle-1 font-weight-medium mb-4">Edit Profile</div>
+              <v-form @submit.prevent="updateProfile">
+                <AppFormFields>
+                  <AppTextField
+                    v-model="editName"
+                    label="Display Name"
+                    maxlength="80"
+                    :prepend-inner-icon="mdiAccountOutline"
+                  ></AppTextField>
+                  <AppTextField
+                    :model-value="profile.email"
+                    label="Email"
+                    :prepend-inner-icon="mdiEmailOutline"
+                    disabled
+                    hint="Email cannot be changed"
+                    persistent-hint
+                    :hide-details="false"
+                  ></AppTextField>
+                  <AppButton
+                    type="submit"
+                    color="primary"
+                    :loading="saving"
+                    :disabled="!editName.trim() || editName.trim() === profile.name"
+                    class="align-self-start"
+                  >
+                    Save Changes
+                  </AppButton>
+                </AppFormFields>
+              </v-form>
+            </AppCardBody>
           </AppCard>
 
           <!-- PREFERENCES -->
-          <AppCard class="pa-6 mb-4">
-            <div class="text-subtitle-1 font-weight-medium mb-4">Preferences</div>
-            <AppSelect
-              v-model="selectedCurrency"
-              :items="CURRENCIES"
-              :item-title="(c: CurrencyOption) => `${c.symbol} — ${c.name} (${c.code})`"
-              label="Currency"
-              :prepend-inner-icon="mdiCurrencyUsd"
-              return-object
-              :loading="savingCurrency"
-              @update:model-value="onCurrencyChange"
-              class="mb-2"
-            ></AppSelect>
-            <AppSelect
-              v-model="defaultPeriod"
-              :items="periodOptions"
-              label="Default period"
-              :prepend-inner-icon="mdiCalendarRange"
-              :loading="savingPreferences"
-              @update:model-value="onDefaultPeriodChange"
-              class="mb-2"
-            ></AppSelect>
-            <AppSelect
-              v-model="weekStart"
-              :items="weekDayOptions"
-              label="First day of the week"
-              :prepend-inner-icon="mdiCalendarWeekBegin"
-              :loading="savingPreferences"
-              @update:model-value="onWeekStartChange"
-              class="mb-2"
-            ></AppSelect>
-            <AppSelect
-              v-model="decimalSeparator"
-              :items="separatorOptions"
-              label="Decimal separator"
-              :prepend-inner-icon="mdiDecimal"
-              :loading="savingPreferences"
-              @update:model-value="onDecimalSeparatorChange"
-            ></AppSelect>
+          <AppCard class="mb-4" title="Preferences">
+            <AppCardBody>
+              <AppFormFields>
+                <AppSelect
+                  v-model="selectedCurrency"
+                  :items="CURRENCIES"
+                  :item-title="(c: CurrencyOption) => `${c.symbol} — ${c.name} (${c.code})`"
+                  label="Currency"
+                  :prepend-inner-icon="mdiCurrencyUsd"
+                  return-object
+                  :loading="savingCurrency"
+                  @update:model-value="onCurrencyChange"
+                ></AppSelect>
+                <AppSelect
+                  v-model="defaultPeriod"
+                  :items="periodOptions"
+                  label="Default period"
+                  :prepend-inner-icon="mdiCalendarRange"
+                  :loading="savingPreferences"
+                  @update:model-value="onDefaultPeriodChange"
+                ></AppSelect>
+                <AppSelect
+                  v-model="weekStart"
+                  :items="weekDayOptions"
+                  label="First day of the week"
+                  :prepend-inner-icon="mdiCalendarWeekBegin"
+                  :loading="savingPreferences"
+                  @update:model-value="onWeekStartChange"
+                ></AppSelect>
+                <AppSelect
+                  v-model="decimalSeparator"
+                  :items="separatorOptions"
+                  label="Decimal separator"
+                  :prepend-inner-icon="mdiDecimal"
+                  :loading="savingPreferences"
+                  @update:model-value="onDecimalSeparatorChange"
+                ></AppSelect>
+              </AppFormFields>
+            </AppCardBody>
           </AppCard>
 
           <!-- BACKUP -->
@@ -137,77 +124,84 @@
           </AppCard>
 
           <!-- SECURITY -->
-          <AppCard class="pa-6 mb-4">
-            <div class="text-subtitle-1 font-weight-medium mb-4">Security</div>
-            <v-form @submit.prevent="updatePassword">
-              <AppTextField
-                v-model="currentPassword"
-                label="Current Password"
-                :type="showPassword ? 'text' : 'password'"
-                autocomplete="current-password"
-                :prepend-inner-icon="mdiLockOutline"
-                :append-inner-icon="showPassword ? mdiEyeOff : mdiEye"
-                @click:append-inner="showPassword = !showPassword"
-                hide-details
-                class="mb-4"
-              ></AppTextField>
-              <AppTextField
-                v-model="newPassword"
-                label="New Password"
-                :type="showNewPassword ? 'text' : 'password'"
-                autocomplete="new-password"
-                :prepend-inner-icon="mdiLockOutline"
-                :append-inner-icon="showNewPassword ? mdiEyeOff : mdiEye"
-                @click:append-inner="showNewPassword = !showNewPassword"
-                hide-details
-                class="mb-4"
-              ></AppTextField>
-              <AppTextField
-                v-model="confirmPassword"
-                label="Confirm New Password"
-                :type="showConfirmPassword ? 'text' : 'password'"
-                autocomplete="new-password"
-                :prepend-inner-icon="mdiLockOutline"
-                :append-inner-icon="showConfirmPassword ? mdiEyeOff : mdiEye"
-                @click:append-inner="showConfirmPassword = !showConfirmPassword"
-                :error="confirmMismatch"
-                :error-messages="confirmMismatch ? 'Passwords do not match' : ''"
-                hide-details="auto"
-                class="mb-2"
-              ></AppTextField>
-              <AppButton
-                type="submit"
-                color="primary"
-                :loading="savingPassword"
-                :disabled="!canSavePassword"
-                class="mt-2"
-              >
-                Update Password
-              </AppButton>
-            </v-form>
+          <AppCard class="mb-4" title="Security">
+            <AppCardBody>
+              <v-form @submit.prevent="updatePassword">
+                <AppFormFields :gap="16">
+                  <AppTextField
+                    v-model="currentPassword"
+                    label="Current Password"
+                    :type="showPassword ? 'text' : 'password'"
+                    autocomplete="current-password"
+                    :prepend-inner-icon="mdiLockOutline"
+                    :append-inner-icon="showPassword ? mdiEyeOff : mdiEye"
+                    @click:append-inner="showPassword = !showPassword"
+                    hide-details
+                  ></AppTextField>
+                  <AppTextField
+                    v-model="newPassword"
+                    label="New Password"
+                    :type="showNewPassword ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    :prepend-inner-icon="mdiLockOutline"
+                    :append-inner-icon="showNewPassword ? mdiEyeOff : mdiEye"
+                    @click:append-inner="showNewPassword = !showNewPassword"
+                    hide-details
+                  ></AppTextField>
+                  <AppTextField
+                    v-model="confirmPassword"
+                    label="Confirm New Password"
+                    :type="showConfirmPassword ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    :prepend-inner-icon="mdiLockOutline"
+                    :append-inner-icon="showConfirmPassword ? mdiEyeOff : mdiEye"
+                    @click:append-inner="showConfirmPassword = !showConfirmPassword"
+                    :error="confirmMismatch"
+                    :error-messages="confirmMismatch ? 'Passwords do not match' : ''"
+                    hide-details="auto"
+                  ></AppTextField>
+                  <AppButton
+                    type="submit"
+                    color="primary"
+                    :loading="savingPassword"
+                    :disabled="!canSavePassword"
+                    class="align-self-start"
+                  >
+                    Update Password
+                  </AppButton>
+                </AppFormFields>
+              </v-form>
+            </AppCardBody>
           </AppCard>
 
           <!-- DANGER ZONE -->
-          <AppCard class="pa-6" border style="border-color: rgb(var(--v-theme-error))">
-            <div class="text-subtitle-1 font-weight-medium text-error mb-4">Danger Zone</div>
-            <div class="mb-4">
+          <AppCard
+            class=""
+            border
+            style="border-color: rgb(var(--v-theme-error))"
+            title="Danger Zone"
+            title-class="font-weight-medium text-error"
+          >
+            <AppCardBody>
+              <div class="mb-4">
+                <AppButton
+                  color="error"
+                  variant="outlined"
+                  :disabled="revokingSessions"
+                  @click="revokeDialog = true"
+                >
+                  Log Out All Sessions
+                </AppButton>
+              </div>
               <AppButton
                 color="error"
                 variant="outlined"
-                :disabled="revokingSessions"
-                @click="revokeDialog = true"
+                :prepend-icon="mdiLogout"
+                @click="logoutDialog = true"
               >
-                Log Out All Sessions
+                Log Out
               </AppButton>
-            </div>
-            <AppButton
-              color="error"
-              variant="outlined"
-              :prepend-icon="mdiLogout"
-              @click="logoutDialog = true"
-            >
-              Log Out
-            </AppButton>
+            </AppCardBody>
           </AppCard>
         </template>
       </v-col>
@@ -250,6 +244,8 @@
 </template>
 
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
+import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import MovementCsvImportDialog from '@/components/MovementCsvImportDialog.vue'
 import MovementCsvExportDialog from '@/components/MovementCsvExportDialog.vue'
 import AppActionButton from '@/components/ui/AppActionButton.vue'
@@ -387,6 +383,7 @@ const EMPTY_PROFILE: Profile = {
 const {
   data: profile,
   loading,
+  hasLoaded,
   error: profileError,
   run: fetchProfile
 } = useAsyncData<Profile>(() => refreshAccountProfile(), EMPTY_PROFILE, {

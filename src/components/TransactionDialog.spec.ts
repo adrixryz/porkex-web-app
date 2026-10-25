@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { installTestLocks } from '@/utils/locks.test-helper'
 import { setToken, setUser } from '@/utils/api'
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vite-plus/test'
@@ -42,6 +42,7 @@ const CATEGORIES: Category[] = [
 const VSelectStub = { props: ['items', 'label'], template: '<div class="category-select" />' }
 
 const stubs = {
+  'v-defaults-provider': { props: ['defaults'], template: '<slot />' },
   TagPicker: true,
   'v-dialog': {
     props: ['modelValue'],
@@ -273,6 +274,7 @@ it('walks the amount stepper back to empty instead of parking it on 0.01', async
     expect(vm.form.amount).toBe('')
 
     vm.form.amount = '2.5'
+    await nextTick()
     await decrease.trigger('click')
     expect(vm.form.amount).toBe('1.5')
   } finally {

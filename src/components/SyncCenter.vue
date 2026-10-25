@@ -86,167 +86,157 @@
     :dirty="JSON.stringify(draft) !== cleanDraft"
     @update:model-value="editing = null"
   >
-    <v-alert v-if="error" type="error" class="mb-3">{{ error }}</v-alert>
-    <template v-for="field in fields" :key="field">
-      <AppTextField
-        v-model="draft[field]"
-        :label="labels[field] || field"
-        :type="
-          field.toLowerCase().includes('date')
-            ? 'date'
-            : [...amountFields, 'interval'].includes(field)
-              ? 'number'
-              : 'text'
-        "
-        :inputmode="amountFields.includes(field) ? 'decimal' : undefined"
-        :prefix="amountFields.includes(field) ? cs : undefined"
-        :min="
-          ['openingBalance', 'balance'].includes(field)
-            ? 0
-            : amountFields.includes(field)
-              ? 0.01
-              : field === 'interval'
-                ? 1
-                : undefined
-        "
-        :step="amountFields.includes(field) ? 0.01 : field === 'interval' ? 1 : undefined"
-        :hide-spin-buttons="amountFields.includes(field)"
-        class="mb-2"
-      >
-        <template v-if="amountFields.includes(field)" #append-inner>
-          <AmountStepper :label="labels[field]" @step="stepAmount(field, $event)" />
-        </template>
-      </AppTextField>
-    </template>
-    <CategorySelect
-      v-if="'categoryId' in draft"
-      v-model="draft.categoryId"
-      :items="categories.filter(c => !draft.type || c.type === draft.type)"
-    />
-    <AppSelect
-      v-if="'accountId' in draft"
-      v-model="draft.accountId"
-      :items="accounts"
-      item-title="name"
-      item-value="id"
-      label="Account"
-    />
-    <AppSelect
-      v-if="'sourceId' in draft"
-      v-model="draft.sourceId"
-      :items="transferAccounts"
-      item-title="name"
-      item-value="id"
-      label="From account"
-    />
-    <AppSelect
-      v-if="'destinationId' in draft"
-      v-model="draft.destinationId"
-      :items="transferAccounts"
-      item-title="name"
-      item-value="id"
-      label="To account"
-    />
-    <AppSelect
-      v-if="'frequency' in draft"
-      v-model="draft.frequency"
-      :items="[
-        { title: 'Day', value: 'DAY' },
-        { title: 'Week', value: 'WEEK' },
-        { title: 'Month', value: 'MONTH' },
-        { title: 'Year', value: 'YEAR' }
-      ]"
-      label="Frequency"
-    />
-    <AppSelect
-      v-if="'period' in draft"
-      v-model="draft.period"
-      :items="[
-        { title: 'Week', value: 'WEEK' },
-        { title: 'Month', value: 'MONTH' }
-      ]"
-      label="Period"
-    />
-    <AppSelect
-      v-if="'type' in draft"
-      v-model="draft.type"
-      :items="transactionTypeOptions"
-      label="Type"
-    />
-    <AppSelect
-      v-if="'active' in draft"
-      v-model="draft.active"
-      :items="[
-        { title: 'Active', value: true },
-        { title: 'Paused', value: false }
-      ]"
-      label="Status"
-    />
-    <AppSelect
-      v-if="'currency' in draft"
-      v-model="draft.currency"
-      :items="['USD', 'EUR', 'GBP', 'BRL', 'MXN', 'PEN']"
-      label="Currency"
-    />
-    <AppSelect
-      v-if="'defaultPeriod' in draft"
-      v-model="draft.defaultPeriod"
-      :items="[
-        { title: 'Day', value: 'day' },
-        { title: 'Week', value: 'week' },
-        { title: 'Month', value: 'month' },
-        { title: 'Year', value: 'year' }
-      ]"
-      label="Default period"
-    />
-    <AppSelect
-      v-if="'firstDayOfWeek' in draft"
-      v-model="draft.firstDayOfWeek"
-      :items="[
-        { title: 'Monday', value: 'MONDAY' },
-        { title: 'Tuesday', value: 'TUESDAY' },
-        { title: 'Wednesday', value: 'WEDNESDAY' },
-        { title: 'Thursday', value: 'THURSDAY' },
-        { title: 'Friday', value: 'FRIDAY' },
-        { title: 'Saturday', value: 'SATURDAY' },
-        { title: 'Sunday', value: 'SUNDAY' }
-      ]"
-      label="First day of week"
-    />
-    <AppSelect
-      v-if="'decimalSeparator' in draft"
-      v-model="draft.decimalSeparator"
-      :items="['.', ',']"
-      label="Decimal separator"
-    />
-    <div v-for="(id, index) in orderedTagIds" :key="id" class="d-flex align-center ga-2 mb-2">
-      <span class="flex-grow-1">{{
-        availableTags.find(tag => tag.id === id)?.name || 'Unavailable tag'
-      }}</span>
-      <AppButton size="small" variant="text" :disabled="index === 0" @click="moveTag(index, -1)"
-        >Move up</AppButton
-      >
+    <AppFormFields>
+      <v-alert v-if="error" type="error">{{ error }}</v-alert>
+      <template v-for="field in fields" :key="field">
+        <AppMoneyField
+          v-if="amountFields.includes(field)"
+          :model-value="String(draft[field] ?? '')"
+          :label="labels[field] || field"
+          :min="['openingBalance', 'balance'].includes(field) ? 0 : 0.01"
+          @update:model-value="draft[field] = $event"
+        />
+        <AppTextField
+          v-else
+          v-model="draft[field]"
+          :label="labels[field] || field"
+          :type="
+            field.toLowerCase().includes('date') ? 'date' : field === 'interval' ? 'number' : 'text'
+          "
+          :min="field === 'interval' ? 1 : undefined"
+          :step="field === 'interval' ? 1 : undefined"
+        />
+      </template>
+      <CategorySelect
+        v-if="'categoryId' in draft"
+        v-model="draft.categoryId"
+        :items="categories.filter(c => !draft.type || c.type === draft.type)"
+      />
+      <AppSelect
+        v-if="'accountId' in draft"
+        v-model="draft.accountId"
+        :items="accounts"
+        item-title="name"
+        item-value="id"
+        label="Account"
+      />
+      <AppSelect
+        v-if="'sourceId' in draft"
+        v-model="draft.sourceId"
+        :items="transferAccounts"
+        item-title="name"
+        item-value="id"
+        label="From account"
+      />
+      <AppSelect
+        v-if="'destinationId' in draft"
+        v-model="draft.destinationId"
+        :items="transferAccounts"
+        item-title="name"
+        item-value="id"
+        label="To account"
+      />
+      <AppSelect
+        v-if="'frequency' in draft"
+        v-model="draft.frequency"
+        :items="[
+          { title: 'Day', value: 'DAY' },
+          { title: 'Week', value: 'WEEK' },
+          { title: 'Month', value: 'MONTH' },
+          { title: 'Year', value: 'YEAR' }
+        ]"
+        label="Frequency"
+      />
+      <AppSelect
+        v-if="'period' in draft"
+        v-model="draft.period"
+        :items="[
+          { title: 'Week', value: 'WEEK' },
+          { title: 'Month', value: 'MONTH' }
+        ]"
+        label="Period"
+      />
+      <AppSelect
+        v-if="'type' in draft"
+        v-model="draft.type"
+        :items="transactionTypeOptions"
+        label="Type"
+      />
+      <AppSelect
+        v-if="'active' in draft"
+        v-model="draft.active"
+        :items="[
+          { title: 'Active', value: true },
+          { title: 'Paused', value: false }
+        ]"
+        label="Status"
+      />
+      <AppSelect
+        v-if="'currency' in draft"
+        v-model="draft.currency"
+        :items="['USD', 'EUR', 'GBP', 'BRL', 'MXN', 'PEN']"
+        label="Currency"
+      />
+      <AppSelect
+        v-if="'defaultPeriod' in draft"
+        v-model="draft.defaultPeriod"
+        :items="[
+          { title: 'Day', value: 'day' },
+          { title: 'Week', value: 'week' },
+          { title: 'Month', value: 'month' },
+          { title: 'Year', value: 'year' }
+        ]"
+        label="Default period"
+      />
+      <AppSelect
+        v-if="'firstDayOfWeek' in draft"
+        v-model="draft.firstDayOfWeek"
+        :items="[
+          { title: 'Monday', value: 'MONDAY' },
+          { title: 'Tuesday', value: 'TUESDAY' },
+          { title: 'Wednesday', value: 'WEDNESDAY' },
+          { title: 'Thursday', value: 'THURSDAY' },
+          { title: 'Friday', value: 'FRIDAY' },
+          { title: 'Saturday', value: 'SATURDAY' },
+          { title: 'Sunday', value: 'SUNDAY' }
+        ]"
+        label="First day of week"
+      />
+      <AppSelect
+        v-if="'decimalSeparator' in draft"
+        v-model="draft.decimalSeparator"
+        :items="['.', ',']"
+        label="Decimal separator"
+      />
+      <div v-for="(id, index) in orderedTagIds" :key="id" class="d-flex align-center ga-2">
+        <span class="flex-grow-1">{{
+          availableTags.find(tag => tag.id === id)?.name || 'Unavailable tag'
+        }}</span>
+        <AppButton size="small" variant="text" :disabled="index === 0" @click="moveTag(index, -1)"
+          >Move up</AppButton
+        >
+        <AppButton
+          size="small"
+          variant="text"
+          :disabled="index === orderedTagIds.length - 1"
+          @click="moveTag(index, 1)"
+          >Move down</AppButton
+        >
+      </div>
+      <TagPicker
+        v-if="'tagIds' in draft"
+        :model-value="draft.tagIds || []"
+        @update:model-value="draft.tagIds = $event"
+      />
       <AppButton
-        size="small"
-        variant="text"
-        :disabled="index === orderedTagIds.length - 1"
-        @click="moveTag(index, 1)"
-        >Move down</AppButton
+        color="primary"
+        size="large"
+        class="w-100 font-weight-bold"
+        :loading="busy"
+        @click="save"
+        >Update</AppButton
       >
-    </div>
-    <TagPicker
-      v-if="'tagIds' in draft"
-      :model-value="draft.tagIds || []"
-      @update:model-value="draft.tagIds = $event"
-    />
-    <AppButton
-      color="primary"
-      size="large"
-      class="w-100 mt-4 font-weight-bold"
-      :loading="busy"
-      @click="save"
-      >Update</AppButton
-    >
+    </AppFormFields>
   </AppDialog>
   <TransactionDialog
     v-model="confirmedMovementOpen"
@@ -257,6 +247,8 @@
   <RecurringDialog v-model="confirmedRuleOpen" :rule="confirmedRule" />
 </template>
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
+import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { transactionTypeOptions } from '@/utils/transactionTypes'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { syncCenterOpen } from '@/composables/useSyncCenter'
@@ -272,8 +264,6 @@ import {
 import { getUser, syncPendingWrites, fetchJson } from '@/utils/api'
 import { scheduledDeletes, undoDelete } from '@/utils/undoDelete'
 import { mutationError } from '@/utils/validation'
-import { useCurrencySymbol } from '@/utils/currency'
-import AmountStepper from './AmountStepper.vue'
 import { readCache } from '@/utils/cache'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useAccounts } from '@/composables/useAccounts'
@@ -297,18 +287,8 @@ const editing = ref<QueuedMutation | null>(null)
 // Values retain their original JSON types except for editable scalar inputs.
 const draft = ref<{ [key: string]: unknown; categoryId?: number; tagIds?: string[] }>({})
 const cleanDraft = ref('')
-const cs = useCurrencySymbol()
 const amountFields = ['amount', 'openingBalance', 'balance', 'targetAmount']
-function stepAmount(field: string, delta: number) {
-  const current = Number.parseFloat(String(draft.value[field] ?? ''))
-  const base = Number.isFinite(current) ? current : 0
-  const next = Math.round((base + delta) * 100) / 100
-  draft.value[field] = ['openingBalance', 'balance'].includes(field)
-    ? String(Math.max(0, next))
-    : next >= 0.01
-      ? String(next)
-      : ''
-}
+
 useUnsavedChanges(
   () => !!editing.value && JSON.stringify(draft.value) !== cleanDraft.value,
   () => busy.value

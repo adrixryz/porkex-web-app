@@ -241,3 +241,14 @@ it('keeps the scheduled deletion if Undo persistence fails and allows a retry', 
   await undoDeletes()
   expect(hiddenTransactionIds.value.has(24)).toBe(false)
 })
+
+it('retains the original money effect when a scheduled deletion enters the outbox', async () => {
+  stop?.()
+  await scheduleDelete({ ...row(91), accountId: 'cash', amount: 4.75 })
+  vi.setSystemTime(Date.now() + 9000)
+  await publishScheduledDeletes()
+  const operations = JSON.parse(localStorage.getItem('porkex_outbox')!)
+  expect(JSON.parse(operations[0].body)).toEqual({
+    previousTransaction: { accountId: 'cash', amount: 4.75, type: 'Expense' }
+  })
+})

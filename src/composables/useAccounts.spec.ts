@@ -115,3 +115,101 @@ it('withholds predictions when the response was lost or an old edit has no origi
   pending('PUT', { sourceId: 'cash', destinationId: 'goal', amount: 5 }, '/transfers/id')
   expect(query.accounts.value.every(row => row.pendingBalanceUnknown)).toBe(true)
 })
+
+it('projects income, expenses and account-changing edits without changing confirmed balances', async () => {
+  vi.mocked(fetchJson).mockResolvedValue([account('cash', 50), account('bank', 100)])
+  const { query } = consumer()
+  await query.run()
+  pending('POST', { accountId: 'cash', type: 'Expense', amount: 4.75 }, '/transactions')
+  expect(query.accounts.value[0]).toMatchObject({ balance: 50, projectedBalance: 45.25 })
+  pending('POST', { accountId: 'cash', type: 'Income', amount: 10 }, '/transactions')
+  expect(query.accounts.value[0]!.projectedBalance).toBe(60)
+  pending(
+    'PUT',
+    {
+      accountId: 'bank',
+      type: 'Expense',
+      amount: 7,
+      previousTransaction: { accountId: 'cash', type: 'Expense', amount: 5 }
+    },
+    '/transactions/1'
+  )
+  expect(query.accounts.value.map(row => row.projectedBalance)).toEqual([55, 93])
+  pending(
+    'DELETE',
+    {
+      previousTransaction: { accountId: 'cash', type: 'Expense', amount: 5 }
+    },
+    '/transactions/1'
+  )
+  expect(query.accounts.value[0]!.projectedBalance).toBe(55)
+})
+
+it('accumulates consecutive creates and reverses only the most recent queued edit', async () => {
+  vi.mocked(fetchJson).mockResolvedValue([account('cash', 50)])
+  const { query } = consumer()
+  await query.run()
+  const operations = [
+    {
+      method: 'POST',
+      path: '/transactions',
+      body: { accountId: 'cash', type: 'Income', amount: 10 }
+    },
+    {
+      method: 'POST',
+      path: '/transactions',
+      body: { accountId: 'cash', type: 'Expense', amount: 3 }
+    },
+    {
+      method: 'PUT',
+      path: '/transactions/2',
+      body: {
+        accountId: 'cash',
+        type: 'Expense',
+        amount: 7,
+        previousTransaction: { accountId: 'cash', type: 'Expense', amount: 5 }
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/transactions/2',
+      body: {
+        accountId: 'cash',
+        type: 'Expense',
+        amount: 9,
+        previousTransaction: { accountId: 'cash', type: 'Expense', amount: 5 }
+      }
+    }
+  ]
+  localStorage.setItem(
+    'porkex_outbox',
+    JSON.stringify(
+      operations.map((operation, index) => ({
+        ...operation,
+        id: String(index),
+        userId: 1,
+        status: 'pending',
+        attempts: 0,
+        createdAt: Date.now() + index,
+        body: JSON.stringify(operation.body)
+      }))
+    )
+  )
+  refreshPendingCount()
+  expect(query.accounts.value[0]).toMatchObject({
+    balance: 50,
+    pendingBalanceDelta: 3,
+    projectedBalance: 53
+  })
+})
+
+it('does not invent a balance after a movement response is lost', async () => {
+  vi.mocked(fetchJson).mockResolvedValue([account('cash', 50), account('bank', 100)])
+  const { query } = consumer()
+  await query.run()
+  pending('POST', { accountId: 'cash', type: 'Expense', amount: 4 }, '/transactions', {
+    outcome: 'unknown'
+  })
+  expect(query.accounts.value[0]!.projectedBalance).toBeUndefined()
+  expect(query.accounts.value[1]!.projectedBalance).toBe(100)
+})

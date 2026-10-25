@@ -9,119 +9,102 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-form @submit.prevent="submit">
-      <AppTextField
-        v-if="favoriteMode"
-        v-model="form.name"
-        label="Favorite name"
-        maxlength="60"
-        :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
-      />
-      <div class="amount-date-row mb-6">
-        <div>
-          <AppTextField
-            v-model="form.amount"
-            label="Amount"
-            type="number"
-            inputmode="decimal"
-            :error-messages="
-              form.amount && !validAmount(form.amount)
-                ? 'Use up to two decimals, from 0.01 to 10,000,000.'
-                : []
-            "
-            :prefix="cs"
-            min="0.01"
-            step="0.01"
-            hide-spin-buttons
-            autofocus
-            hide-details="auto"
-          >
-            <template #append-inner>
-              <AmountStepper
-                :label="isIncome ? 'income amount' : 'expense amount'"
-                @step="stepAmount"
-              ></AmountStepper>
-            </template>
-          </AppTextField>
+      <AppFormFields>
+        <AppTextField
+          v-if="favoriteMode"
+          v-model="form.name"
+          label="Favorite name"
+          maxlength="60"
+          :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
+        />
+        <div class="amount-date-row">
+          <div>
+            <AppMoneyField
+              v-model="form.amount"
+              :step-label="isIncome ? 'income amount' : 'expense amount'"
+              autofocus
+            />
+          </div>
+          <div>
+            <AppTextField
+              v-model="form.date"
+              label="Date"
+              type="date"
+              :max="occurrence ? undefined : todayInput()"
+              :readonly="!!occurrence"
+              hide-details="auto"
+            ></AppTextField>
+          </div>
         </div>
-        <div>
-          <AppTextField
-            v-model="form.date"
-            label="Date"
-            type="date"
-            :max="occurrence ? undefined : todayInput()"
-            :readonly="!!occurrence"
-            hide-details="auto"
-          ></AppTextField>
+
+        <AppSelect
+          v-model="form.accountId"
+          :readonly="!!occurrence"
+          :items="activeAccounts"
+          item-title="name"
+          item-value="id"
+          label="Account"
+        />
+        <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
+
+        <AppTextField
+          v-model="form.description"
+          label="Comment (optional)"
+          maxlength="200"
+          :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Grocery shopping'"
+          hide-details="auto"
+        ></AppTextField>
+        <TagPicker v-model="form.tagIds" />
+
+        <v-alert
+          v-if="!categoryOptions.length && categoriesError"
+          type="warning"
+          variant="tonal"
+          density="compact"
+        >
+          Categories could not be loaded. Connect once and they will stay available offline.
+        </v-alert>
+
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          closable
+          @click:close="error = ''"
+        >
+          {{ error }}
+        </v-alert>
+
+        <AppButton
+          type="submit"
+          color="primary"
+          size="large"
+          class="w-100 font-weight-bold"
+          :loading="submitting"
+          :disabled="!isValid"
+        >
+          {{ isEditing ? 'Update' : favoriteMode ? 'Create' : 'Save' }}
+        </AppButton>
+
+        <!-- Record metadata: only meaningful for an existing movement -->
+        <div
+          v-if="isEditing && transaction?.createdAt"
+          class="d-flex align-center justify-space-between ga-3 pt-3 border-t border-outline-variant"
+        >
+          <span class="text-caption text-on-surface-variant">Created At</span>
+          <span class="text-caption text-on-surface">{{
+            formatDateTime(transaction.createdAt)
+          }}</span>
         </div>
-      </div>
-
-      <AppSelect
-        v-model="form.accountId"
-        :readonly="!!occurrence"
-        :items="activeAccounts"
-        item-title="name"
-        item-value="id"
-        label="Account"
-      />
-      <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
-
-      <AppTextField
-        v-model="form.description"
-        label="Comment (optional)"
-        maxlength="200"
-        :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Grocery shopping'"
-        hide-details="auto"
-      ></AppTextField>
-      <TagPicker v-model="form.tagIds" class="mt-6" />
-
-      <v-alert
-        v-if="!categoryOptions.length && categoriesError"
-        type="warning"
-        variant="tonal"
-        density="compact"
-        class="mt-2"
-      >
-        Categories could not be loaded. Connect once and they will stay available offline.
-      </v-alert>
-
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        density="compact"
-        class="mt-4"
-        closable
-        @click:close="error = ''"
-      >
-        {{ error }}
-      </v-alert>
-
-      <AppButton
-        type="submit"
-        color="primary"
-        size="large"
-        class="w-100 mt-4 font-weight-bold"
-        :loading="submitting"
-        :disabled="!isValid"
-      >
-        {{ isEditing ? 'Update' : favoriteMode ? 'Create' : 'Save' }}
-      </AppButton>
-
-      <!-- Record metadata: only meaningful for an existing movement -->
-      <div
-        v-if="isEditing && transaction?.createdAt"
-        class="d-flex align-center justify-space-between ga-3 mt-4 pt-3 border-t border-outline-variant"
-      >
-        <span class="text-caption text-on-surface-variant">Created At</span>
-        <span class="text-caption text-on-surface">{{
-          formatDateTime(transaction.createdAt)
-        }}</span>
-      </div>
+      </AppFormFields>
     </v-form>
   </AppDialog>
 </template>
 
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
+import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import { useAccounts } from '@/composables/useAccounts'
@@ -131,14 +114,12 @@ import { ref, computed, watch } from 'vue'
 import { createEditStamp } from '@/utils/editStamp'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import TagPicker from '@/components/TagPicker.vue'
-import AmountStepper from '@/components/AmountStepper.vue'
 import CategorySelect from '@/components/CategorySelect.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppDialog from '@/components/ui/AppDialog.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
-import { useCurrencySymbol } from '@/utils/currency'
 import { fromDateInput, toDateInput, todayInput, formatDateTime } from '@/utils/date'
 import type { Category, Transaction, MovementDraft, Favorite } from '@/types'
 
@@ -172,7 +153,6 @@ const emit = defineEmits<{
 }>()
 
 const { activeAccounts, run: fetchAccounts } = useAccounts()
-const cs = useCurrencySymbol()
 
 const form = ref({
   name: '',
@@ -271,19 +251,8 @@ watch(
 
 const close = () => emit('update:modelValue', false)
 
-// Empty input counts as 0 and decimals stay exact instead of picking up
-// floating point noise. Stepping below the 0.01 minimum clears the field, so
-// the stepper can always be walked back to empty instead of parking the value
-// on a 0.01 the user never chose.
-const stepAmount = (delta: number) => {
-  const current = Number.parseFloat(form.value.amount)
-  const base = Number.isFinite(current) ? current : 0
-  const next = Math.round((base + delta) * 100) / 100
-  form.value.amount = next >= 0.01 ? String(next) : ''
-}
-
 const submit = async () => {
-  if (!isValid.value) return
+  if (submitting.value || !isValid.value) return
   submitting.value = true
   error.value = ''
 
@@ -311,6 +280,15 @@ const submit = async () => {
           : {}),
         ...form.value,
         ...stamp,
+        ...(props.transaction && !props.favoriteMode && !props.occurrence
+          ? {
+              previousTransaction: {
+                accountId: props.transaction.accountId,
+                amount: props.transaction.amount,
+                type: props.transaction.type
+              }
+            }
+          : {}),
         ...(props.occurrence ? { kind: 'EDIT' } : {}),
         comment: form.value.description.trim(),
         type: props.type,

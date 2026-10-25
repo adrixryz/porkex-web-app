@@ -5,6 +5,7 @@
     :persistent="persistent"
     :aria-label="title || undefined"
     v-bind="$attrs"
+    @keydown="onKeydown"
   >
     <v-card>
       <v-card-title
@@ -73,29 +74,19 @@ const guardedOpen = computed({
   set: value => {
     if (!value && (props.closeDisabled || (props.dirty && !confirmDiscard()))) return
     open.value = value
+    if (!value) emit('close')
   }
 })
 
 function close() {
   if (props.closeDisabled) return
   guardedOpen.value = false
-  if (!open.value) emit('close')
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !props.persistent || !open.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  close()
 }
 </script>
-
-<style scoped>
-.app-dialog-body :deep(.v-form > .v-btn:last-child) {
-  margin-top: 24px !important;
-}
-.app-dialog-body :deep(.v-form > .v-input:has(+ .v-btn:last-child)) {
-  margin-bottom: 0 !important;
-}
-.app-dialog-body
-  :deep(
-    .v-form
-      > .v-input:has(+ .v-btn:last-child)
-      > .v-input__details:has(> .v-messages:only-child):not(:has(.v-messages__message))
-  ) {
-  display: none;
-}
-</style>

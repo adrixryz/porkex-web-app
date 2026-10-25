@@ -20,6 +20,7 @@ vi.mock('@/utils/currency', () => ({ setCurrencyByCode: vi.fn() }))
 vi.mock('@/utils/preferences', () => ({ applyPreferences: vi.fn() }))
 
 const stubs = {
+  'v-defaults-provider': { props: ['defaults'], template: '<slot />' },
   'v-container': { template: '<div><slot /></div>' },
   'v-card': { template: '<div><slot /></div>' },
   'v-card-text': { template: '<div><slot /></div>' },

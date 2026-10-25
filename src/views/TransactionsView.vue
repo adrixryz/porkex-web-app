@@ -7,35 +7,7 @@
       :selection="csvExportSelection"
     />
     <!-- LOADING SKELETON -->
-    <template v-if="loading && !initialLoadComplete">
-      <v-row class="mb-2">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
-        >
-          <v-skeleton-loader type="heading" width="200"></v-skeleton-loader>
-        </v-col>
-      </v-row>
-      <v-row class="mb-4">
-        <v-col cols="12">
-          <AppCard class="pa-4">
-            <v-skeleton-loader type="text" width="360"></v-skeleton-loader>
-          </AppCard>
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col cols="12">
-          <AppCard class="pa-4">
-            <div v-for="n in 6" :key="n" class="d-flex align-center py-3 ga-4">
-              <v-skeleton-loader type="text" width="100"></v-skeleton-loader>
-              <v-skeleton-loader type="text" width="180" class="flex-grow-1"></v-skeleton-loader>
-              <v-skeleton-loader type="chip" width="80"></v-skeleton-loader>
-              <v-skeleton-loader type="text" width="90"></v-skeleton-loader>
-            </div>
-          </AppCard>
-        </v-col>
-      </v-row>
-    </template>
+    <AppPageSkeleton v-if="loading && !initialLoadComplete" page="transactions" />
     <template v-else>
       <AppPageHeader class="transactions-header">
         <template #title>
@@ -44,7 +16,6 @@
             <AppSegmentedControl
               :model-value="filterType"
               label="Transaction type"
-              :button-height="32"
               :items="[
                 { label: 'Expense', value: 'Expense' },
                 { label: 'Income', value: 'Income' }
@@ -59,210 +30,179 @@
       <!-- DATE FILTER + SEARCH + FILTERS -->
       <v-row class="mb-4">
         <v-col cols="12">
-          <AppCard class="pa-4 transactions-filter-card">
-            <div class="transaction-period">
-              <div class="period-picker">
-                <v-btn-toggle
-                  v-model="periodMode"
-                  mandatory
-                  color="primary"
-                  density="compact"
-                  rounded="pill"
-                  variant="flat"
-                  class="compact-toggle"
-                  aria-label="Select period"
+          <AppCard class="transactions-filter-card">
+            <AppCardBody>
+              <div class="transaction-period">
+                <div class="period-picker">
+                  <AppSegmentedControl
+                    v-model="periodMode"
+                    label="Select period"
+                    :items="[
+                      { label: 'Day', value: 'day' },
+                      { label: 'Week', value: 'week' },
+                      { label: 'Month', value: 'month' },
+                      { label: 'Year', value: 'year' },
+                      { label: 'Custom', value: 'custom' }
+                    ]"
+                  />
+                </div>
+
+                <AppPeriodNavigation
+                  v-if="periodMode !== 'custom'"
+                  :label="periodLabel"
+                  :can-go-forward="canGoForward"
+                  :can-go-back="canGoBack"
+                  class="period-navigation"
+                  @previous="navigate(-1)"
+                  @next="navigate(1)"
+                />
+                <div
+                  v-else
+                  class="period-navigation d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3"
                 >
-                  <!-- The buttons stay flat: this pill carries the selection
-                       and slides from one period to the next. -->
-                  <span
-                    aria-hidden="true"
-                    class="compact-toggle__thumb"
-                    :style="periodThumbStyle"
-                  ></span>
-                  <v-btn value="day">Day</v-btn>
-                  <v-btn value="week">Week</v-btn>
-                  <v-btn value="month">Month</v-btn>
-                  <v-btn value="year">Year</v-btn>
-                  <v-btn value="custom">Custom</v-btn>
-                </v-btn-toggle>
+                  <AppTextField
+                    v-model="customFrom"
+                    label="From"
+                    type="date"
+                    :max="todayInput()"
+                    density="compact"
+                    hide-details
+                    class="flex-grow-1"
+                  ></AppTextField>
+                  <AppTextField
+                    v-model="customTo"
+                    label="To"
+                    type="date"
+                    :max="todayInput()"
+                    density="compact"
+                    hide-details
+                    class="flex-grow-1"
+                  ></AppTextField>
+                  <AppButton color="primary" @click="reload" class="flex-grow-1 flex-sm-grow-0">
+                    Apply
+                  </AppButton>
+                </div>
               </div>
 
-              <AppPeriodNavigation
-                v-if="periodMode !== 'custom'"
-                :label="periodLabel"
-                :can-go-forward="canGoForward"
-                :can-go-back="canGoBack"
-                class="period-navigation"
-                @previous="navigate(-1)"
-                @next="navigate(1)"
-              />
-              <div
-                v-else
-                class="period-navigation d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3"
-              >
-                <AppTextField
-                  v-model="customFrom"
-                  label="From"
-                  type="date"
-                  :max="todayInput()"
+              <!-- Account / category / sorting / amount filters -->
+              <div class="transaction-filters mt-3">
+                <AppSelect
+                  v-model="filterAccount"
+                  :items="accountOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Account"
+                  clearable
                   density="compact"
                   hide-details
-                  class="flex-grow-1"
-                ></AppTextField>
-                <AppTextField
-                  v-model="customTo"
-                  label="To"
-                  type="date"
-                  :max="todayInput()"
+                  class="account-filter"
+                />
+
+                <CategorySelect
+                  v-model="filterCategory"
+                  :items="categoryOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Category"
+                  clearable
                   density="compact"
                   hide-details
-                  class="flex-grow-1"
-                ></AppTextField>
-                <AppButton color="primary" @click="reload" class="flex-grow-1 flex-sm-grow-0">
-                  Apply
+                  class="category-filter"
+                />
+
+                <AppSelect
+                  v-model="sortOption"
+                  :items="sortOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Sort by"
+                  density="compact"
+                  hide-details
+                  class="sort-filter"
+                ></AppSelect>
+
+                <div class="amount-range">
+                  <AppMoneyField
+                    v-model="minAmount"
+                    label="Min"
+                    step-label="minimum amount"
+                    :min="0"
+                    optional
+                    density="compact"
+                    class="amount-filter"
+                  />
+
+                  <AppMoneyField
+                    v-model="maxAmount"
+                    label="Max"
+                    step-label="maximum amount"
+                    :min="0"
+                    optional
+                    :error-messages="amountRangeError"
+                    density="compact"
+                    class="amount-filter"
+                  />
+                </div>
+              </div>
+
+              <!-- Active filter summary -->
+              <div v-if="hasActiveFilters" class="d-flex align-center flex-wrap ga-2 mt-3">
+                <span class="text-caption text-on-surface-variant">Active filters:</span>
+                <v-chip
+                  v-if="filterTag"
+                  size="small"
+                  color="primary"
+                  closable
+                  @click:close="filterTag = null"
+                  >{{ selectedTagName }}</v-chip
+                >
+                <v-chip v-if="searchQuery" size="x-small" closable @click:close="searchQuery = ''"
+                  >"{{ searchQuery }}"</v-chip
+                >
+                <v-chip
+                  v-if="filterAccount !== null"
+                  size="x-small"
+                  closable
+                  @click:close="filterAccount = null"
+                >
+                  {{ accounts.find(account => account.id === filterAccount)?.name || 'Selected' }}
+                  Account
+                </v-chip>
+                <v-chip
+                  v-if="filterCategory !== null"
+                  size="x-small"
+                  closable
+                  @click:close="filterCategory = null"
+                >
+                  {{ categories?.find(c => c.id === filterCategory)?.name || 'Category' }}
+                </v-chip>
+                <v-chip
+                  v-if="minBound !== null"
+                  size="x-small"
+                  closable
+                  @click:close="minAmount = ''"
+                >
+                  ≥ {{ cs }}{{ formatMoney(minBound) }}
+                </v-chip>
+                <v-chip
+                  v-if="maxBound !== null"
+                  size="x-small"
+                  closable
+                  @click:close="maxAmount = ''"
+                >
+                  ≤ {{ cs }}{{ formatMoney(maxBound) }}
+                </v-chip>
+                <AppButton
+                  variant="text"
+                  :framed="false"
+                  size="x-small"
+                  color="white"
+                  @click="clearFilters"
+                >
+                  Clear all
                 </AppButton>
               </div>
-            </div>
-
-            <!-- Account / category / sorting / amount filters -->
-            <div class="transaction-filters mt-3">
-              <AppSelect
-                v-model="filterAccount"
-                :items="accountOptions"
-                item-title="title"
-                item-value="value"
-                label="Account"
-                clearable
-                density="compact"
-                hide-details
-                class="account-filter"
-              />
-
-              <CategorySelect
-                v-model="filterCategory"
-                :items="categoryOptions"
-                item-title="title"
-                item-value="value"
-                label="Category"
-                clearable
-                density="compact"
-                hide-details
-                class="category-filter"
-              />
-
-              <AppSelect
-                v-model="sortOption"
-                :items="sortOptions"
-                item-title="title"
-                item-value="value"
-                label="Sort by"
-                density="compact"
-                hide-details
-                class="sort-filter"
-              ></AppSelect>
-
-              <div class="amount-range">
-                <AppTextField
-                  v-model="minAmount"
-                  label="Min"
-                  type="number"
-                  inputmode="decimal"
-                  :prefix="cs"
-                  min="0"
-                  step="1"
-                  density="compact"
-                  hide-details
-                  hide-spin-buttons
-                  class="amount-filter"
-                >
-                  <template #append-inner>
-                    <AmountStepper
-                      label="minimum amount"
-                      @step="delta => stepAmount('min', delta)"
-                    ></AmountStepper>
-                  </template>
-                </AppTextField>
-
-                <AppTextField
-                  v-model="maxAmount"
-                  label="Max"
-                  type="number"
-                  inputmode="decimal"
-                  :prefix="cs"
-                  min="0"
-                  step="1"
-                  density="compact"
-                  hide-details
-                  hide-spin-buttons
-                  class="amount-filter"
-                >
-                  <template #append-inner>
-                    <AmountStepper
-                      label="maximum amount"
-                      @step="delta => stepAmount('max', delta)"
-                    ></AmountStepper>
-                  </template>
-                </AppTextField>
-              </div>
-            </div>
-
-            <!-- Active filter summary -->
-            <div v-if="hasActiveFilters" class="d-flex align-center flex-wrap ga-2 mt-3">
-              <span class="text-caption text-on-surface-variant">Active filters:</span>
-              <v-chip
-                v-if="filterTag"
-                size="small"
-                color="primary"
-                closable
-                @click:close="filterTag = null"
-                >{{ selectedTagName }}</v-chip
-              >
-              <v-chip v-if="searchQuery" size="x-small" closable @click:close="searchQuery = ''"
-                >"{{ searchQuery }}"</v-chip
-              >
-              <v-chip
-                v-if="filterAccount !== null"
-                size="x-small"
-                closable
-                @click:close="filterAccount = null"
-              >
-                {{ accounts.find(account => account.id === filterAccount)?.name || 'Selected' }}
-                Account
-              </v-chip>
-              <v-chip
-                v-if="filterCategory !== null"
-                size="x-small"
-                closable
-                @click:close="filterCategory = null"
-              >
-                {{ categories?.find(c => c.id === filterCategory)?.name || 'Category' }}
-              </v-chip>
-              <v-chip
-                v-if="minBound !== null"
-                size="x-small"
-                closable
-                @click:close="minAmount = ''"
-              >
-                ≥ {{ cs }}{{ formatMoney(minBound) }}
-              </v-chip>
-              <v-chip
-                v-if="maxBound !== null"
-                size="x-small"
-                closable
-                @click:close="maxAmount = ''"
-              >
-                ≤ {{ cs }}{{ formatMoney(maxBound) }}
-              </v-chip>
-              <AppButton
-                variant="text"
-                :framed="false"
-                size="x-small"
-                color="white"
-                @click="clearFilters"
-              >
-                Clear all
-              </AppButton>
-            </div>
+            </AppCardBody>
           </AppCard>
         </v-col>
       </v-row>
@@ -289,11 +229,9 @@
         <v-col cols="12">
           <AppCard class="overflow-hidden" :aria-busy="loading">
             <AppCardBody padding="pa-0">
-              <v-skeleton-loader
-                v-if="loading"
-                type="list-item-two-line@4"
-                class="pa-4"
-              ></v-skeleton-loader>
+              <div v-if="loading" role="status" aria-label="Loading transactions">
+                <AppSkeleton type="rows" :rows="4" />
+              </div>
               <!-- MOBILE LIST -->
               <v-list
                 v-else-if="mobile && transactions.length > 0"
@@ -496,7 +434,7 @@
             <AppActionButton
               :icon="mdiDownload"
               :loading="exporting"
-              :disabled="isOffline || exporting"
+              :disabled="isOffline || exporting || !!amountFilterError"
               @click="prepareCsvExport"
               >Export CSV</AppActionButton
             >
@@ -531,9 +469,13 @@
 </template>
 
 <script setup lang="ts">
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
+import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import MovementCsvImportDialog from '@/components/MovementCsvImportDialog.vue'
 import MovementCsvExportDialog from '@/components/MovementCsvExportDialog.vue'
 import type { CsvExportSelection } from '@/utils/movementCsv'
+import { moneyInputError, parseMoneyInput } from '@/utils/moneyInput'
 import { isOffline } from '@/utils/connection'
 import MovementShortcutsMenu from '@/components/MovementShortcutsMenu.vue'
 import QuickActions from '@/components/QuickActions.vue'
@@ -549,7 +491,6 @@ import TransactionSummary from '@/components/TransactionSummary.vue'
 import { useTags } from '@/composables/useTags'
 import TagChips from '@/components/TagChips.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
-import AmountStepper from '@/components/AmountStepper.vue'
 import CategorySelect from '@/components/CategorySelect.vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
 import AppActionButton from '@/components/ui/AppActionButton.vue'
@@ -603,7 +544,7 @@ const csvExportOpen = ref(false)
 const csvExportSelection = ref<CsvExportSelection | null>(null)
 const exporting = ref(false)
 function prepareCsvExport() {
-  if (exporting.value) return
+  if (exporting.value || amountFilterError.value) return
   const url = transactionsUrl()
   const query = new URLSearchParams(url.split('?')[1])
   const accountId = query.get('accountId')
@@ -702,11 +643,6 @@ watch([customFrom, customTo], () => {
   customTo.value = capAtToday(customTo.value)
 })
 
-// Equal segments let the pill move without measuring the DOM or stretching.
-const periodThumbStyle = computed(() => ({
-  transform: `translateX(${PERIODS.indexOf(periodMode.value) * 100}%)`
-}))
-
 // Delete confirm
 const deleteDialog = ref(false)
 const deletingTx = ref<Transaction | null>(null)
@@ -745,7 +681,10 @@ const {
   error: listError,
   run: fetchTransactions
 } = useAsyncData<TransactionsResponse>(
-  signal => fetchJson<TransactionsResponse>(transactionsUrl(), { signal }),
+  signal =>
+    amountFilterError.value
+      ? Promise.reject(new Error(amountFilterError.value))
+      : fetchJson<TransactionsResponse>(transactionsUrl(), { signal }),
   { items: [], total: 0, page: 1, perPage: PER_PAGE, totalPages: 1 },
   { cacheKey: transactionsUrl }
 )
@@ -782,14 +721,19 @@ const sortOption = computed({
   }
 })
 
-// Valid amount bounds (>= 0); invalid input is ignored instead of being sent to the backend.
-const parseBound = (v: string): number | null => {
-  if (v === '' || v === null) return null
-  const n = Number(v)
-  return Number.isFinite(n) && n >= 0 ? n : null
-}
-const minBound = computed(() => parseBound(minAmount.value))
-const maxBound = computed(() => parseBound(maxAmount.value))
+const minBound = computed(() => (minAmount.value.trim() ? parseMoneyInput(minAmount.value) : null))
+const maxBound = computed(() => (maxAmount.value.trim() ? parseMoneyInput(maxAmount.value) : null))
+const amountRangeError = computed(() =>
+  minBound.value !== null && maxBound.value !== null && minBound.value > maxBound.value
+    ? 'Max must be greater than or equal to Min.'
+    : ''
+)
+const amountFilterError = computed(
+  () =>
+    moneyInputError(minAmount.value, { min: 0, optional: true }) ||
+    moneyInputError(maxAmount.value, { min: 0, optional: true }) ||
+    amountRangeError.value
+)
 
 const hasActiveFilters = computed(
   () =>
@@ -930,23 +874,10 @@ async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
   return true
 }
 
-// Custom steppers (AmountStepper) replace the native number spinner.
-// Empty input counts as 0, decimals are kept exact, and stepping down to zero
-// or below clears the field: empty means "no min/max", while a literal 0 would
-// be a filter of its own and 0.00 is not a bound anyone types.
-const stepAmount = (which: 'min' | 'max', delta: number) => {
-  const current = Number.parseFloat(which === 'min' ? minAmount.value : maxAmount.value)
-  const base = Number.isFinite(current) ? current : 0
-  const next = Math.round((base + delta) * 100) / 100
-  const value = next > 0 ? String(next) : ''
-  if (which === 'min') minAmount.value = value
-  else maxAmount.value = value
-}
-
 // A filter change invalidates the current page, so go back to the first one.
 let navigationTimer: number | undefined
 const reload = (_event?: unknown, mode: 'push' | 'replace' = 'push', resetPage = true) => {
-  if (hydrating) return
+  if (hydrating || amountFilterError.value) return
   window.clearTimeout(navigationTimer)
   if (resetPage) page.value = 1
   navigationTimer = window.setTimeout(async () => {
@@ -955,6 +886,11 @@ const reload = (_event?: unknown, mode: 'push' | 'replace' = 'push', resetPage =
 }
 
 const load = async () => {
+  if (amountFilterError.value) {
+    loading.value = false
+    initialLoadComplete.value = true
+    return
+  }
   await fetchTransactions()
   initialLoadComplete.value = true
   if (listError.value) showSnack(listError.value, 'error')
@@ -1125,14 +1061,11 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition: gap 0.22s ease;
 }
 .transactions-type-toggle {
-  width: 220px;
   flex-shrink: 1;
   min-width: 0;
-}
-.transactions-type-toggle :deep(.v-btn) {
-  font-size: 0.875rem;
 }
 @media (max-width: 599px) {
   .transactions-csv-actions > .v-btn {
@@ -1141,12 +1074,10 @@ onMounted(async () => {
   .transactions-heading {
     gap: 8px;
   }
-  .transactions-type-toggle {
-    width: 170px;
-  }
-  .transactions-type-toggle :deep(.v-btn) {
-    padding-inline: 4px;
-    font-size: 0.8125rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .transactions-heading {
+    transition: none;
   }
 }
 .hover-row {
@@ -1212,87 +1143,6 @@ onMounted(async () => {
 .description-cell {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Period picker: the tones of the type filter (dark track, hairline border,
-   muted labels, accent only on the chosen one) drawn as a segmented control
-   whose selection pill slides from one segment to the next. */
-.compact-toggle {
-  position: relative;
-  display: grid !important;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  width: 380px;
-  gap: 0 !important;
-  padding: 5px !important;
-  max-width: 100%;
-  flex-wrap: nowrap;
-  height: auto !important;
-  overflow: hidden;
-  background: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 999px !important;
-}
-/* Percentage positioning stays aligned during resize without a second animation. */
-.compact-toggle__thumb {
-  position: absolute;
-  top: 5px;
-  bottom: 5px;
-  left: 5px;
-  width: calc((100% - 10px) / 5);
-  pointer-events: none;
-  background: rgba(var(--v-theme-primary), var(--v-activated-opacity));
-  border: 1px solid rgb(var(--v-theme-primary));
-  border-radius: 999px;
-  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.compact-toggle :deep(.v-btn) {
-  /* Vuetify paints an always-on "activated" overlay on the chosen button,
-     which would tint the dark track; the fill lives on the sliding pill. The
-     value has to be set on the buttons themselves: they carry the theme class
-     that declares it, so inheriting it from the track would not win. */
-  --v-activated-opacity: 0 !important;
-  padding: 10px 12px !important;
-  height: 40px !important;
-  min-width: 0 !important;
-  font-size: 0.875rem !important;
-  background: transparent !important;
-  border-radius: 999px !important;
-  color: rgb(var(--v-theme-on-surface-variant)) !important;
-  transition: color 0.16s ease;
-}
-.compact-toggle :deep(.v-btn__overlay) {
-  transition: opacity 0.18s ease;
-}
-.compact-toggle :deep(.v-btn--active) {
-  /* Accent on the label only, like the type filter's chosen pill. */
-  color: rgb(var(--v-theme-primary)) !important;
-}
-
-@media (max-width: 600px) {
-  .compact-toggle {
-    width: 100%;
-  }
-  .compact-toggle :deep(.v-btn) {
-    flex: 1 1 0;
-    padding: 12px 4px !important;
-    /* Leave room for wider system fonts while keeping the 44px touch target. */
-    font-size: clamp(0.75rem, 3.75vw, 0.875rem) !important;
-    height: 44px !important;
-  }
-}
-
-@media (max-width: 360px) {
-  .compact-toggle :deep(.v-btn) {
-    padding-inline: 2px !important;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .compact-toggle__thumb,
-  .compact-toggle :deep(.v-btn),
-  .compact-toggle :deep(.v-btn__overlay) {
-    transition: none !important;
-  }
 }
 
 .transactions-filter-card {

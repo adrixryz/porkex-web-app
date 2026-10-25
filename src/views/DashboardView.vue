@@ -1,66 +1,7 @@
 <template>
   <AppPage>
     <!-- LOADING SKELETON -->
-    <template v-if="loading">
-      <v-row class="mb-4">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-sm-space-between align-start align-sm-center pb-4 ga-4"
-        >
-          <div>
-            <v-skeleton-loader type="text" width="120" class="mb-2"></v-skeleton-loader>
-            <v-skeleton-loader type="heading" width="260"></v-skeleton-loader>
-          </div>
-        </v-col>
-      </v-row>
-      <v-row class="mb-6">
-        <v-col cols="4" v-for="n in 3" :key="n">
-          <AppCard class="pa-4">
-            <div class="d-flex align-center">
-              <v-skeleton-loader type="avatar" class="mr-4"></v-skeleton-loader>
-              <div>
-                <v-skeleton-loader type="text" width="100" class="mb-1"></v-skeleton-loader>
-                <v-skeleton-loader type="text" width="140"></v-skeleton-loader>
-              </div>
-            </div>
-          </AppCard>
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col cols="12" md="8" order="2" order-md="1">
-          <AppCard>
-            <template #title
-              ><v-skeleton-loader type="text" width="180"></v-skeleton-loader
-            ></template>
-            <AppCardBody padding="pa-0">
-              <div v-for="n in 5" :key="n" class="px-6 py-4 d-flex align-center">
-                <v-skeleton-loader
-                  type="avatar"
-                  class="mr-4"
-                  width="44"
-                  height="44"
-                ></v-skeleton-loader>
-                <div class="flex-grow-1">
-                  <v-skeleton-loader type="text" width="60%" class="mb-1"></v-skeleton-loader>
-                  <v-skeleton-loader type="text" width="30%"></v-skeleton-loader>
-                </div>
-                <v-skeleton-loader type="text" width="80"></v-skeleton-loader>
-              </div>
-            </AppCardBody>
-          </AppCard>
-        </v-col>
-        <v-col cols="12" md="4" order="1" order-md="2">
-          <AppCard>
-            <template #title
-              ><v-skeleton-loader type="text" width="160"></v-skeleton-loader
-            ></template>
-            <AppCardBody class="d-flex justify-center">
-              <v-skeleton-loader type="ossein" width="200" height="200"></v-skeleton-loader>
-            </AppCardBody>
-          </AppCard>
-        </v-col>
-      </v-row>
-    </template>
+    <AppPageSkeleton v-if="loading && !hasLoaded" page="dashboard" />
 
     <!-- ACTUAL CONTENT -->
     <template v-else>
@@ -348,6 +289,7 @@
 </template>
 
 <script setup lang="ts">
+import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import { useRoute, useRouter } from 'vue-router'
 import QuickActions from '@/components/QuickActions.vue'
 import { watch } from 'vue'
@@ -486,6 +428,7 @@ const dashboardUrl = () =>
 const {
   data: db,
   loading,
+  hasLoaded,
   error: dbError,
   run: fetchDashboard
 } = useAsyncData<DashboardResponse>(

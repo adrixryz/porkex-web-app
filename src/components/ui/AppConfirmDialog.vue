@@ -3,9 +3,11 @@
     v-model="open"
     :max-width="maxWidth"
     :persistent="persistent || loading"
+    :close-disabled="loading || cancelDisabled"
     :aria-label="title"
     :closable="false"
     content-class="pa-6 text-center"
+    @close="emit('cancel')"
   >
     <slot name="icon">
       <v-icon v-if="icon" :icon="icon" size="56" :color="color" class="mb-4"></v-icon>

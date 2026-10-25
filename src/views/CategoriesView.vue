@@ -1,30 +1,7 @@
 <template>
   <AppPage>
     <!-- LOADING SKELETON -->
-    <template v-if="loading">
-      <v-row class="mb-4">
-        <v-col
-          cols="12"
-          class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-4"
-        >
-          <v-skeleton-loader type="heading" width="180"></v-skeleton-loader>
-          <v-skeleton-loader type="button" width="150"></v-skeleton-loader>
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col cols="12" sm="6" md="4" v-for="n in 6" :key="n">
-          <AppCard class="pa-4">
-            <div class="d-flex align-center">
-              <v-skeleton-loader type="avatar" class="mr-4"></v-skeleton-loader>
-              <div>
-                <v-skeleton-loader type="text" width="120" class="mb-1"></v-skeleton-loader>
-                <v-skeleton-loader type="chip" width="70"></v-skeleton-loader>
-              </div>
-            </div>
-          </AppCard>
-        </v-col>
-      </v-row>
-    </template>
+    <AppPageSkeleton v-if="loading && !hasLoaded" page="categories" />
     <template v-else>
       <AppPageHeader title="Categories">
         <template #actions>
@@ -36,49 +13,40 @@
 
       <v-row class="mb-4">
         <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
-          <v-btn-toggle
+          <AppSegmentedControl
             v-model="filterType"
-            mandatory
-            color="primary"
-            density="comfortable"
-            rounded="pill"
-            variant="outlined"
-            aria-label="Filter by type"
-          >
-            <v-btn value="Expense">Expense</v-btn>
-            <v-btn value="Income">Income</v-btn>
-          </v-btn-toggle>
+            label="Filter by type"
+            :items="[
+              { label: 'Expense', value: 'Expense' },
+              { label: 'Income', value: 'Income' }
+            ]"
+          />
 
           <v-spacer class="d-none d-sm-block"></v-spacer>
 
-          <v-btn-toggle
+          <AppSegmentedControl
             v-model="period"
-            mandatory
-            color="primary"
-            density="compact"
-            rounded="pill"
-            variant="outlined"
-            aria-label="Filter by period"
-          >
-            <v-btn value="day">Day</v-btn>
-            <v-btn value="week">Week</v-btn>
-            <v-btn value="month">Month</v-btn>
-            <v-btn value="year">Year</v-btn>
-          </v-btn-toggle>
+            label="Filter by period"
+            :items="[
+              { label: 'Day', value: 'day' },
+              { label: 'Week', value: 'week' },
+              { label: 'Month', value: 'month' },
+              { label: 'Year', value: 'year' }
+            ]"
+          />
         </v-col>
       </v-row>
 
       <v-row>
         <v-col cols="12" sm="6" md="4" v-for="cat in filteredCategories" :key="cat.id">
-          <AppCard class="pa-4 cat-card fill-height">
-            <div class="d-flex align-center justify-space-between">
-              <div class="d-flex align-center">
-                <v-avatar :color="cat.color ?? undefined" size="40" class="mr-4">
-                  <v-icon :icon="mdiTagOutline" color="white"></v-icon>
-                </v-avatar>
-                <div>
-                  <div class="font-weight-medium text-body-1 text-on-surface">{{ cat.name }}</div>
-                  <div class="d-flex align-center ga-2 mt-1">
+          <AppCard class="cat-card fill-height">
+            <AppCardBody>
+              <AppEntityHeader
+                :title="cat.name"
+                :icon="mdiTagOutline"
+                :color="cat.color ?? undefined"
+                ><template #subtitle
+                  ><div class="d-flex align-center ga-2 mt-1">
                     <v-chip
                       size="x-small"
                       :color="cat.type === 'Income' ? 'success' : 'error'"
@@ -89,34 +57,30 @@
                     <span class="text-caption text-on-surface-variant">
                       {{ cat.transactionCount }} movement{{ cat.transactionCount === 1 ? '' : 's' }}
                     </span>
-                  </div>
-                </div>
+                  </div></template
+                ><template #actions
+                  ><AppIconButton
+                    :icon="mdiPencilOutline"
+                    :label="`Edit ${cat.name}`"
+                    color="primary"
+                    @click="editCat(cat)" />
+                  <AppIconButton
+                    :icon="mdiDeleteOutline"
+                    :label="`Delete ${cat.name}`"
+                    color="error"
+                    @click="confirmDelete(cat)" /></template
+              ></AppEntityHeader>
+              <v-divider class="my-3"></v-divider>
+              <div class="d-flex align-baseline justify-space-between">
+                <span class="text-caption text-on-surface-variant">Total {{ periodLabel }}</span>
+                <span
+                  class="text-subtitle-1 font-weight-bold"
+                  :class="cat.type === 'Income' ? 'text-success' : 'text-error'"
+                >
+                  {{ cs }}{{ formatMoney(cat.total) }}
+                </span>
               </div>
-              <div>
-                <AppIconButton
-                  :icon="mdiPencilOutline"
-                  :label="`Edit ${cat.name}`"
-                  color="primary"
-                  @click="editCat(cat)"
-                />
-                <AppIconButton
-                  :icon="mdiDeleteOutline"
-                  :label="`Delete ${cat.name}`"
-                  color="error"
-                  @click="confirmDelete(cat)"
-                />
-              </div>
-            </div>
-            <v-divider class="my-3"></v-divider>
-            <div class="d-flex align-baseline justify-space-between">
-              <span class="text-caption text-on-surface-variant">Total {{ periodLabel }}</span>
-              <span
-                class="text-subtitle-1 font-weight-bold"
-                :class="cat.type === 'Income' ? 'text-success' : 'text-error'"
-              >
-                {{ cs }}{{ formatMoney(cat.total) }}
-              </span>
-            </div>
+            </AppCardBody>
           </AppCard>
         </v-col>
         <v-col v-if="filteredCategories.length === 0" cols="12">
@@ -146,49 +110,58 @@
       persistent
     >
       <v-form @submit.prevent="submitCat">
-        <AppTextField
-          v-model="catForm.name"
-          :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
-          label="Name"
-          maxlength="60"
-          class="mb-2"
-        ></AppTextField>
-        <AppSelect
-          v-model="catForm.type"
-          :items="transactionTypeOptions"
-          label="Type"
-          class="mb-2"
-        ></AppSelect>
-        <div class="text-body-2 text-on-surface-variant mb-2">Color</div>
-        <div class="d-flex flex-wrap ga-2 mb-4" role="radiogroup" aria-label="Category color">
-          <v-avatar
-            v-for="c in colorOptions"
-            :key="c"
-            :color="c"
-            size="36"
-            class="cursor-pointer"
-            role="radio"
-            tabindex="0"
-            :aria-checked="catForm.color === c"
-            :aria-label="`Color ${c}`"
-            :style="catForm.color === c ? 'outline: 3px solid #0070f3; outline-offset: 2px;' : ''"
-            @click="catForm.color = c"
-            @keydown.enter.prevent="catForm.color = c"
-            @keydown.space.prevent="catForm.color = c"
+        <AppFormFields>
+          <AppTextField
+            v-model="catForm.name"
+            :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
+            label="Name"
+            maxlength="60"
+          ></AppTextField>
+          <AppSelect
+            v-model="catForm.type"
+            :items="transactionTypeOptions"
+            label="Type"
+          ></AppSelect>
+          <div>
+            <div class="text-body-2 text-on-surface-variant mb-2">Color</div>
+            <div class="d-flex flex-wrap ga-2" role="radiogroup" aria-label="Category color">
+              <v-avatar
+                v-for="c in colorOptions"
+                :key="c"
+                :color="c"
+                size="36"
+                class="cursor-pointer"
+                role="radio"
+                tabindex="0"
+                :aria-checked="catForm.color === c"
+                :aria-label="`Color ${c}`"
+                :style="
+                  catForm.color === c ? 'outline: 3px solid #0070f3; outline-offset: 2px;' : ''
+                "
+                @click="catForm.color = c"
+                @keydown.enter.prevent="catForm.color = c"
+                @keydown.space.prevent="catForm.color = c"
+              >
+                <v-icon
+                  v-if="catForm.color === c"
+                  :icon="mdiCheck"
+                  color="white"
+                  size="18"
+                ></v-icon>
+              </v-avatar>
+            </div>
+          </div>
+          <AppButton
+            type="submit"
+            color="primary"
+            size="large"
+            class="w-100 font-weight-bold"
+            :loading="submitting"
+            :disabled="!catForm.name.trim() || !catForm.type"
           >
-            <v-icon v-if="catForm.color === c" :icon="mdiCheck" color="white" size="18"></v-icon>
-          </v-avatar>
-        </div>
-        <AppButton
-          type="submit"
-          color="primary"
-          size="large"
-          class="w-100 mt-2 font-weight-bold"
-          :loading="submitting"
-          :disabled="!catForm.name.trim() || !catForm.type"
-        >
-          {{ isEditing ? 'Update' : 'Create' }}
-        </AppButton>
+            {{ isEditing ? 'Update' : 'Create' }}
+          </AppButton>
+        </AppFormFields>
       </v-form>
     </AppDialog>
 
@@ -259,6 +232,11 @@
 </template>
 
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
+import AppCardBody from '@/components/ui/AppCardBody.vue'
+import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
+import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'
+import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
 import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 import { transactionTypeOptions } from '@/utils/transactionTypes'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
@@ -349,6 +327,7 @@ const categoriesUrl = () => {
 const {
   data: categories,
   loading,
+  hasLoaded,
   error: categoriesError,
   run: fetchCategories
 } = useAsyncData<Category[]>(signal => fetchJson<Category[]>(categoriesUrl(), { signal }), [], {

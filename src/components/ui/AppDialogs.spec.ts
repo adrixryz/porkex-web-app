@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vite-plus/test'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { defineComponent, nextTick } from 'vue'
 import AppConfirmDialog from './AppConfirmDialog.vue'
@@ -48,6 +48,27 @@ const stubs = {
 }
 
 describe('AppDialog', () => {
+  it('keeps a dirty persistent draft on Escape until discard is accepted', async () => {
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    try {
+      const wrapper = mount(AppDialog, {
+        props: { modelValue: true, title: 'Draft', persistent: true, dirty: true },
+        global: { stubs }
+      })
+      await wrapper.find('.v-dialog').trigger('keydown', { key: 'Escape' })
+      expect(confirmation).toHaveBeenCalledWith(
+        'Discard your unsaved changes and leave? Cancel to keep editing.'
+      )
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+      confirmation.mockReturnValue(true)
+      await wrapper.find('.v-dialog').trigger('keydown', { key: 'Escape' })
+      expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
+      expect(wrapper.emitted('close')).toHaveLength(1)
+    } finally {
+      confirmation.mockRestore()
+    }
+  })
+
   it('renders a titled dialog with its default and action slots', () => {
     const wrapper = mount(AppDialog, {
       props: { modelValue: true, title: 'Edit category', maxWidth: 520, persistent: true },
@@ -113,6 +134,24 @@ describe('AppDialog', () => {
 })
 
 describe('AppConfirmDialog', () => {
+  it('treats Escape as cancellation but blocks it while saving or cancellation is disabled', async () => {
+    const wrapper = mount(AppConfirmDialog, {
+      props: { modelValue: true, title: 'Confirm', persistent: true },
+      global: { stubs }
+    })
+    await wrapper.find('.v-dialog').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+    for (const flags of [{ loading: true }, { loading: false, cancelDisabled: true }]) {
+      const locked = mount(AppConfirmDialog, {
+        props: { modelValue: true, title: 'Saving', persistent: true, ...flags },
+        global: { stubs }
+      })
+      await locked.find('.v-dialog').trigger('keydown', { key: 'Escape' })
+      expect(locked.emitted('cancel')).toBeUndefined()
+      expect(locked.emitted('update:modelValue')).toBeUndefined()
+    }
+  })
+
   it('closes and emits cancel from the cancel button', async () => {
     const wrapper = mount(AppConfirmDialog, {
       props: {

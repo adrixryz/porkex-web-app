@@ -18,23 +18,20 @@
     <v-alert v-if="error || accountsError || transfersError" type="error" class="mb-4">{{
       error || accountsError || transfersError
     }}</v-alert>
-    <v-row
+    <AppPageSkeleton v-if="loading && !hasLoaded" page="accounts" :header="false" />
+    <v-row v-else
       ><v-col v-for="account in accounts" :key="account.id" cols="12" sm="6" md="4" lg="3"
         ><AppCard
-          ><AppCardBody padding="pa-4">
-            <div class="d-flex align-center justify-space-between ga-2">
-              <div class="account-summary">
-                <div class="d-flex align-center ga-2">
-                  <p class="text-subtitle-2 font-weight-bold">{{ account.name }}</p>
-                  <span v-if="account.archived" class="text-caption text-medium-emphasis"
-                    >Archived</span
-                  >
-                </div>
-                <p class="text-h6 mt-1">{{ cs }}{{ formatMoney(account.balance) }}</p>
-                <PendingBalance :account="account" />
-              </div>
-              <div class="d-flex flex-shrink-0">
-                <AppIconButton
+          ><AppCardBody>
+            <AppEntityHeader
+              :title="account.name"
+              :subtitle="account.archived ? 'Archived' : undefined"
+            >
+              <template #title
+                ><span class="font-weight-bold">{{ account.name }}</span></template
+              >
+              <template #actions
+                ><AppIconButton
                   v-if="!account.archived"
                   :icon="mdiPencilOutline"
                   :label="`Edit ${account.name}`"
@@ -44,28 +41,26 @@
                       editing = account
                       accountDialog = true
                     }
-                  "
-                /><AppIconButton
+                  " /><AppIconButton
                   v-if="!account.isMain && !account.archived"
                   :icon="mdiArchiveOutline"
                   :label="`Archive ${account.name}`"
                   color="warning"
-                  @click="archiving = account"
-                /><AppIconButton
+                  @click="archiving = account" /><AppIconButton
                   v-if="account.archived"
                   :icon="mdiRestore"
                   :label="`Restore ${account.name}`"
                   color="warning"
-                  @click="restoring = account"
-                /><AppIconButton
+                  @click="restoring = account" /><AppIconButton
                   v-if="account.archived"
                   :icon="mdiDeleteOutline"
                   :label="`Delete ${account.name}`"
                   color="error"
                   @click="deletingAccount = account"
-                />
-              </div>
-            </div> </AppCardBody></AppCard></v-col
+              /></template>
+            </AppEntityHeader>
+            <p class="text-h6 mt-3">{{ cs }}{{ formatMoney(account.balance) }}</p>
+            <PendingBalance :account="account" /> </AppCardBody></AppCard></v-col
     ></v-row>
     <AppCard
       title="Account Movements"
@@ -86,8 +81,15 @@
         />
       </template>
       <AppCardBody padding="pa-0">
+        <div
+          v-if="historyLoading && !historyLoaded"
+          role="status"
+          aria-label="Loading account movements"
+        >
+          <AppSkeleton type="rows" :rows="4" />
+        </div>
         <AppEmptyState
-          v-if="!history.items.length"
+          v-else-if="!history.items.length"
           :icon="mdiSwapHorizontal"
           title="No account movements yet"
           description="Transfers, opening balances and balance adjustments will appear here."
@@ -232,6 +234,9 @@
   </AppPage>
 </template>
 <script setup lang="ts">
+import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'
 import { onMounted, ref, watch } from 'vue'
 import {
   mdiSwapHorizontal,
@@ -263,7 +268,7 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppIconButton from '@/components/ui/AppIconButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
-const { accounts, run, error: accountsError } = useAccounts(),
+const { accounts, loading, hasLoaded, run, error: accountsError } = useAccounts(),
   cs = useCurrencySymbol()
 const accountDialog = ref(false),
   adjustmentDialog = ref(false),
@@ -299,6 +304,8 @@ const url = () =>
   `/accounts/movements?page=${page.value}${accountFilter.value ? `&accountId=${encodeURIComponent(accountFilter.value)}` : ''}`
 const {
   data: history,
+  loading: historyLoading,
+  hasLoaded: historyLoaded,
   run: load,
   error: transfersError
 } = useAsyncData<{

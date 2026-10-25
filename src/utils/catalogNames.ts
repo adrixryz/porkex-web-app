@@ -5,3 +5,5 @@ export function validCatalogName(value: unknown, maxLength: number): boolean {
   const name = value.trim().normalize('NFC')
   return name.length > 0 && Array.from(name).length <= maxLength && /^[\p{L}\p{N} -]+$/u.test(name)
 }
+
+export const catalogNameKey = (name: string) => name.trim().normalize('NFC').toLowerCase()

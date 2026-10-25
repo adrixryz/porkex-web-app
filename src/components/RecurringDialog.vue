@@ -13,149 +13,127 @@
       it.</v-alert
     >
     <v-form @submit.prevent="submit">
-      <v-btn-toggle
-        v-model="form.type"
-        mandatory
-        color="primary"
-        rounded="pill"
-        variant="outlined"
-        density="comfortable"
-        divided
-        class="w-100 mb-4"
-        aria-label="Rule type"
-      >
-        <v-btn value="Expense" class="flex-grow-1">Expense</v-btn>
-        <v-btn value="Income" class="flex-grow-1">Income</v-btn>
-      </v-btn-toggle>
+      <AppFormFields>
+        <AppSegmentedControl
+          v-model="form.type"
+          label="Rule type"
+          block
+          :items="[
+            { label: 'Expense', value: 'Expense' },
+            { label: 'Income', value: 'Income' }
+          ]"
+        />
 
-      <AppTextField
-        v-model="form.amount"
-        label="Amount"
-        type="number"
-        inputmode="decimal"
-        :error-messages="
-          form.amount && !validAmount(form.amount)
-            ? 'Use up to two decimals, from 0.01 to 10,000,000.'
-            : []
-        "
-        :prefix="cs"
-        min="0.01"
-        step="0.01"
-        hide-spin-buttons
-        autofocus
-        class="mb-2"
-      >
-        <template #append-inner>
-          <AmountStepper
-            :label="isIncome ? 'income amount' : 'expense amount'"
-            @step="stepAmount"
-          ></AmountStepper>
-        </template>
-      </AppTextField>
+        <AppMoneyField
+          v-model="form.amount"
+          :step-label="isIncome ? 'income amount' : 'expense amount'"
+          autofocus
+        />
 
-      <AppTextField
-        v-model="form.description"
-        label="Comment (optional)"
-        maxlength="200"
-        :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Rent'"
-        class="mb-2"
-      ></AppTextField>
+        <AppTextField
+          v-model="form.description"
+          label="Comment (optional)"
+          maxlength="200"
+          :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Rent'"
+        ></AppTextField>
 
-      <AppSelect
-        v-model="form.accountId"
-        :items="activeAccounts"
-        item-title="name"
-        item-value="id"
-        label="Account"
-      />
-      <CategorySelect v-model="form.categoryId" :items="categoryOptions" class="mb-2" />
+        <AppSelect
+          v-model="form.accountId"
+          :items="activeAccounts"
+          item-title="name"
+          item-value="id"
+          label="Account"
+        />
+        <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
 
-      <v-row dense class="mt-0">
-        <v-col cols="7">
-          <AppSelect
-            v-model="form.frequency"
-            :items="frequencyOptions"
-            item-title="title"
-            item-value="value"
-            label="Repeats"
-          ></AppSelect>
-        </v-col>
-        <v-col cols="5">
-          <AppTextField
-            v-model="form.interval"
-            type="number"
-            inputmode="numeric"
-            :min="1"
-            :max="MAX_INTERVAL"
-            step="1"
-            hide-spin-buttons
-            :label="`Every (${unitLabel(form.frequency)})`"
-          >
-            <template #append-inner>
-              <AmountStepper label="interval" @step="stepInterval"></AmountStepper>
-            </template>
-          </AppTextField>
-        </v-col>
-      </v-row>
+        <v-row dense>
+          <v-col cols="7">
+            <AppSelect
+              v-model="form.frequency"
+              :items="frequencyOptions"
+              item-title="title"
+              item-value="value"
+              label="Repeats"
+            ></AppSelect>
+          </v-col>
+          <v-col cols="5">
+            <AppTextField
+              v-model="form.interval"
+              type="number"
+              inputmode="numeric"
+              :min="1"
+              :max="MAX_INTERVAL"
+              step="1"
+              hide-spin-buttons
+              :label="`Every (${unitLabel(form.frequency)})`"
+            >
+              <template #append-inner>
+                <AmountStepper label="interval" @step="stepInterval"></AmountStepper>
+              </template>
+            </AppTextField>
+          </v-col>
+        </v-row>
 
-      <v-row dense>
-        <v-col cols="6">
-          <AppTextField v-model="form.startDate" label="Starts" type="date"></AppTextField>
-        </v-col>
-        <v-col cols="6">
-          <AppTextField
-            v-model="form.endDate"
-            label="Ends (optional)"
-            type="date"
-            :min="form.startDate || undefined"
-            clearable
-          ></AppTextField>
-        </v-col>
-      </v-row>
+        <v-row dense>
+          <v-col cols="6">
+            <AppTextField v-model="form.startDate" label="Starts" type="date"></AppTextField>
+          </v-col>
+          <v-col cols="6">
+            <AppTextField
+              v-model="form.endDate"
+              label="Ends (optional)"
+              type="date"
+              :min="form.startDate || undefined"
+              clearable
+            ></AppTextField>
+          </v-col>
+        </v-row>
 
-      <div v-if="startsInPast" class="text-caption text-on-surface-variant mb-2">
-        Past dates are not backfilled: the rule starts at the next occurrence from today.
-      </div>
+        <div v-if="startsInPast" class="text-caption text-on-surface-variant">
+          Past dates are not backfilled: the rule starts at the next occurrence from today.
+        </div>
 
-      <v-alert
-        v-if="!categoryOptions.length && categoriesError"
-        type="warning"
-        variant="tonal"
-        density="compact"
-        class="mt-2"
-      >
-        Categories could not be loaded. Connect once and they will stay available offline.
-      </v-alert>
+        <v-alert
+          v-if="!categoryOptions.length && categoriesError"
+          type="warning"
+          variant="tonal"
+          density="compact"
+        >
+          Categories could not be loaded. Connect once and they will stay available offline.
+        </v-alert>
 
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        density="compact"
-        class="mt-4"
-        closable
-        @click:close="error = ''"
-      >
-        {{ error }}
-      </v-alert>
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          density="compact"
+          closable
+          @click:close="error = ''"
+        >
+          {{ error }}
+        </v-alert>
 
-      <!-- Neutral blue like the other dialogs: the rule itself already
-           says whether it is income or expense. -->
-      <AppButton
-        type="submit"
-        color="primary"
-        size="large"
-        class="w-100 mt-4 font-weight-bold"
-        :loading="submitting"
-        :disabled="!isValid"
-      >
-        {{ isEditing ? 'Update' : 'Create' }}
-      </AppButton>
+        <!-- Neutral blue like the other dialogs: the rule itself already
+             says whether it is income or expense. -->
+        <AppButton
+          type="submit"
+          color="primary"
+          size="large"
+          class="w-100 font-weight-bold"
+          :loading="submitting"
+          :disabled="!isValid"
+        >
+          {{ isEditing ? 'Update' : 'Create' }}
+        </AppButton>
+      </AppFormFields>
     </v-form>
   </AppDialog>
 </template>
 
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
+import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
+import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { useAccounts } from '@/composables/useAccounts'
 import { getUser } from '@/utils/api'
 import { validAmount } from '@/utils/validation'
@@ -169,7 +147,6 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
-import { useCurrencySymbol } from '@/utils/currency'
 import { fromDateInput, toDateInput, todayInput } from '@/utils/date'
 import { unitLabel } from '@/utils/recurring'
 import type { Category, RecurringFrequency, RecurringRule, TxType } from '@/types'
@@ -188,8 +165,6 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'saved', payload: { isEditing: boolean; queued: boolean }): void
 }>()
-
-const cs = useCurrencySymbol()
 
 const { activeAccounts, run: fetchAccounts } = useAccounts()
 const form = ref({
@@ -301,19 +276,6 @@ watch(
 
 const close = () => emit('update:modelValue', false)
 
-// Empty input counts as 0 and decimals stay exact instead of picking up
-// floating point noise. Stepping below the 0.01 minimum clears the field, so
-// the stepper can always be walked back to empty instead of parking the value
-// on a 0.01 the user never chose.
-const stepAmount = (delta: number) => {
-  const current = Number.parseFloat(form.value.amount)
-  const base = Number.isFinite(current) ? current : 0
-  const next = Math.round((base + delta) * 100) / 100
-  form.value.amount = next >= 0.01 ? String(next) : ''
-}
-
-// The interval uses the same custom stepper as the amount. Both bounds are
-// clamped so a few extra clicks can never leave the field invalid.
 const stepInterval = (delta: number) => {
   const current = Number.parseInt(form.value.interval, 10)
   const base = Number.isFinite(current) ? current : 1
@@ -321,7 +283,7 @@ const stepInterval = (delta: number) => {
 }
 
 const submit = async () => {
-  if (!isValid.value) return
+  if (submitting.value || !isValid.value) return
   submitting.value = true
   error.value = ''
 

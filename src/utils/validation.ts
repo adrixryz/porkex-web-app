@@ -1,10 +1,10 @@
 import { validCatalogName, catalogNameHint } from './catalogNames'
 import { parseDateOnly, todayInput } from './date'
+import { parseMoneyInput } from './moneyInput'
 
 export function validAmount(value: unknown): boolean {
-  if (typeof value !== 'number' && typeof value !== 'string') return false
-  const text = String(value).trim()
-  return /^\d+(?:\.\d{1,2})?$/.test(text) && Number(text) > 0 && Number(text) <= 10_000_000
+  const amount = parseMoneyInput(value)
+  return amount !== null && amount > 0
 }
 
 /** Local shape checks only; account ownership and live references belong to the API. */

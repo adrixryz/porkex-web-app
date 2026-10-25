@@ -7,75 +7,55 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-form @submit.prevent="transfer ? (confirming = true) : save()">
-      <AppSelect
-        v-model="form.sourceId"
-        label="From account"
-        :items="sourceOptions"
-        :item-title="accountTitle"
-        item-value="id"
-        class="mb-2"
-      />
-      <AppSelect
-        v-model="form.destinationId"
-        label="To account"
-        :items="destinationOptions"
-        :item-title="accountTitle"
-        item-value="id"
-        class="mb-2"
-      />
-      <AppTextField
-        v-model="form.amount"
-        label="Amount"
-        type="number"
-        inputmode="decimal"
-        :prefix="cs"
-        min="0.01"
-        :max="goalLimit"
-        step="0.01"
-        hide-spin-buttons
-        class="mb-2"
-        :error-messages="
-          form.amount && !validAmount(form.amount)
-            ? 'Use up to two decimals, from 0.01 to 10,000,000.'
-            : exceedsGoal
-              ? 'This amount exceeds the remaining savings goal target.'
-              : []
-        "
-      >
-        <template #append-inner>
-          <AmountStepper label="transfer amount" @step="stepAmount" />
-        </template>
-      </AppTextField>
-      <AppTextField v-model="form.date" label="Date" type="date" :max="todayInput()" class="mb-2" />
-      <AppTextField
-        v-model="form.comment"
-        label="Comment (optional)"
-        maxlength="200"
-        class="mb-2"
-      />
-      <v-alert
-        v-if="accountsError && !activeAccounts.length && (!sourceAccounts || !destinationAccounts)"
-        type="warning"
-        class="mb-3"
-        >{{ accountsError }}</v-alert
-      >
-      <v-alert v-if="error" type="error" class="mb-3">{{ error }}</v-alert>
-      <AppButton
-        type="submit"
-        color="primary"
-        size="large"
-        class="w-100 mt-4 font-weight-bold"
-        :loading="busy"
-        :disabled="
-          !validAmount(form.amount) ||
-          exceedsGoal ||
-          !form.sourceId ||
-          !form.destinationId ||
-          !sourceOptions.some(account => account.id === form.sourceId) ||
-          !destinationOptions.some(account => account.id === form.destinationId)
-        "
-        >{{ transfer ? 'Update' : 'Create' }}</AppButton
-      >
+      <AppFormFields>
+        <AppSelect
+          v-model="form.sourceId"
+          label="From account"
+          :items="sourceOptions"
+          :item-title="accountTitle"
+          item-value="id"
+        />
+        <AppSelect
+          v-model="form.destinationId"
+          label="To account"
+          :items="destinationOptions"
+          :item-title="accountTitle"
+          item-value="id"
+        />
+        <AppMoneyField
+          v-model="form.amount"
+          :max="goalLimit ?? 10_000_000"
+          :error-messages="
+            exceedsGoal ? 'This amount exceeds the remaining savings goal target.' : []
+          "
+        />
+        <AppTextField v-model="form.date" label="Date" type="date" :max="todayInput()" />
+        <AppTextField v-model="form.comment" label="Comment (optional)" maxlength="200" />
+        <v-alert
+          v-if="
+            accountsError && !activeAccounts.length && (!sourceAccounts || !destinationAccounts)
+          "
+          type="warning"
+          >{{ accountsError }}</v-alert
+        >
+        <v-alert v-if="error" type="error">{{ error }}</v-alert>
+        <AppButton
+          type="submit"
+          color="primary"
+          size="large"
+          class="w-100 font-weight-bold"
+          :loading="busy"
+          :disabled="
+            !validAmount(form.amount) ||
+            exceedsGoal ||
+            !form.sourceId ||
+            !form.destinationId ||
+            !sourceOptions.some(account => account.id === form.sourceId) ||
+            !destinationOptions.some(account => account.id === form.destinationId)
+          "
+          >{{ transfer ? 'Update' : 'Create' }}</AppButton
+        >
+      </AppFormFields>
     </v-form>
   </AppDialog>
   <AppConfirmDialog
@@ -88,14 +68,14 @@
   >
 </template>
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
+import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { computed, ref, watch } from 'vue'
 import type { Account, Transfer } from '@/types'
 import { createEditStamp } from '@/utils/editStamp'
 import { api, isQueuedResponse } from '@/utils/api'
 import { todayInput, toDateInput } from '@/utils/date'
 import { validAmount } from '@/utils/validation'
-import { useCurrencySymbol } from '@/utils/currency'
-import AmountStepper from './AmountStepper.vue'
 import { useAccounts } from '@/composables/useAccounts'
 import { useSnackbar } from '@/composables/useSnackbar'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
@@ -113,7 +93,6 @@ const props = defineProps<{
   destinationId?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
-const cs = useCurrencySymbol()
 const { activeAccounts, run, error: accountsError } = useAccounts({ includeGoals: true }),
   { showSnack } = useSnackbar()
 const form = ref({ sourceId: '', destinationId: '', amount: '', date: todayInput(), comment: '' }),
@@ -123,12 +102,6 @@ const form = ref({ sourceId: '', destinationId: '', amount: '', date: todayInput
   error = ref('')
 let id = ''
 let editStamp = createEditStamp()
-function stepAmount(delta: number) {
-  const current = Number.parseFloat(form.value.amount)
-  const base = Number.isFinite(current) ? current : 0
-  const next = Math.round((base + delta) * 100) / 100
-  form.value.amount = next >= 0.01 ? String(next) : ''
-}
 const selectedSource = computed(() =>
   (props.sourceAccounts ?? activeAccounts.value).find(account => account.id === form.value.sourceId)
 )
@@ -199,6 +172,7 @@ useUnsavedChanges(
   () => busy.value
 )
 async function save() {
+  if (busy.value || !validAmount(form.value.amount)) return
   if (exceedsGoal.value) {
     error.value = 'This amount exceeds the remaining savings goal target.'
     return

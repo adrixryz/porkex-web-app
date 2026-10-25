@@ -10,10 +10,12 @@
   >
     <div class="mb-5">
       <h2 class="text-subtitle-1 font-weight-bold mt-0 mb-1">Choose your CSV</h2>
+
       <p class="text-body-2 text-on-surface-variant ma-0">
         Review your transactions and possible duplicates before importing.
       </p>
     </div>
+
     <AppFilePicker
       label="Select a CSV file"
       description="Import your complete transaction history"
@@ -24,30 +26,44 @@
       class="mb-5"
       @select="chooseFile"
     />
+
     <div class="csv-format">
       <div class="d-flex align-center ga-2 mb-3">
         <v-icon :icon="mdiTable" size="18" color="on-surface-variant" />
+
         <span class="text-subtitle-2">File format</span>
+
         <span class="text-caption text-on-surface-variant ml-auto"
           >UTF-8 · Semicolon separated</span
         >
       </div>
+
       <code class="csv-format__header">Date;Type;Account;Category;Tags;Comment;Amount</code>
+
       <div class="d-flex flex-wrap ga-2 mt-3 text-caption text-on-surface-variant">
         <span>Date: <span class="text-on-surface">YYYY-MM-DD</span></span>
+
         <span aria-hidden="true">·</span>
+
         <span>Amount: <span class="text-on-surface">4.75</span></span>
+
         <span aria-hidden="true">·</span>
+
         <span>Tags: <span class="text-on-surface">Daily,Essential</span></span>
       </div>
     </div>
+
     <v-alert v-if="isOffline" type="warning" density="compact" class="mt-4 mb-4">
       Connect to the internet to preview and import your file.
     </v-alert>
+
     <v-alert v-if="error" type="error" density="compact" class="mt-4 mb-4">{{ error }}</v-alert>
+
     <v-progress-linear v-if="busy" indeterminate color="primary" class="mt-4 mb-4" />
+
     <div v-if="csv" class="d-flex align-center flex-wrap ga-3 mt-5 mb-4">
       <h2 v-if="preview" class="text-subtitle-1 font-weight-bold">Transaction Preview</h2>
+
       <AppButton
         v-if="!attemptLocked"
         variant="outlined"
@@ -60,34 +76,42 @@
         >Refresh preview</AppButton
       >
     </div>
+
     <template v-if="preview">
       <div class="d-flex flex-wrap ga-2 my-4">
         <v-chip>{{ selectedRows.length }} of {{ preview.rows.length }} selected</v-chip>
+
         <v-chip v-if="duplicateCount" color="warning"
           >{{ duplicateCount }} possible duplicates</v-chip
         >
+
         <v-chip v-if="errorCount" color="error">{{ errorCount }} rows with errors</v-chip>
       </div>
+
       <p class="text-body-2 mb-4">
         Possible duplicates are unselected by default. Check them only if they are separate real
         transactions. Correct every error in your CSV before importing. Rows on the same date keep
         their file order.
       </p>
+
       <v-data-table
         v-model="selectedLines"
         :headers="headers"
         :items="preview.rows"
         item-value="line"
-        :item-selectable="row => !row.errors.length"
+        :item-selectable="row => !row.errors.length && row.importable !== false"
         :show-select="!busy && !attemptLocked"
         :items-per-page="15"
         class="border rounded-lg mb-4"
       >
         <template #item.tags="{ item }">{{ item.tags.join(', ') || '—' }}</template>
+
         <template #item.comment="{ item }"
           ><span class="csv-comment">{{ item.comment || '—' }}</span></template
         >
+
         <template #item.amount="{ item }">{{ formatMoney(item.amount) }}</template>
+
         <template #bottom="{ page, pageCount, setPage }">
           <div
             v-if="pageCount > 1"
@@ -103,11 +127,20 @@
             />
           </div>
         </template>
+
         <template #item.status="{ item }">
           <span v-if="item.errors.length" class="text-error">{{ item.errors.join(' ') }}</span>
+
           <span v-else-if="item.duplicate.existing || item.duplicate.file" class="text-warning">
-            {{ item.duplicate.existing ? 'Matches saved transaction' : 'Repeated in file' }}
+            {{
+              item.importable === false
+                ? 'Already saved · Archived account'
+                : item.duplicate.existing
+                  ? 'Matches saved transaction'
+                  : 'Repeated in file'
+            }}
           </span>
+
           <span v-else class="text-success">Ready</span>
         </template>
       </v-data-table>
@@ -116,16 +149,20 @@
         <p v-if="newAccounts.length" class="mb-2">
           <strong>New accounts (opening balance 0):</strong> {{ newAccounts.join(', ') }}
         </p>
+
         <p v-if="newCategories.length" class="mb-2">
           <strong>New categories (gray):</strong> {{ newCategories.join(', ') }}
         </p>
+
         <p v-if="newTags.length" class="mb-2">
           <strong>New tags:</strong> {{ newTags.join(', ') }}
         </p>
       </div>
+
       <p class="text-subtitle-2 mb-2">
         Balances before and after importing the selected transactions
       </p>
+
       <div class="d-flex flex-wrap ga-2 mb-4">
         <v-chip
           v-for="account in projectedBalances"
@@ -140,11 +177,15 @@
           variant="outlined"
         >
           <span class="mr-1">{{ account.name }}:</span>
+
           <span>{{ formatMoney(account.previousBalance) }}</span>
+
           <strong class="mx-2">→</strong>
+
           <span class="font-weight-bold">{{ formatMoney(account.balance) }}</span>
         </v-chip>
       </div>
+
       <v-alert
         v-if="projectedBalances.some(account => account.balance < 0)"
         type="warning"
@@ -155,6 +196,7 @@
         confirming.
       </v-alert>
     </template>
+
     <template #actions>
       <AppButton
         color="primary"
@@ -176,121 +218,200 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+
+import { catalogNameKey as normalize } from '@/utils/catalogNames'
+
 import { mdiRefresh, mdiTable } from '@mdi/js'
+
 import AppFilePicker from '@/components/ui/AppFilePicker.vue'
+
 import AppDialog from '@/components/ui/AppDialog.vue'
+
 import AppButton from '@/components/ui/AppButton.vue'
+
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+
 import { useSnackbar } from '@/composables/useSnackbar'
+
 import { isOffline } from '@/utils/connection'
+
 import { formatMoney } from '@/utils/currency'
+
 import { importMovementsCsv, previewMovementsCsv, type CsvPreview } from '@/utils/movementCsv'
 
 const open = defineModel<boolean>({ default: false })
+
 const emit = defineEmits<{ imported: [] }>()
+
 const { showSnack } = useSnackbar()
+
 const csv = ref('')
+
 const fileName = ref('')
+
 const fileSize = ref(0)
+
 const preview = ref<CsvPreview | null>(null)
+
 const selectedLines = ref<number[]>([])
+
 const busy = ref(false)
+
 const error = ref('')
+
 const importId = ref(crypto.randomUUID())
+
 const attemptLocked = ref(false)
+
 const headers = [
   { title: 'Row', key: 'line' },
+
   { title: 'Date', key: 'date' },
+
   { title: 'Type', key: 'type' },
+
   { title: 'Account', key: 'account' },
+
   { title: 'Category', key: 'category' },
+
   { title: 'Tags', key: 'tags', sortable: false },
+
   { title: 'Comment', key: 'comment', sortable: false },
+
   { title: 'Amount', key: 'amount' },
+
   { title: 'Status', key: 'status', sortable: false }
 ]
+
 const selectedRows = computed(() => {
   const selected = new Set(selectedLines.value)
+
   return preview.value?.rows.filter(row => selected.has(row.line)) ?? []
 })
+
 const errorCount = computed(() => preview.value?.rows.filter(row => row.errors.length).length ?? 0)
+
 const duplicateCount = computed(
   () => preview.value?.rows.filter(row => row.duplicate.existing || row.duplicate.file).length ?? 0
 )
-const normalize = (name: string) => name.normalize('NFC').toLowerCase()
+
+const selectedCatalog = computed(() => {
+  const accounts = new Map<string, number>()
+
+  const categories = new Set<string>()
+
+  const tags = new Set<string>()
+
+  for (const row of selectedRows.value) {
+    const key = normalize(row.account)
+
+    accounts.set(
+      key,
+      (accounts.get(key) ?? 0) + (row.type === 'Income' ? 1 : -1) * Math.round(row.amount * 100)
+    )
+
+    categories.add(normalize(row.category))
+
+    for (const tag of row.tags) tags.add(normalize(tag))
+  }
+
+  return { accounts, categories, tags }
+})
+
 const newAccounts = computed(
   () =>
     preview.value?.accounts
+
       .filter(
-        account =>
-          account.isNew &&
-          selectedRows.value.some(row => normalize(row.account) === normalize(account.name))
+        account => account.isNew && selectedCatalog.value.accounts.has(normalize(account.name))
       )
+
       .map(account => account.name) ?? []
 )
+
 const newCategories = computed(
   () =>
     preview.value?.newCategories
-      .filter(category =>
-        selectedRows.value.some(row => normalize(row.category) === normalize(category.name))
-      )
+
+      .filter(category => selectedCatalog.value.categories.has(normalize(category.name)))
+
       .map(category => `${category.name} (${category.type})`) ?? []
 )
+
 const newTags = computed(
   () =>
-    preview.value?.newTags.filter(tag =>
-      selectedRows.value.some(row => row.tags.some(name => normalize(name) === normalize(tag)))
-    ) ?? []
+    preview.value?.newTags
+
+      .filter(tag => selectedCatalog.value.tags.has(normalize(tag))) ?? []
 )
+
 const projectedBalances = computed(
   () =>
     preview.value?.accounts
-      .filter(account =>
-        selectedRows.value.some(row => normalize(row.account) === normalize(account.name))
-      )
-      .map(account => {
-        const delta = selectedRows.value
-          .filter(row => normalize(row.account) === normalize(account.name))
-          .reduce(
-            (sum, row) => sum + (row.type === 'Income' ? 1 : -1) * Math.round(row.amount * 100),
-            0
-          )
-        return {
-          name: account.name,
-          previousBalance: account.balance,
-          balance: (Math.round(account.balance * 100) + delta) / 100
-        }
-      }) ?? []
+
+      .filter(account => selectedCatalog.value.accounts.has(normalize(account.name)))
+
+      .map(account => ({
+        name: account.name,
+
+        previousBalance: account.balance,
+
+        balance:
+          (Math.round(account.balance * 100) +
+            (selectedCatalog.value.accounts.get(normalize(account.name)) ?? 0)) /
+          100
+      })) ?? []
 )
+
 useUnsavedChanges(
   () => open.value && !!csv.value,
+
   () => open.value && busy.value
 )
+
 watch(open, value => {
   if (!value) {
     csv.value = ''
+
     fileName.value = ''
+
     fileSize.value = 0
+
     preview.value = null
+
     selectedLines.value = []
+
     error.value = ''
+
     attemptLocked.value = false
+
     importId.value = crypto.randomUUID()
   }
 })
+
 async function chooseFile(file: File) {
   if (busy.value || attemptLocked.value) return
+
   fileName.value = file.name
+
   fileSize.value = file.size
+
   preview.value = null
+
   selectedLines.value = []
+
   error.value = ''
+
   csv.value = ''
+
   busy.value = true
+
   try {
     csv.value = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+
     if (!csv.value.trim()) {
       csv.value = ''
+
       error.value = 'The CSV file is empty.'
     }
   } catch {
@@ -298,19 +419,36 @@ async function chooseFile(file: File) {
   } finally {
     busy.value = false
   }
+
   if (csv.value) await refreshPreview()
 }
+
 async function refreshPreview() {
   if (busy.value || attemptLocked.value) return
+
   busy.value = true
+
   error.value = ''
+
   preview.value = null
+
   selectedLines.value = []
+
   try {
     preview.value = await previewMovementsCsv(csv.value)
+
     selectedLines.value = preview.value.rows
-      .filter(row => !row.errors.length && !row.duplicate.existing && !row.duplicate.file)
+
+      .filter(
+        row =>
+          row.importable !== false &&
+          !row.errors.length &&
+          !row.duplicate.existing &&
+          !row.duplicate.file
+      )
+
       .map(row => row.line)
+
     importId.value = crypto.randomUUID()
   } catch (cause) {
     error.value = (cause as Error).message
@@ -318,27 +456,43 @@ async function refreshPreview() {
     busy.value = false
   }
 }
+
 async function confirmImport() {
   if (!preview.value || busy.value || errorCount.value || !selectedRows.value.length) return
+
   busy.value = true
+
   error.value = ''
+
   attemptLocked.value = true
+
   try {
     const result = await importMovementsCsv(
       csv.value,
+
       preview.value,
+
       selectedLines.value,
+
       importId.value
     )
+
     csv.value = ''
+
     preview.value = null
+
     attemptLocked.value = false
+
     showSnack(`Imported ${result.imported} transactions.`, 'success')
+
     open.value = false
+
     emit('imported')
   } catch (cause) {
     const { status, notSent } = cause as { status?: number; notSent?: boolean }
+
     if (notSent || (status && status >= 400 && status < 500)) attemptLocked.value = false
+
     error.value =
       (cause as Error).message +
       (attemptLocked.value
@@ -353,24 +507,39 @@ async function confirmImport() {
 <style scoped>
 .csv-format {
   padding: 16px;
+
   border: 1px solid rgb(var(--v-theme-outline-variant));
+
   border-radius: 16px;
 }
+
 .csv-format__header {
   display: block;
+
   padding: 12px;
+
   overflow-x: auto;
+
   white-space: nowrap;
+
   border-radius: 8px;
+
   background: rgb(var(--v-theme-surface-variant));
+
   color: rgb(var(--v-theme-on-surface));
+
   font-size: 0.75rem;
 }
+
 .csv-comment {
   display: block;
+
   min-width: 120px;
+
   max-width: 240px;
+
   overflow-wrap: anywhere;
+
   white-space: pre-wrap;
 }
 </style>

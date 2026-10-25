@@ -61,21 +61,23 @@
       </div>
     </div>
     <v-form class="mt-4" @submit.prevent="create">
-      <AppTextField
-        v-model="newName"
-        label="New tag name"
-        density="compact"
-        enterkeyhint="done"
-        :disabled="busy"
-      />
-      <AppButton
-        type="submit"
-        color="primary"
-        size="large"
-        class="w-100 mt-4 font-weight-bold"
-        :disabled="busy || !newName.trim()"
-        >Add tag</AppButton
-      >
+      <AppFormFields>
+        <AppTextField
+          v-model="newName"
+          label="New tag name"
+          density="compact"
+          enterkeyhint="done"
+          :disabled="busy"
+        />
+        <AppButton
+          type="submit"
+          color="primary"
+          size="large"
+          class="w-100 font-weight-bold"
+          :disabled="busy || !newName.trim()"
+          >Add tag</AppButton
+        >
+      </AppFormFields>
     </v-form>
   </AppDialog>
   <AppConfirmDialog
@@ -92,6 +94,7 @@
   </AppConfirmDialog>
 </template>
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
 import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 import { onUnmounted, ref, watch } from 'vue'
 import { mdiCheck, mdiDeleteOutline, mdiDragVertical } from '@mdi/js'

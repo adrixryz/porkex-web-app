@@ -56,52 +56,51 @@
         </v-alert>
 
         <v-form @submit.prevent="submit">
-          <!-- Name (register only) -->
-          <AppTextField
-            v-if="tab === 'register'"
-            v-model="form.name"
-            label="Full Name"
-            autocomplete="name"
-            maxlength="80"
-            :prepend-inner-icon="mdiAccountOutline"
-            class="mb-2"
-          ></AppTextField>
+          <AppFormFields>
+            <!-- Name (register only) -->
+            <AppTextField
+              v-if="tab === 'register'"
+              v-model="form.name"
+              label="Full Name"
+              autocomplete="name"
+              maxlength="80"
+              :prepend-inner-icon="mdiAccountOutline"
+            ></AppTextField>
 
-          <AppTextField
-            v-model="form.email"
-            label="Email"
-            type="email"
-            autocomplete="email"
-            :prepend-inner-icon="mdiEmailOutline"
-            autofocus
-            class="mb-2"
-          ></AppTextField>
+            <AppTextField
+              v-model="form.email"
+              label="Email"
+              type="email"
+              autocomplete="email"
+              :prepend-inner-icon="mdiEmailOutline"
+              autofocus
+            ></AppTextField>
 
-          <AppTextField
-            v-model="form.password"
-            :label="tab === 'register' ? 'Password (min 6 chars)' : 'Password'"
-            :type="showPass ? 'text' : 'password'"
-            :autocomplete="tab === 'register' ? 'new-password' : 'current-password'"
-            :prepend-inner-icon="mdiLockOutline"
-            :append-inner-icon="showPass ? mdiEyeOff : mdiEye"
-            @click:append-inner="showPass = !showPass"
-            class="mb-2"
-          ></AppTextField>
+            <AppTextField
+              v-model="form.password"
+              :label="tab === 'register' ? 'Password (min 6 chars)' : 'Password'"
+              :type="showPass ? 'text' : 'password'"
+              :autocomplete="tab === 'register' ? 'new-password' : 'current-password'"
+              :prepend-inner-icon="mdiLockOutline"
+              :append-inner-icon="showPass ? mdiEyeOff : mdiEye"
+              @click:append-inner="showPass = !showPass"
+            ></AppTextField>
 
-          <AppButton
-            type="submit"
-            color="primary"
-            size="large"
-            class="w-100 mt-4 font-weight-bold"
-            :loading="loading"
-            :disabled="
-              !form.email.trim() ||
-              !form.password ||
-              (tab === 'register' && (!form.name.trim() || registrationState !== 'enabled'))
-            "
-          >
-            {{ tab === 'login' ? 'Log In' : 'Create Account' }}
-          </AppButton>
+            <AppButton
+              type="submit"
+              color="primary"
+              size="large"
+              class="w-100 font-weight-bold"
+              :loading="loading"
+              :disabled="
+                !form.email.trim() ||
+                !form.password ||
+                (tab === 'register' && (!form.name.trim() || registrationState !== 'enabled'))
+              "
+            >
+              {{ tab === 'login' ? 'Log In' : 'Create Account' }}
+            </AppButton>
+          </AppFormFields>
         </v-form>
       </AppCardBody>
     </AppCard>
@@ -109,6 +108,7 @@
 </template>
 
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi, setToken, setUser } from '@/utils/api'

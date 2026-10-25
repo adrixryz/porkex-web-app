@@ -52,6 +52,28 @@ test('unsaved expense close can be canceled without losing its fields', async ({
   await expect(dialog).not.toBeVisible()
 })
 
+test('Escape preserves a dirty draft and closes only after confirmed discard', async ({ page }) => {
+  page.removeAllListeners('dialog')
+  await page.goto('/transactions')
+  const dialog = await openExpense(page, 'Escape draft')
+  let confirmations = 0
+  page.on('dialog', async confirmation => {
+    confirmations++
+    expect(confirmation.message()).toBe(
+      'Discard your unsaved changes and leave? Cancel to keep editing.'
+    )
+    if (confirmations === 1) await confirmation.dismiss()
+    else await confirmation.accept()
+  })
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Comment (optional)', { exact: true })).toHaveValue('Escape draft')
+  expect(confirmations).toBe(1)
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  expect(confirmations).toBe(2)
+})
+
 test('closed registration transient failure recovers its tab without reload', async ({ page }) => {
   let requests = 0
   await page.route('**/auth/config', route => {
@@ -271,9 +293,9 @@ test('the period picker reads as a dark segmented control with an accent pill', 
   await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible()
 
   // Match the outlined type filter while keeping every period in one track.
-  const toggle = page.locator('.compact-toggle')
+  const toggle = page.getByRole('group', { name: 'Select period', exact: true })
   await expect(toggle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  await expect(toggle).toHaveCSS('border-top-color', 'rgba(255, 255, 255, 0.12)')
+  await expect(toggle).toHaveCSS('border-top-color', 'rgba(237, 237, 237, 0.12)')
   await expect(toggle).toHaveCSS('border-radius', '999px')
 
   const active = toggle.locator('.v-btn--active')
@@ -283,8 +305,8 @@ test('the period picker reads as a dark segmented control with an accent pill', 
   await expect(active).toHaveCSS('border-radius', '999px')
   // Vuetify's always-on "activated" overlay would wash that pill out.
   await expect(active.locator('.v-btn__overlay')).toHaveCSS('opacity', '0')
-  const thumb = toggle.locator('.compact-toggle__thumb')
-  await expect(thumb).toHaveCSS('background-color', 'rgba(0, 112, 243, 0.12)')
+  const thumb = toggle.locator('.app-segmented-control__thumb')
+  await expect(thumb).toHaveCSS('background-color', 'rgba(0, 112, 243, 0.08)')
   await expect(thumb).toHaveCSS('border-top-color', 'rgb(0, 112, 243)')
 
   const idle = toggle.locator('.v-btn:not(.v-btn--active)').first()
@@ -299,10 +321,10 @@ test('period selection stays mounted during loading and fits mobile without stre
   page
 }) => {
   await page.goto('/transactions?period=month')
-  const toggle = page.locator('.compact-toggle')
+  const toggle = page.getByRole('group', { name: 'Select period', exact: true })
   await expect(toggle).toBeVisible()
   const original = await toggle.elementHandle()
-  const thumb = toggle.locator('.compact-toggle__thumb')
+  const thumb = toggle.locator('.app-segmented-control__thumb')
   const startingWidth = (await thumb.boundingBox())!.width
 
   // Keep the response pending: controls must respond while only results load.
@@ -333,11 +355,22 @@ test('period selection stays mounted during loading and fits mobile without stre
 
   for (const width of [1280, 600, 390, 320]) {
     await page.setViewportSize({ width, height: 900 })
+    await expect(toggle.getByRole('button').first()).toHaveCSS(
+      'height',
+      width < 600 ? '44px' : '40px'
+    )
+    await toggle.evaluate(async element => {
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .map(animation => animation.finished.catch(() => {}))
+      )
+    })
     await expect
       .poll(() =>
         toggle.evaluate(track => {
           const active = track.querySelector('.v-btn--active')!.getBoundingClientRect()
-          const pill = track.querySelector('.compact-toggle__thumb')!.getBoundingClientRect()
+          const pill = track.querySelector('.app-segmented-control__thumb')!.getBoundingClientRect()
           return Math.max(Math.abs(active.x - pill.x), Math.abs(active.width - pill.width))
         })
       )
@@ -366,7 +399,7 @@ test('period selection stays mounted during loading and fits mobile without stre
       expect(layout).toHaveLength(5)
       for (const button of layout) {
         const diagnostic = JSON.stringify({ viewport: width, ...button })
-        expect(button.height, diagnostic).toBeGreaterThanOrEqual(width <= 600 ? 44 : 40)
+        expect(button.height, diagnostic).toBeGreaterThanOrEqual(width < 600 ? 44 : 40)
         expect(button.inside, diagnostic).toBe(true)
         expect(button.labelFits, diagnostic).toBe(true)
       }
@@ -1216,7 +1249,7 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
       .getByRole('button')
     await expect(buttons).toHaveCount(2)
     for (const button of await buttons.all()) {
-      expect((await button.boundingBox())!.height).toBe(32)
+      await expect(button).toHaveCSS('height', width < 600 ? '44px' : '40px')
     }
     const layout = await page.locator('.transaction-filters').evaluate(element => {
       const rects = Array.from(element.children).map(child => child.getBoundingClientRect())
@@ -1617,7 +1650,9 @@ test('shared dialogs align fields and primary actions with balanced spacing', as
     const fields = element.querySelectorAll('.v-input__control')
     const first = fields[0].getBoundingClientRect()
     const last = fields[fields.length - 1].getBoundingClientRect()
-    const button = element.querySelector('.v-form > .v-btn:last-child')!.getBoundingClientRect()
+    const button = element
+      .querySelector('.app-form-fields > .v-btn:last-child')!
+      .getBoundingClientRect()
     return { top: first.top - header.bottom, bottom: button.top - last.bottom }
   })
   expect(spacing.top).toBe(24)
@@ -2022,4 +2057,56 @@ test('accounts and goals separate confirmed balances from queued transfers', asy
   await page.goto('/goals')
   await expect(page.getByText('+$5.00 pending · Expected $25.00', { exact: true })).toBeVisible()
   await page.screenshot({ path: info.outputPath('pending-goal-balance.png'), fullPage: true })
+})
+
+test('shared form spacing stays stable and validation expands only the affected field', async ({
+  page
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  for (const config of [
+    { path: '/budgets', button: 'New Budget', title: 'New Budget', amount: 'Limit' },
+    { path: '/recurring', button: 'New Rule', title: 'New Recurring Rule', amount: 'Amount' }
+  ]) {
+    await page.goto(config.path)
+    await page.getByRole('button', { name: config.button, exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: config.title, exact: true })
+    const amount = dialog.getByLabel(config.amount, { exact: true })
+    await expect(amount).toBeVisible()
+    await expect(dialog.locator('.v-input__details')).toHaveCount(0)
+    const separation = () =>
+      amount.evaluate(input => {
+        const field = input.closest('.v-input')!
+        const next = field.nextElementSibling!
+        return next.getBoundingClientRect().top - field.getBoundingClientRect().bottom
+      })
+    await expect.poll(separation).toBe(24)
+    if (config.path === '/recurring') {
+      const toggle = dialog.getByRole('group', { name: 'Rule type', exact: true })
+      expect((await toggle.boundingBox())!.width).toBeCloseTo(
+        (await dialog.locator('.app-form-fields').boundingBox())!.width,
+        0
+      )
+    }
+    const before = await amount.evaluate(
+      input => input.closest('.v-input')!.nextElementSibling!.getBoundingClientRect().top
+    )
+    await amount.fill('1.001')
+    await expect(dialog.locator('.v-messages__message')).toContainText('Use up to two decimals')
+    const after = await amount.evaluate(
+      input => input.closest('.v-input')!.nextElementSibling!.getBoundingClientRect().top
+    )
+    expect(after).toBeGreaterThan(before)
+    await expect.poll(separation).toBe(24)
+    await amount.fill('1.00')
+    await expect(dialog.locator('.v-input__details')).toHaveCount(0)
+    await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  }
+  await page.goto('/settings')
+  const security = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Security', { exact: true }) })
+  await expect(security.getByLabel('Current Password', { exact: true })).toBeVisible()
+  await expect(security.locator('.v-input__details')).toHaveCount(0)
+  await expect(security.locator('.app-form-fields')).toHaveCSS('gap', '16px')
+  await expect(page.getByText('Email cannot be changed', { exact: true })).toBeVisible()
 })

@@ -1,22 +1,29 @@
 <template>
-  <AppCard class="pa-4 d-flex align-center" :class="{ 'stat-card-responsive': responsive }">
-    <v-avatar v-if="icon" :color="color" size="56" variant="tonal" class="mr-4">
-      <v-icon :icon="icon" size="32"></v-icon>
-    </v-avatar>
-    <div class="stat-card-content">
-      <div class="stat-card-label" :class="labelClass">{{ label }}</div>
-      <div class="stat-card-value text-h5 font-weight-bold" :class="valueClass">
-        <slot name="value">{{ value }}</slot>
+  <AppCard class="fill-height"
+    ><AppCardBody
+      padding="pa-4"
+      class="app-stat-card d-flex align-center"
+      :class="{ 'stat-card-responsive': responsive }"
+    >
+      <v-avatar v-if="icon" :color="color" size="56" variant="tonal" class="mr-4">
+        <v-icon :icon="icon" size="32"></v-icon>
+      </v-avatar>
+      <div class="stat-card-content">
+        <div class="stat-card-label" :class="labelClass">{{ label }}</div>
+        <div class="stat-card-value text-h5 font-weight-bold" :class="valueClass">
+          <slot name="value">{{ value }}</slot>
+        </div>
+        <div v-if="caption || $slots.caption" class="text-caption text-on-surface-variant">
+          <slot name="caption">{{ caption }}</slot>
+        </div>
       </div>
-      <div v-if="caption || $slots.caption" class="text-caption text-on-surface-variant">
-        <slot name="caption">{{ caption }}</slot>
-      </div>
-    </div>
-  </AppCard>
+    </AppCardBody></AppCard
+  >
 </template>
 
 <script setup lang="ts">
 import AppCard from './AppCard.vue'
+import AppCardBody from './AppCardBody.vue'
 
 withDefaults(
   defineProps<{
@@ -40,6 +47,9 @@ withDefaults(
 </script>
 
 <style scoped>
+.app-stat-card {
+  height: 100%;
+}
 .stat-card-content {
   min-width: 0;
 }

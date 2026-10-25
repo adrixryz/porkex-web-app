@@ -1,3 +1,4 @@
+import { todayInput } from './date'
 import { getSessionIdentity, onlineApi, readJson } from './api'
 
 async function csvRequest<T>(path: string, body: unknown): Promise<T> {
@@ -22,6 +23,7 @@ export interface CsvPreviewRow {
   duplicate: { existing: boolean; file: boolean }
   accountId: string | null
   categoryId: number | null
+  importable: boolean
 }
 
 export interface CsvPreview {
@@ -74,7 +76,7 @@ export async function exportMovementsCsv(transactionsUrl: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `porkex-backup-${new Date().toISOString().slice(0, 10)}.csv`
+  link.download = `porkex-backup-${todayInput()}.csv`
   document.body.append(link)
   link.click()
   link.remove()

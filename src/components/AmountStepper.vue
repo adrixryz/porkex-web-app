@@ -2,6 +2,7 @@
   <div class="amount-stepper">
     <button
       type="button"
+      :disabled="disabled"
       class="amount-stepper-btn"
       :aria-label="`Increase ${label}`"
       @click="$emit('step', 1)"
@@ -10,6 +11,7 @@
     </button>
     <button
       type="button"
+      :disabled="disabled"
       class="amount-stepper-btn"
       :aria-label="`Decrease ${label}`"
       @click="$emit('step', -1)"
@@ -29,9 +31,11 @@ import { mdiChevronDown, mdiChevronUp } from '@mdi/js'
 withDefaults(
   defineProps<{
     label?: string
+    disabled?: boolean
   }>(),
   {
-    label: 'amount'
+    label: 'amount',
+    disabled: false
   }
 )
 
@@ -65,7 +69,12 @@ defineEmits<{
     border-radius 0.15s ease;
 }
 
-.amount-stepper-btn:hover {
+.amount-stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.amount-stepper-btn:not(:disabled):hover {
   background-color: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.28);
   border-radius: 6px;

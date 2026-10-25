@@ -1,8 +1,9 @@
 <template>
   <div v-bind="$attrs">
     <v-alert v-if="error || loadError" type="error" class="mb-4">{{ error || loadError }}</v-alert>
+    <AppPageSkeleton v-if="loading && !hasLoaded" page="goals" :header="false" />
     <AppEmptyState
-      v-if="!goals.length"
+      v-else-if="!goals.length"
       :icon="mdiBullseyeArrow"
       title="No savings goals yet"
       description="Create a goal to start setting money aside."
@@ -11,29 +12,24 @@
     <v-row v-else>
       <v-col v-for="goal in goals" :key="goal.id" cols="12" md="6">
         <AppCard class="fill-height goal-card">
-          <AppCardBody padding="pa-5">
-            <div class="d-flex align-center ga-3 mb-3">
-              <v-avatar color="primary" size="40">
-                <v-icon :icon="mdiBullseyeArrow" color="white" />
-              </v-avatar>
-              <div class="flex-grow-1 goal-name text-body-1 font-weight-medium">
-                {{ goal.name }}
-              </div>
-              <div class="d-flex flex-shrink-0">
-                <AppIconButton
+          <AppCardBody>
+            <AppEntityHeader
+              :title="goal.name"
+              :icon="mdiBullseyeArrow"
+              color="primary"
+              class="mb-3"
+              ><template #actions
+                ><AppIconButton
                   :icon="mdiPencilOutline"
                   :label="`Edit ${goal.name}`"
                   color="primary"
-                  @click="edit(goal)"
-                />
+                  @click="edit(goal)" />
                 <AppIconButton
                   :icon="mdiDeleteOutline"
                   :label="`Remove ${goal.name}`"
                   color="error"
-                  @click="deleting = goal"
-                />
-              </div>
-            </div>
+                  @click="deleting = goal" /></template
+            ></AppEntityHeader>
             <div class="d-flex flex-wrap align-baseline justify-space-between ga-2 mb-2">
               <span class="text-h6 font-weight-bold">{{ cs }}{{ formatMoney(goal.balance) }}</span>
               <span class="text-body-2 text-on-surface-variant"
@@ -87,50 +83,38 @@
     :dirty="JSON.stringify(form) !== clean"
   >
     <v-form @submit.prevent="save">
-      <AppTextField
-        v-model="form.name"
-        label="Name"
-        maxlength="60"
-        :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
-        class="mb-2"
-      />
-      <AppTextField
-        v-model="form.targetAmount"
-        label="Target amount"
-        type="number"
-        inputmode="decimal"
-        :prefix="cs"
-        :error-messages="
-          form.targetAmount && !validAmount(form.targetAmount)
-            ? 'Use up to two decimals, from 0.01 to 10,000,000.'
-            : editing && Number(form.targetAmount) < editing.balance
+      <AppFormFields>
+        <AppTextField
+          v-model="form.name"
+          label="Name"
+          maxlength="60"
+          :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
+        />
+        <AppMoneyField
+          v-model="form.targetAmount"
+          label="Target amount"
+          :error-messages="
+            editing && Number(form.targetAmount) < editing.balance
               ? 'The target cannot be lower than the amount already saved.'
               : []
-        "
-        min="0.01"
-        step="0.01"
-        hide-spin-buttons
-        class="mb-2"
-      >
-        <template #append-inner>
-          <AmountStepper label="target amount" @step="stepTargetAmount" />
-        </template>
-      </AppTextField>
-      <v-alert v-if="error" type="error" class="mb-3">{{ error }}</v-alert>
-      <AppButton
-        type="submit"
-        color="primary"
-        size="large"
-        class="w-100 mt-4 font-weight-bold"
-        :loading="busy"
-        :disabled="
-          !validCatalogName(form.name, 60) ||
-          !validAmount(form.targetAmount) ||
-          !!(editing && Number(form.targetAmount) < editing.balance)
-        "
-      >
-        {{ editing ? 'Update' : 'Create' }}
-      </AppButton>
+          "
+        />
+        <v-alert v-if="error" type="error">{{ error }}</v-alert>
+        <AppButton
+          type="submit"
+          color="primary"
+          size="large"
+          class="w-100 font-weight-bold"
+          :loading="busy"
+          :disabled="
+            !validCatalogName(form.name, 60) ||
+            !validAmount(form.targetAmount) ||
+            !!(editing && Number(form.targetAmount) < editing.balance)
+          "
+        >
+          {{ editing ? 'Update' : 'Create' }}
+        </AppButton>
+      </AppFormFields>
     </v-form>
   </AppDialog>
   <TransferDialog
@@ -152,6 +136,10 @@
   >
 </template>
 <script setup lang="ts">
+import AppFormFields from '@/components/ui/AppFormFields.vue'
+import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
+import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'
+import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 defineOptions({ inheritAttrs: false })
 import { computed, onMounted, ref } from 'vue'
@@ -173,10 +161,15 @@ import AppActionButton from '@/components/ui/AppActionButton.vue'
 import AppButton from './ui/AppButton.vue'
 import AppIconButton from './ui/AppIconButton.vue'
 import AppTextField from './ui/AppTextField.vue'
-import AmountStepper from './AmountStepper.vue'
 import TransferDialog from './TransferDialog.vue'
 import PendingBalance from './PendingBalance.vue'
-const { accounts, run: load, error: loadError } = useAccounts({ includeGoals: true })
+const {
+  accounts,
+  loading,
+  hasLoaded,
+  run: load,
+  error: loadError
+} = useAccounts({ includeGoals: true })
 const activeAccounts = computed(() =>
   accounts.value.filter(account => !account.isGoal && !account.archived)
 )
@@ -208,12 +201,6 @@ function edit(goal: Account | null) {
 function newGoal() {
   edit(null)
 }
-function stepTargetAmount(delta: number) {
-  const current = Number.parseFloat(form.value.targetAmount)
-  const base = Number.isFinite(current) ? current : 0
-  const next = Math.round((base + delta) * 100) / 100
-  form.value.targetAmount = next >= 0.01 ? String(next) : ''
-}
 defineExpose({ newGoal })
 function fund(goal: Account, out: boolean) {
   selected.value = goal
@@ -226,6 +213,7 @@ useUnsavedChanges(
   () => busy.value
 )
 async function send(path: string, method: string, body?: unknown) {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   try {
@@ -246,6 +234,7 @@ async function send(path: string, method: string, body?: unknown) {
   }
 }
 async function save() {
+  if (!validCatalogName(form.value.name, 60) || !validAmount(form.value.targetAmount)) return
   await send(
     editing.value ? `/goals/${editing.value.id}` : '/goals',
     editing.value ? 'PUT' : 'POST',

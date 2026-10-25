@@ -171,7 +171,13 @@ export async function publishScheduledDeletes() {
           userId,
           method: 'DELETE',
           path: `/transactions/${item.transaction.id}`,
-          body: null
+          body: JSON.stringify({
+            previousTransaction: {
+              accountId: item.transaction.accountId,
+              amount: item.transaction.amount,
+              type: item.transaction.type
+            }
+          })
         })
         write(read().filter(value => value.id !== item.id))
       }

@@ -59,6 +59,7 @@ const RULE: RecurringRule = {
 const VSelectStub = { props: ['items', 'label'], template: '<div class="v-select-stub" />' }
 
 const stubs = {
+  'v-defaults-provider': { props: ['defaults'], template: '<slot />' },
   'v-dialog': {
     props: ['modelValue'],
     template: '<div v-if="modelValue"><slot /></div>'

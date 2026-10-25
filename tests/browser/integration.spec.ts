@@ -4,6 +4,174 @@ import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 import { readFile } from 'node:fs/promises'
 
+test('analytics account filters scope every chart and survive history at narrow widths', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Analytics owner',
+      email: `analytics-scope-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const cash = randomUUID()
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: cash, name: 'Analytics Cash', openingBalance: 100 }
+      })
+    ).status()
+  ).toBe(201)
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const expense = categories.find((category: { type: string }) => category.type === 'Expense')
+  const day = new Date().toISOString().slice(0, 10)
+  expect(
+    (
+      await page.request.post('/api/transactions', {
+        headers,
+        data: { accountId: cash, categoryId: expense.id, type: 'Expense', amount: 10, date: day }
+      })
+    ).status()
+  ).toBe(201)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/analytics')
+  await page.locator('.analytics-account-filter').click()
+  await page.getByRole('option', { name: 'Analytics Cash', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  const comparison = page.getByRole('region', { name: 'Category Comparison', exact: true })
+  await expect(comparison.getByText(expense.name, { exact: true })).toBeVisible()
+  for (const width of [320, 480, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(page.getByRole('combobox', { name: 'Account', exact: true })).toBeVisible()
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    let previousPixels = ''
+    let stableFrames = 0
+    await expect
+      .poll(async () => {
+        const pixels = await page
+          .locator('canvas')
+          .evaluateAll(nodes =>
+            nodes.map(node => (node as HTMLCanvasElement).toDataURL()).join('|')
+          )
+        stableFrames = pixels === previousPixels ? stableFrames + 1 : 0
+        previousPixels = pixels
+        return stableFrames
+      })
+      .toBeGreaterThanOrEqual(2)
+    await page.screenshot({
+      path: info.outputPath(`analytics-account-${width}.png`),
+      fullPage: true,
+      animations: 'disabled'
+    })
+  }
+  await page.locator('.analytics-account-filter').click()
+  await page.getByRole('option', { name: 'Main', exact: true }).click()
+  await expect(comparison.getByText(expense.name, { exact: true })).toHaveCount(0)
+  await page.goBack()
+  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  await expect(comparison.getByText(expense.name, { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('combobox', { name: 'Account', exact: true })).toHaveValue(
+    'Analytics Cash'
+  )
+})
+
+for (const committed of [false, true])
+  test(`an uncertain CSV import recovers after closing and reloading (${committed ? 'committed' : 'not committed'})`, async ({
+    page
+  }, info) => {
+    const registration = await page.request.post('/auth/register', {
+      data: {
+        name: 'Receipt owner',
+        email: `receipt-${committed}-${info.project.name}@example.test`,
+        password: 'secret123'
+      }
+    })
+    const { token, user } = await registration.json()
+    await page.addInitScript(
+      ({ token, user }) => {
+        localStorage.setItem('porkex_token', token)
+        localStorage.setItem('porkex_user', JSON.stringify(user))
+      },
+      { token, user }
+    )
+    await page.goto('/settings')
+    await page.getByRole('button', { name: 'Import CSV', exact: true }).click()
+    const modal = page.getByRole('dialog', { name: 'Import Transactions', exact: true })
+    const csv =
+      'Date;Type;Account;Category;Tags;Comment;Amount\n2020-01-01;Income;Main;Salary;;Lost CSV response;12.34'
+    await modal
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'receipt.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
+    await page.route(
+      '**/api/transactions/import',
+      async route => {
+        if (committed) await route.fetch()
+        await route.abort('failed')
+      },
+      { times: 1 }
+    )
+    await modal.getByRole('button', { name: 'Import 1 transactions', exact: true }).click()
+    await expect(
+      modal.getByText('The outcome could not be confirmed.', { exact: false })
+    ).toBeVisible()
+    expect(
+      await page.evaluate(
+        id => JSON.parse(localStorage.getItem(`porkex_csv_import_${id}`) || 'null')?.importId,
+        user.id
+      )
+    ).toBeTruthy()
+    page.once('dialog', dialog => dialog.accept())
+    await modal.getByRole('button', { name: 'Close dialog', exact: true }).click()
+    await page.reload()
+    await page.getByRole('button', { name: 'Import CSV', exact: true }).click()
+    if (!committed) {
+      await expect(
+        modal.getByText('A previous import needs confirmation.', { exact: false })
+      ).toBeVisible()
+      const originalId = await page.evaluate(
+        id => JSON.parse(localStorage.getItem(`porkex_csv_import_${id}`)!).importId,
+        user.id
+      )
+      await modal
+        .locator('input[type=file]')
+        .setInputFiles({ name: 'wrong.csv', mimeType: 'text/csv', buffer: Buffer.from(csv + '\n') })
+      await expect(modal.getByText('Select the original CSV file', { exact: false })).toBeVisible()
+      await modal
+        .locator('input[type=file]')
+        .setInputFiles({ name: 'receipt.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
+      expect(
+        await page.evaluate(
+          id => JSON.parse(localStorage.getItem(`porkex_csv_import_${id}`)!).importId,
+          user.id
+        )
+      ).toBe(originalId)
+      await modal.getByRole('button', { name: 'Retry confirmation', exact: true }).click()
+    }
+    await expect(page.getByText('Imported 1 transactions.', { exact: true })).toBeVisible()
+    const rows = await (
+      await page.request.get('/api/transactions?search=Lost%20CSV%20response', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    ).json()
+    expect(rows.total).toBe(1)
+    expect(
+      await page.evaluate(id => localStorage.getItem(`porkex_csv_import_${id}`), user.id)
+    ).toBeNull()
+  })
+
 test('CSV backup previews, imports, detects duplicates and exports filtered or complete history', async ({
   page
 }, info) => {

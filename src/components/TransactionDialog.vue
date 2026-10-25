@@ -9,7 +9,13 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-form @submit.prevent="submit">
-      <AppTextField v-if="favoriteMode" v-model="form.name" label="Favorite name" maxlength="60" />
+      <AppTextField
+        v-if="favoriteMode"
+        v-model="form.name"
+        label="Favorite name"
+        maxlength="60"
+        :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
+      />
       <div class="amount-date-row mb-6">
         <div>
           <AppTextField
@@ -116,6 +122,7 @@
 </template>
 
 <script setup lang="ts">
+import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import { useAccounts } from '@/composables/useAccounts'
 import { getUser } from '@/utils/api'
@@ -222,7 +229,7 @@ const categoryOptions = computed(() => allCategories.value.filter(c => c.type ==
 
 const isValid = computed(() => {
   return (
-    (!props.favoriteMode || !!form.value.name.trim()) &&
+    (!props.favoriteMode || validCatalogName(form.value.name, 60)) &&
     validAmount(form.value.amount) &&
     !!form.value.date &&
     categoryOptions.value.some(c => c.id === form.value.categoryId) &&

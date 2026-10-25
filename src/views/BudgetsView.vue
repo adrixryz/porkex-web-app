@@ -53,6 +53,7 @@
             item-title="name"
             item-value="id"
             label="Account"
+            clearable
             hide-details
             class="budget-account-filter"
           />
@@ -128,7 +129,7 @@
           <AppCard class="pa-5 fill-height">
             <div class="d-flex align-center mb-3">
               <v-avatar :color="b.category.color ?? undefined" size="40" class="mr-3">
-                <v-icon :icon="mdiTagOutline" color="white"></v-icon>
+                <v-icon :icon="mdiPiggyBankOutline" color="white"></v-icon>
               </v-avatar>
               <div class="flex-grow-1">
                 <div class="font-weight-medium text-body-1 text-on-surface">
@@ -279,7 +280,7 @@
     >
       <template #icon>
         <v-avatar :color="deletingBudget?.category.color ?? undefined" size="56" class="mb-4">
-          <v-icon :icon="mdiTagOutline" color="white" size="28"></v-icon>
+          <v-icon :icon="mdiPiggyBankOutline" color="white" size="28"></v-icon>
         </v-avatar>
       </template>
       The limit for {{ deletingBudget?.category.name }} will be deleted. Your transactions are not
@@ -318,13 +319,7 @@ import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { todayInput } from '@/utils/date'
 import { getFirstDayOfWeek } from '@/utils/preferences'
 import type { Budget, BudgetPeriod, BudgetsResponse, Category } from '@/types'
-import {
-  mdiDeleteOutline,
-  mdiPencilOutline,
-  mdiPiggyBankOutline,
-  mdiPlus,
-  mdiTagOutline
-} from '@mdi/js'
+import { mdiDeleteOutline, mdiPencilOutline, mdiPiggyBankOutline, mdiPlus } from '@mdi/js'
 
 const cs = useCurrencySymbol()
 const { showSnack } = useSnackbar()
@@ -332,21 +327,20 @@ const { accounts, activeAccounts, run: fetchAccounts, error: accountsError } = u
 const route = useRoute(),
   router = useRouter()
 const accountFilter = computed({
-  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : 'all'),
-  set: (value: string) => {
+  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : null),
+  set: (value: string | null) => {
     const query = { ...route.query }
-    if (value === 'all') delete query.accountId
+    if (!value) delete query.accountId
     else query.accountId = value
     void router.push({ query })
   }
 })
-const accountOptions = computed(() => [
-  { id: 'all', name: 'All accounts' },
-  ...accounts.value.map(account => ({
+const accountOptions = computed(() =>
+  accounts.value.map(account => ({
     ...account,
     name: account.archived ? `${account.name} (Archived)` : account.name
   }))
-])
+)
 const selectedAccountArchived = computed(() =>
   accounts.value.some(account => account.id === accountFilter.value && account.archived)
 )
@@ -380,7 +374,7 @@ const budgets = computed(() =>
   data.value.budgets.filter(
     b =>
       b.period === period.value &&
-      (accountFilter.value === 'all' ||
+      (accountFilter.value === null ||
         (b.accountId ?? `main-${getUser()?.id}`) === accountFilter.value)
   )
 )
@@ -504,7 +498,7 @@ const openDialog = (budget?: Budget) => {
       }
     : {
         accountId:
-          accountFilter.value !== 'all'
+          accountFilter.value !== null
             ? accountFilter.value
             : (activeAccounts.value.find(a => a.isMain)?.id ?? ''),
         categoryId: null,

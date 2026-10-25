@@ -75,6 +75,22 @@ export function formatDateOnly(
   return d.toLocaleDateString('en-US', { ...options, timeZone: 'UTC' })
 }
 
+/** Consistent calendar labels for all shared period navigation controls. */
+export function formatPeriodLabel(
+  period: 'day' | 'week' | 'month' | 'year',
+  from: string | Date,
+  to: string | Date = from
+): string {
+  if (period === 'year') return formatDateOnly(from, { year: 'numeric' })
+  if (period === 'month') return formatDateOnly(from, { month: 'long', year: 'numeric' })
+  if (period === 'day') return formatDateOnly(from)
+  const start = typeof from === 'string' ? new Date(from) : from
+  const end = typeof to === 'string' ? new Date(to) : to
+  const startOptions: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) startOptions.year = 'numeric'
+  return `${formatDateOnly(from, startOptions)} – ${formatDateOnly(to)}`
+}
+
 export function formatDateTime(value: string | Date): string {
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''

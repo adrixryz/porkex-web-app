@@ -75,9 +75,9 @@ test('midnight changes the visible day label and the requested range together', 
 }) => {
   await page.clock.install({ time: new Date('2026-10-31T23:59:50-05:00') })
   await page.goto('/transactions?period=day')
-  await expect(page.getByText('Sat, Oct 31', { exact: true })).toBeVisible()
+  await expect(page.getByText('Oct 31, 2026', { exact: true })).toBeVisible()
   await page.clock.fastForward(31_000)
-  await expect(page.getByText('Sun, Nov 1', { exact: true })).toBeVisible()
+  await expect(page.getByText('Nov 1, 2026', { exact: true })).toBeVisible()
   await expect
     .poll(async () =>
       (await state(page)).requests.some((request: { path: string }) =>
@@ -94,6 +94,30 @@ async function state(page: Page, changes?: object) {
   })
   return response.json()
 }
+
+test('period navigation stops at the first transaction for dashboard, transactions and categories', async ({
+  page
+}) => {
+  await page.addInitScript(() => localStorage.setItem('porkex_default_period', 'month'))
+  await page.clock.install({ time: new Date('2026-10-24T12:00:00-05:00') })
+  await state(page, {
+    earliestDate: '2026-09-15',
+    categoryComparisons: {
+      month: [{ name: 'Food', color: '#EA4335', current: 12, previous: 10, changePercent: 20 }]
+    }
+  })
+  for (const path of ['/', '/transactions?period=month', '/analytics']) {
+    await page.goto(path)
+    const navigation = page.getByRole('group', { name: 'Period navigation', exact: true })
+    const previous = navigation.getByRole('button', { name: 'Previous period', exact: true })
+    await expect(previous).toBeEnabled()
+    await previous.click()
+    await expect(navigation.getByText('September 2026', { exact: true })).toBeVisible()
+    await expect(previous).toBeDisabled()
+    await navigation.getByRole('button', { name: 'Next period', exact: true }).click()
+    await expect(navigation.getByText('October 2026', { exact: true })).toBeVisible()
+  }
+})
 
 test('remote week preference updates the visible range together with its request', async ({
   page
@@ -113,7 +137,7 @@ test('remote week preference updates the visible range together with its request
     })
   )
   await page.goto('/transactions?period=week')
-  await expect(page.getByText('Oct 19 - Oct 25', { exact: true })).toBeVisible()
+  await expect(page.getByText('Oct 19 – Oct 25, 2026', { exact: true })).toBeVisible()
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('porkex_week_start')))
     .toBe('MONDAY')
@@ -126,7 +150,7 @@ test('remote week preference updates the visible range together with its request
       )
     )
     .toBe(true)
-  await expect(page.getByText('Oct 18 - Oct 24', { exact: true })).toBeVisible()
+  await expect(page.getByText('Oct 18 – Oct 24, 2026', { exact: true })).toBeVisible()
 })
 async function openExpense(page: Page, description: string) {
   await quickAction(page, 'Expense')
@@ -740,12 +764,12 @@ test('analytics range fields and steppers enforce supported limits', async ({ pa
   await expect(page).toHaveURL(/days=8/)
 })
 
-test('analytics spending title wraps inside its card on narrow screens', async ({ page }) => {
+test('analytics comparison title wraps inside its card on narrow screens', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 })
   await page.goto('/analytics')
-  const title = page.locator('.analytics-spending-card .app-card-title')
+  const title = page.locator('.category-comparison .app-card-title')
   await expect(title).toBeVisible()
-  await expect(title.getByText('Monthly Expense Breakdown', { exact: true })).toBeVisible()
+  await expect(title.getByText('Category Comparison', { exact: true })).toBeVisible()
   expect(
     await title.evaluate(element => ({
       fits: element.scrollWidth <= element.clientWidth + 1,
@@ -776,29 +800,25 @@ test('category comparison selector keeps Analytics ranges and restores browser h
   })
   await page.goto('/analytics?months=9&days=60&comparison=week')
   const card = page.getByRole('region', { name: 'Category Comparison', exact: true })
-  const spending = page
-    .locator('.v-card')
-    .filter({ has: page.getByText('Monthly Expense Breakdown', { exact: true }) })
-  for (const name of ['Food', 'Transport', 'Housing', 'Health', 'Shopping'])
-    await expect(spending.getByText(name, { exact: true })).toBeVisible()
-  const selector = card.locator('.comparison-selector')
+  await expect(page.getByText('Monthly Expense Breakdown', { exact: true })).toHaveCount(0)
+  const selector = card.locator('.comparison-selector').filter({ hasText: 'Period' })
   await expect(card.locator('.app-card-title')).toHaveCSS('font-size', '16px')
   await expect(card.locator('.app-card-subtitle')).toHaveCount(0)
   await expect(card.locator('.app-card-title')).toHaveCSS('font-weight', '700')
-  await expect(card.getByRole('columnheader', { name: 'This week', exact: true })).toBeVisible()
+  await expect(card.getByRole('columnheader', { name: 'This Week', exact: true })).toBeVisible()
   await expect(
     card.getByText('This week to date vs full previous week', { exact: true })
   ).toHaveCount(0)
   await expect(card.getByText('Transport', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Months', { exact: true })).toHaveValue('9')
   await selector.click()
-  await page.getByRole('option', { name: 'Year vs year', exact: true }).click()
+  await page.getByRole('option', { name: 'By Year', exact: true }).click()
   await expect(page).toHaveURL(/comparison=year/)
   await expect(card.getByText('Housing', { exact: true })).toBeVisible()
   await expect(
     card.getByText('This year to date vs full previous year', { exact: true })
   ).toHaveCount(0)
-  await expect(card.getByText('New', { exact: true })).toBeVisible()
+  await expect(card.getByText('New', { exact: true })).toHaveCount(2)
   await expect(page.getByLabel('Days', { exact: true })).toHaveValue('60')
   await expect(page.getByText('Period comparison', { exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Comparison year', { exact: true })).toHaveCount(0)
@@ -809,9 +829,9 @@ test('category comparison selector keeps Analytics ranges and restores browser h
   await page.goBack()
   await expect(card.getByText('Transport', { exact: true })).toBeVisible()
   await selector.click()
-  await page.getByRole('option', { name: 'Month vs month', exact: true }).click()
+  await page.getByRole('option', { name: 'By Month', exact: true }).click()
   await expect(card.getByText('Food', { exact: true })).toBeVisible()
-  await expect(card.getByRole('columnheader', { name: 'This month', exact: true })).toBeVisible()
+  await expect(card.getByRole('columnheader', { name: 'This Month', exact: true })).toBeVisible()
   await page.goBack()
   await expect(card.getByText('Transport', { exact: true })).toBeVisible()
 })
@@ -1122,10 +1142,10 @@ test('next-only edit and skip preserve the rule base and target exact dates', as
   })
   await page.goto('/recurring')
   await expect(page.getByRole('button', { name: 'Skip next', exact: true })).toHaveClass(
-    /v-btn--variant-tonal/
+    /v-btn--variant-outlined/
   )
   await expect(page.getByRole('button', { name: 'Edit next', exact: true })).toHaveClass(
-    /v-btn--variant-tonal/
+    /v-btn--variant-outlined/
   )
   await page.getByRole('button', { name: 'Edit next', exact: true }).click()
   const dialog = page.getByRole('dialog')
@@ -1243,6 +1263,7 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
       const headers = await page.locator('.tx-table th').allTextContents()
       expect(headers.map(text => text.trim())).toEqual([
         'Date',
+        'Account',
         'Category',
         'Tags',
         'Comment',

@@ -142,6 +142,7 @@ export interface PieSlice {
 }
 
 export interface DashboardResponse {
+  earliestDate?: string | null
   globalBalance: number
   totalIncome: number
   totalExpense: number
@@ -196,6 +197,7 @@ export interface AnalyticsResponse {
 }
 
 export interface TransactionsResponse {
+  earliestDate?: string | null
   items: Transaction[]
   total: number
   page: number

@@ -59,26 +59,20 @@
               <span>{{ Math.floor((goal.balance / (goal.targetAmount || 1)) * 100) }}%</span>
             </div>
             <div class="d-flex flex-wrap ga-2 mt-3">
-              <AppButton
-                size="small"
-                color="primary"
-                variant="tonal"
-                :prepend-icon="mdiPlus"
+              <AppActionButton
+                :icon="mdiPlus"
                 :disabled="
                   goal.pendingBalanceUnknown ||
                   (goal.projectedBalance ?? goal.balance) >= (goal.targetAmount || 0)
                 "
                 @click="fund(goal, false)"
-                >Add funds</AppButton
+                >Add funds</AppActionButton
               >
-              <AppButton
-                size="small"
-                color="primary"
-                variant="tonal"
-                :prepend-icon="mdiMinus"
+              <AppActionButton
+                :icon="mdiMinus"
                 :disabled="goal.balance <= 0"
                 @click="fund(goal, true)"
-                >Withdraw</AppButton
+                >Withdraw</AppActionButton
               >
             </div>
           </AppCardBody>
@@ -93,7 +87,13 @@
     :dirty="JSON.stringify(form) !== clean"
   >
     <v-form @submit.prevent="save">
-      <AppTextField v-model="form.name" label="Name" maxlength="60" class="mb-2" />
+      <AppTextField
+        v-model="form.name"
+        label="Name"
+        maxlength="60"
+        :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
+        class="mb-2"
+      />
       <AppTextField
         v-model="form.targetAmount"
         label="Target amount"
@@ -124,7 +124,7 @@
         class="w-100 mt-4 font-weight-bold"
         :loading="busy"
         :disabled="
-          !form.name.trim() ||
+          !validCatalogName(form.name, 60) ||
           !validAmount(form.targetAmount) ||
           !!(editing && Number(form.targetAmount) < editing.balance)
         "
@@ -152,6 +152,7 @@
   >
 </template>
 <script setup lang="ts">
+import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 defineOptions({ inheritAttrs: false })
 import { computed, onMounted, ref } from 'vue'
 import { mdiPlus, mdiMinus, mdiPencilOutline, mdiDeleteOutline, mdiBullseyeArrow } from '@mdi/js'
@@ -168,6 +169,7 @@ import AppCardBody from './ui/AppCardBody.vue'
 import AppEmptyState from './ui/AppEmptyState.vue'
 import AppDialog from './ui/AppDialog.vue'
 import AppConfirmDialog from './ui/AppConfirmDialog.vue'
+import AppActionButton from '@/components/ui/AppActionButton.vue'
 import AppButton from './ui/AppButton.vue'
 import AppIconButton from './ui/AppIconButton.vue'
 import AppTextField from './ui/AppTextField.vue'

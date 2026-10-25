@@ -6,7 +6,9 @@
     <div class="summary-meta">
       <div class="text-white text-body-2" :class="{ 'text-truncate': !compactSpacing }">
         {{ transaction.category?.name || 'Category' }}
-        <span class="text-caption"> · {{ transaction.account?.name || 'Main' }}</span>
+        <span class="text-caption text-medium-emphasis">
+          · {{ transaction.account?.name || 'Main' }}</span
+        >
         <v-icon
           v-if="transaction.recurringId"
           :icon="mdiRepeat"

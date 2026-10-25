@@ -87,27 +87,15 @@
                 </v-btn-toggle>
               </div>
 
-              <div
+              <AppPeriodNavigation
                 v-if="periodMode !== 'custom'"
-                class="period-navigation d-flex align-center justify-center ga-2"
-              >
-                <AppIconButton
-                  :icon="mdiChevronLeft"
-                  label="Previous period"
-                  @click="navigate(-1)"
-                />
-                <span
-                  class="text-body-1 font-weight-medium text-on-surface"
-                  style="min-width: 140px; text-align: center"
-                  >{{ periodLabel }}</span
-                >
-                <AppIconButton
-                  :icon="mdiChevronRight"
-                  label="Next period"
-                  :disabled="!canGoForward"
-                  @click="navigate(1)"
-                />
-              </div>
+                :label="periodLabel"
+                :can-go-forward="canGoForward"
+                :can-go-back="canGoBack"
+                class="period-navigation"
+                @previous="navigate(-1)"
+                @next="navigate(1)"
+              />
               <div
                 v-else
                 class="period-navigation d-flex flex-column flex-sm-row align-stretch align-sm-center ga-3"
@@ -348,6 +336,7 @@
                 <v-table theme="dark" class="bg-surface tx-table">
                   <colgroup>
                     <col class="col-date" />
+                    <col class="col-account" />
                     <col class="col-category" />
                     <col class="col-tags" />
                     <col class="col-description" />
@@ -374,6 +363,7 @@
                           size="14"
                         ></v-icon>
                       </th>
+                      <th class="text-left font-weight-bold" scope="col">Account</th>
                       <th class="text-left font-weight-bold" scope="col">Category</th>
                       <th class="text-left font-weight-bold" scope="col">Tags</th>
                       <th class="text-left font-weight-bold" scope="col">Comment</th>
@@ -401,6 +391,9 @@
                   <tbody>
                     <tr v-for="tx in transactions" :key="tx.id" class="hover-row">
                       <td class="text-on-surface-variant">{{ formatDateOnly(tx.date) }}</td>
+                      <td class="account-cell text-white" :title="tx.account?.name || 'Main'">
+                        {{ tx.account?.name || 'Main' }}
+                      </td>
                       <td class="py-2">
                         <v-chip
                           size="small"
@@ -410,9 +403,6 @@
                           :style="`color: ${textOn(tx.category?.color)}`"
                           >{{ tx.category?.name }}</v-chip
                         >
-                        <div class="text-caption mt-1">
-                          {{ tx.account?.name || 'Main' }} Account
-                        </div>
                       </td>
                       <td>
                         <TagChips
@@ -571,6 +561,7 @@ import AppEmptyState from '@/components/ui/AppEmptyState.vue'
 import AppIconButton from '@/components/ui/AppIconButton.vue'
 import AppPage from '@/components/ui/AppPage.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import AppPeriodNavigation from '@/components/ui/AppPeriodNavigation.vue'
 import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
 import { normalizeTransactionType } from '@/utils/transactionTypes'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -578,7 +569,7 @@ import AppTextField from '@/components/ui/AppTextField.vue'
 import { fetchJson } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import {
-  formatDate,
+  formatPeriodLabel,
   formatDateOnly,
   parseDateOnly,
   startOfWeek,
@@ -594,8 +585,6 @@ import {
   mdiUpload,
   mdiArrowDown,
   mdiArrowUp,
-  mdiChevronLeft,
-  mdiChevronRight,
   mdiFilterOffOutline,
   mdiMagnify,
   mdiPencilOutline,
@@ -853,14 +842,9 @@ const getDateRange = () => {
 }
 
 const periodLabel = computed(() => {
+  if (periodMode.value === 'custom') return 'Custom Range'
   const { from, to } = getDateRange()
-  if (periodMode.value === 'day')
-    return formatDate(from, { weekday: 'short', month: 'short', day: 'numeric' })
-  if (periodMode.value === 'week')
-    return `${formatDate(from, { month: 'short', day: 'numeric' })} - ${formatDate(to, { month: 'short', day: 'numeric' })}`
-  if (periodMode.value === 'month') return formatDate(from, { month: 'long', year: 'numeric' })
-  if (periodMode.value === 'year') return from.getFullYear().toString()
-  return 'Custom Range'
+  return formatPeriodLabel(periodMode.value, toDateOnly(from), toDateOnly(to))
 })
 
 // ── Filters mirrored in the URL ───────────────────────────────────────────
@@ -978,7 +962,14 @@ const load = async () => {
 
 // The arrows walk back through past periods; the current one is the last stop.
 const canGoForward = computed(() => offset.value < 0)
+const canGoBack = computed(
+  () =>
+    !loading.value &&
+    !!list.value.earliestDate &&
+    toDateOnly(getDateRange().from) > list.value.earliestDate
+)
 const navigate = (dir: number) => {
+  if (dir < 0 && !canGoBack.value) return
   // Forward stops at the current period: no positive offset, ever.
   if (dir > 0 && !canGoForward.value) return
   offset.value += dir
@@ -1201,7 +1192,15 @@ onMounted(async () => {
   width: 128px;
 }
 .col-category {
-  width: 170px;
+  width: 150px;
+}
+.col-account {
+  width: 96px;
+}
+.tx-table :deep(.account-cell) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .col-amount {
   width: 150px;

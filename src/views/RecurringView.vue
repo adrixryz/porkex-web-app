@@ -59,66 +59,7 @@
                   {{ r.category?.name }} · {{ scheduleLabel(r.frequency, r.interval) }}
                 </div>
               </div>
-              <v-chip
-                size="small"
-                :color="statusColor(r)"
-                variant="tonal"
-                class="ml-2 font-weight-medium"
-              >
-                {{ statusLabel(r) }}
-              </v-chip>
-            </div>
-
-            <div class="d-flex align-baseline justify-space-between">
-              <span
-                class="text-h6 font-weight-bold"
-                :class="r.type === 'Income' ? 'text-success' : 'text-error'"
-              >
-                {{ r.type === 'Income' ? '+' : '-' }}{{ cs }}{{ formatMoney(r.amount) }}
-              </span>
-              <span v-if="!isEnded(r)" class="text-body-2 text-on-surface-variant">
-                Next: {{ formatDateOnly(r.nextDate) }}
-              </span>
-              <span v-else class="text-body-2 text-on-surface-variant">
-                Ended {{ formatDateOnly(r.endDate!) }}
-              </span>
-            </div>
-
-            <v-alert
-              v-if="r.nextException"
-              density="compact"
-              variant="tonal"
-              type="info"
-              class="mt-2"
-              >Next only: {{ cs }}{{ formatMoney(r.nextException.amount)
-              }}<span v-if="r.nextException.comment">
-                · {{ r.nextException.comment }}</span
-              ></v-alert
-            >
-            <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-2 mt-2">
-              <AppButton
-                size="small"
-                color="primary"
-                variant="tonal"
-                :prepend-icon="mdiSkipNextOutline"
-                @click="skipRule = r"
-                >Skip next</AppButton
-              >
-              <AppButton
-                size="small"
-                color="primary"
-                variant="tonal"
-                :prepend-icon="mdiPencilOutline"
-                @click="editNext(r)"
-                >Edit next</AppButton
-              >
-            </div>
-            <div class="d-flex align-center justify-space-between mt-2">
-              <span class="text-caption text-on-surface-variant">
-                <template v-if="r.endDate">Until {{ formatDateOnly(r.endDate) }}</template>
-                <template v-else-if="!r.active && !isEnded(r)">Paused</template>
-              </span>
-              <div>
+              <div class="d-flex flex-shrink-0 ml-2">
                 <AppIconButton
                   v-if="!isEnded(r)"
                   :icon="r.active ? mdiPause : mdiPlayOutline"
@@ -140,6 +81,54 @@
                 />
               </div>
             </div>
+
+            <div class="d-flex flex-wrap align-center justify-space-between ga-2">
+              <div class="d-flex align-center flex-wrap ga-2">
+                <span
+                  class="text-h6 font-weight-bold"
+                  :class="r.type === 'Income' ? 'text-success' : 'text-error'"
+                >
+                  {{ r.type === 'Income' ? '+' : '-' }}{{ cs }}{{ formatMoney(r.amount) }}
+                </span>
+                <v-chip
+                  size="small"
+                  :color="statusColor(r)"
+                  variant="tonal"
+                  class="font-weight-medium"
+                >
+                  {{ statusLabel(r) }}
+                </v-chip>
+              </div>
+              <span v-if="!isEnded(r)" class="text-body-2 text-on-surface-variant">
+                Next: {{ formatDateOnly(r.nextDate) }}
+              </span>
+              <span v-else class="text-body-2 text-on-surface-variant">
+                Ended {{ formatDateOnly(r.endDate!) }}
+              </span>
+            </div>
+
+            <v-alert
+              v-if="r.nextException"
+              density="compact"
+              variant="tonal"
+              type="info"
+              class="mt-2"
+              >Next only: {{ cs }}{{ formatMoney(r.nextException.amount)
+              }}<span v-if="r.nextException.comment">
+                · {{ r.nextException.comment }}</span
+              ></v-alert
+            >
+            <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-2 mt-2">
+              <AppActionButton :icon="mdiSkipNextOutline" @click="skipRule = r"
+                >Skip next</AppActionButton
+              >
+              <AppActionButton :icon="mdiPencilOutline" @click="editNext(r)"
+                >Edit next</AppActionButton
+              >
+            </div>
+            <p v-if="r.endDate" class="text-caption text-on-surface-variant mt-3 mb-0">
+              Until {{ formatDateOnly(r.endDate) }}
+            </p>
           </AppCard>
         </v-col>
       </v-row>
@@ -213,6 +202,7 @@ import { mutationFeedback } from '@/utils/mutationFeedback'
 import { ref, onMounted } from 'vue'
 import TransactionDialog from '@/components/TransactionDialog.vue'
 import RecurringDialog from '@/components/RecurringDialog.vue'
+import AppActionButton from '@/components/ui/AppActionButton.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'

@@ -172,6 +172,13 @@ const server = createServer(async (req, res) => {
           res,
           {
             mode,
+            type: url.searchParams.get('type') || 'Expense',
+            anchor: url.searchParams.get('anchor'),
+            earliestDate: db.earliestDate === undefined ? '2024-01-01' : db.earliestDate,
+            ranges: {
+              current: { from: '2026-10-01', to: '2026-10-24' },
+              previous: { from: '2026-09-01', to: '2026-09-30' }
+            },
             partial: mode !== 'month',
             categoryComparison: db.categoryComparisons[mode] ?? []
           },
@@ -276,6 +283,7 @@ const server = createServer(async (req, res) => {
         return json(
           res,
           {
+            earliestDate: db.earliestDate === undefined ? '2000-01-01' : db.earliestDate,
             globalBalance: totalIncome - totalExpense,
             totalIncome,
             totalExpense,
@@ -316,6 +324,7 @@ const server = createServer(async (req, res) => {
           res,
           {
             items: rows.slice((page - 1) * perPage, page * perPage).map(decorate),
+            earliestDate: db.earliestDate === undefined ? '2000-01-01' : db.earliestDate,
             total: rows.length,
             page,
             perPage,
@@ -351,13 +360,13 @@ const server = createServer(async (req, res) => {
       '.png': 'image/png',
       '.webmanifest': 'application/manifest+json'
     }
+    let data = readFileSync(file)
+    if (relative === 'sw.js')
+      data = Buffer.concat([data, Buffer.from(`\n// local fixture version ${version}\n`)])
     res.writeHead(200, {
       'Content-Type': types[extname(file)] || 'application/octet-stream',
       'Cache-Control': 'no-store'
     })
-    let data = readFileSync(file)
-    if (relative === 'sw.js')
-      data = Buffer.concat([data, Buffer.from(`\n// local fixture version ${version}\n`)])
     res.end(data)
   } catch (error) {
     json(res, { error: error.message }, 500)

@@ -65,7 +65,6 @@
         v-model="newName"
         label="New tag name"
         density="compact"
-        hide-details
         enterkeyhint="done"
         :disabled="busy"
       />
@@ -93,6 +92,7 @@
   </AppConfirmDialog>
 </template>
 <script setup lang="ts">
+import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 import { onUnmounted, ref, watch } from 'vue'
 import { mdiCheck, mdiDeleteOutline, mdiDragVertical } from '@mdi/js'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -142,8 +142,8 @@ useUnsavedChanges(
 )
 function valid(value: string, exceptId?: string) {
   const clean = value.trim().normalize('NFC')
-  if (Array.from(clean).length < 1 || Array.from(clean).length > 20)
-    throw new Error('Tag names must contain 1–20 characters.')
+  if (!validCatalogName(clean, 20))
+    throw new Error(`Tag names must contain 1–20 characters. ${catalogNameHint}`)
   if (tags.value.some(tag => tag.id !== exceptId && tag.name.toLowerCase() === clean.toLowerCase()))
     throw new Error('A tag with that name already exists.')
   return clean

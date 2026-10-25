@@ -11,12 +11,21 @@ import {
   fromDateInput,
   parseDateOnly,
   formatDate,
-  formatDateOnly
+  formatDateOnly,
+  formatPeriodLabel
 } from './date'
 import { setFirstDayOfWeek } from './preferences'
 
 const localYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+it('uses shared period labels with full month and year and an en dash', () => {
+  expect(formatPeriodLabel('month', '2026-10-01')).toBe('October 2026')
+  expect(formatPeriodLabel('year', '2026-01-01')).toBe('2026')
+  expect(formatPeriodLabel('day', '2026-10-24')).toBe('Oct 24, 2026')
+  expect(formatPeriodLabel('week', '2026-10-19', '2026-10-25')).toBe('Oct 19 – Oct 25, 2026')
+  expect(formatPeriodLabel('week', '2025-12-29', '2026-01-04')).toBe('Dec 29, 2025 – Jan 4, 2026')
+})
 
 // Stored dates are UTC midnights. The suite runs in the machine's timezone
 // (America/Lima, UTC-5 in CI/dev), where reading a UTC midnight with local

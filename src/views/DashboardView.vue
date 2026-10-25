@@ -97,8 +97,9 @@
               <AppPeriodNavigation
                 :label="periodLabel"
                 :can-go-forward="periodOffset < 0"
+                :can-go-back="canGoBack"
                 class="dashboard-period-navigation"
-                @previous="periodOffset--"
+                @previous="canGoBack && periodOffset--"
                 @next="periodOffset < 0 && periodOffset++"
               />
             </div>
@@ -257,7 +258,7 @@
       <!-- BUDGETS AT A GLANCE -->
       <v-row>
         <v-col cols="12">
-          <AppCard title="Budget Summary" class="overflow-hidden">
+          <AppCard title="Budget Summary" keep-actions-inline class="overflow-hidden">
             <template #header-actions>
               <AppButton
                 variant="text"
@@ -285,8 +286,8 @@
               />
               <div v-else class="d-flex flex-column ga-5">
                 <div v-for="b in summaryBudgets" :key="b.id">
-                  <div class="d-flex align-center justify-space-between mb-1">
-                    <div class="d-flex align-center">
+                  <div class="budget-summary-row mb-1">
+                    <div class="budget-summary-label">
                       <span class="text-body-2 font-weight-medium"
                         >{{ b.category.name
                         }}<span
@@ -294,14 +295,17 @@
                           class="text-caption text-medium-emphasis"
                         >
                           · {{ b.account?.name || 'Main' }}</span
+                        ><span class="text-caption text-medium-emphasis">
+                          · {{ b.period === 'WEEK' ? 'Weekly' : 'Monthly' }}</span
                         ></span
                       >
                       <span
-                        class="text-caption ml-2"
+                        class="text-caption"
                         :class="
                           b.overBudget ? 'text-error font-weight-medium' : 'text-on-surface-variant'
                         "
                       >
+                        ·
                         <template v-if="b.overBudget"
                           >Over by
                           {{
@@ -316,9 +320,9 @@
                         >
                       </span>
                     </div>
-                    <span class="text-caption text-on-surface-variant">
-                      {{ hideBalances ? '****' : cs + formatMoney(b.spent) }} /
-                      {{ hideBalances ? '****' : cs + formatMoney(b.amount) }}
+                    <span class="budget-summary-amount text-caption text-on-surface-variant">
+                      <span>{{ hideBalances ? '****' : cs + formatMoney(b.spent) }} /</span>
+                      <span>{{ hideBalances ? '****' : cs + formatMoney(b.amount) }}</span>
                     </span>
                   </div>
                   <v-progress-linear
@@ -348,6 +352,7 @@ import { useRoute, useRouter } from 'vue-router'
 import QuickActions from '@/components/QuickActions.vue'
 import { watch } from 'vue'
 import { useAccounts } from '@/composables/useAccounts'
+import { useDashboardAccount } from '@/composables/useDashboardAccount'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import AppIconButton from '@/components/ui/AppIconButton.vue'
 
@@ -371,7 +376,7 @@ import { fetchJson } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { BudgetsResponse, DashboardResponse } from '@/types'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
-import { todayInput, parseDateOnly, toDateOnly, startOfWeek, formatDateOnly } from '@/utils/date'
+import { todayInput, parseDateOnly, toDateOnly, startOfWeek, formatPeriodLabel } from '@/utils/date'
 import { getDefaultPeriod, getFirstDayOfWeek } from '@/utils/preferences'
 import { themeColors } from '@/utils/color'
 import { useTheme } from 'vuetify'
@@ -407,19 +412,35 @@ const EMPTY_DASHBOARD: DashboardResponse = {
 
 const route = useRoute(),
   router = useRouter()
-const { activeAccounts, run: fetchAccounts } = useAccounts()
+const {
+  activeAccounts,
+  hasLoaded: accountsLoaded,
+  loading: accountsLoading,
+  error: accountsError,
+  run: fetchAccounts
+} = useAccounts()
 const balanceOptions = computed(() => [{ id: 'global', name: 'Total' }, ...activeAccounts.value])
-const selectedAccountId = computed({
-  get: () =>
-    typeof route.query.accountId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(route.query.accountId)
-      ? route.query.accountId
-      : 'global',
-  set: (value: string) => {
-    const query = { ...route.query }
-    if (value === 'global') delete query.accountId
-    else query.accountId = value
-    void router.push({ query })
-  }
+const selectedAccountId = useDashboardAccount()
+watch(
+  () => route.query.accountId,
+  value => {
+    if (route.name === 'dashboard' && value !== undefined) {
+      const query = { ...route.query }
+      delete query.accountId
+      void router.replace({ query })
+    }
+  },
+  { immediate: true }
+)
+watch([activeAccounts, accountsLoaded, accountsLoading], ([accounts, loaded, loading]) => {
+  if (
+    loaded &&
+    !loading &&
+    !accountsError.value &&
+    selectedAccountId.value !== 'global' &&
+    !accounts.some(account => account.id === selectedAccountId.value)
+  )
+    selectedAccountId.value = 'global'
 })
 const accountQuery = () =>
   selectedAccountId.value === 'global'
@@ -457,15 +478,9 @@ const periodRange = computed(() => {
   }
   return { from: toDateOnly(from), to: toDateOnly(to) }
 })
-const periodLabel = computed(() => {
-  const { from, to } = periodRange.value
-  if (dashboardPeriod.value === 'year') return from.slice(0, 4)
-  if (dashboardPeriod.value === 'month')
-    return formatDateOnly(from, { month: 'short', year: 'numeric' })
-  if (dashboardPeriod.value === 'day')
-    return formatDateOnly(from, { month: 'short', day: 'numeric', year: 'numeric' })
-  return `${formatDateOnly(from, { month: 'short', day: 'numeric' })} – ${formatDateOnly(to, { month: 'short', day: 'numeric', year: 'numeric' })}`
-})
+const periodLabel = computed(() =>
+  formatPeriodLabel(dashboardPeriod.value, periodRange.value.from, periodRange.value.to)
+)
 const dashboardUrl = () =>
   `/dashboard?from=${periodRange.value.from}&to=${periodRange.value.to}${accountQuery()}`
 const {
@@ -477,6 +492,9 @@ const {
   signal => fetchJson<DashboardResponse>(dashboardUrl(), { signal }),
   EMPTY_DASHBOARD,
   { cacheKey: dashboardUrl }
+)
+const canGoBack = computed(
+  () => !loading.value && !!db.value.earliestDate && periodRange.value.from > db.value.earliestDate
 )
 
 let hidden = false
@@ -581,6 +599,25 @@ onMounted(loadDashboard)
 </script>
 
 <style scoped>
+.budget-summary-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.budget-summary-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.budget-summary-amount {
+  display: flex;
+  justify-content: flex-end;
+  column-gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+  white-space: nowrap;
+  text-align: right;
+}
 .balance-period-row {
   display: flex;
   width: 100%;
@@ -591,6 +628,8 @@ onMounted(loadDashboard)
 .balance-period-row > h1 {
   min-width: 0;
   overflow-wrap: anywhere;
+  font-size: clamp(18px, 5vw, 32px);
+  line-height: 1.25;
 }
 .dashboard-period-navigation {
   flex: 0 0 auto;
@@ -647,9 +686,6 @@ onMounted(loadDashboard)
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
 @media (max-width: 599px) {
-  .dashboard-period-navigation {
-    gap: 0;
-  }
   .recent-transaction-item {
     padding-inline: 8px !important;
   }
@@ -660,6 +696,22 @@ onMounted(loadDashboard)
   .dashboard-kpis > .v-col {
     padding-left: 4px;
     padding-right: 4px;
+  }
+}
+@media (max-width: 480px) {
+  .balance-period-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .balance-period-row > h1 {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    flex-shrink: 0;
+  }
+  .budget-summary-amount {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+    max-width: min(30%, 88px);
   }
 }
 </style>

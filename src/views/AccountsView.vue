@@ -25,7 +25,7 @@
             <div class="d-flex align-center justify-space-between ga-2">
               <div class="account-summary">
                 <div class="d-flex align-center ga-2">
-                  <p class="text-subtitle-2">{{ account.name }}</p>
+                  <p class="text-subtitle-2 font-weight-bold">{{ account.name }}</p>
                   <span v-if="account.archived" class="text-caption text-medium-emphasis"
                     >Archived</span
                   >

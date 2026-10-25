@@ -8,7 +8,7 @@
     :type="type"
     v-bind="$attrs"
   >
-    <v-icon :icon="icon"></v-icon>
+    <v-icon :icon="icon" :size="iconSize"></v-icon>
   </v-btn>
 </template>
 
@@ -16,6 +16,7 @@
 withDefaults(
   defineProps<{
     icon: string
+    iconSize?: string | number
     label: string
     size?: string | number
     variant?: 'flat' | 'text' | 'outlined' | 'tonal' | 'plain' | 'elevated'
@@ -23,6 +24,7 @@ withDefaults(
   }>(),
   {
     size: 'small',
+    iconSize: undefined,
     variant: 'text',
     type: 'button'
   }

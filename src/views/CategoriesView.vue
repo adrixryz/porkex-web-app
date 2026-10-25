@@ -148,6 +148,7 @@
       <v-form @submit.prevent="submitCat">
         <AppTextField
           v-model="catForm.name"
+          :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
           label="Name"
           maxlength="60"
           class="mb-2"
@@ -258,6 +259,7 @@
 </template>
 
 <script setup lang="ts">
+import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 import { transactionTypeOptions } from '@/utils/transactionTypes'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
@@ -428,7 +430,7 @@ const submitCat = async () => {
       method,
       body: JSON.stringify({
         ...catForm.value,
-        name: catForm.value.name.trim(),
+        name: catForm.value.name.trim().normalize('NFC'),
         ...(!isEditing.value ? { clientId: clientId.value } : {})
       })
     })

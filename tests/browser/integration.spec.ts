@@ -745,10 +745,10 @@ test('real API integrates tags, optional comments, undo, next-only edits and com
     .toBe('2090-01-02T00:00:00.000Z')
   await page.goto('/analytics')
   const comparison = page.getByRole('region', { name: 'Category Comparison', exact: true })
-  await comparison.locator('.comparison-selector').click()
-  await page.getByRole('option', { name: 'Year vs year', exact: true }).click()
+  await comparison.locator('.comparison-selector').filter({ hasText: 'Period' }).click()
+  await page.getByRole('option', { name: 'By Year', exact: true }).click()
   await expect(
-    comparison.getByRole('columnheader', { name: 'This year', exact: true })
+    comparison.getByRole('columnheader', { name: 'This Year', exact: true })
   ).toBeVisible()
   await expect(comparison.getByText('Food', { exact: true })).toBeVisible()
   await expect(page.getByText('Period comparison', { exact: true })).toHaveCount(0)
@@ -845,7 +845,12 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
   await page.goto('/')
   await page.locator('.balance-select').click()
   await page.getByRole('option', { name: 'Cash', exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`accountId=${cash.id}`))
+  await expect(page).toHaveURL('http://localhost:4178/')
+  await expect
+    .poll(() =>
+      page.evaluate(id => localStorage.getItem(`porkex_dashboard_account_${id}`), user.id)
+    )
+    .toBe(cash.id)
   await expect(page.locator('h1')).toHaveText('$70.00')
   await page.getByRole('button', { name: 'Hide balances', exact: true }).click()
   await expect(page.getByText('****', { exact: true })).toHaveCount(5)

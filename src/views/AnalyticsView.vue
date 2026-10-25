@@ -117,7 +117,7 @@
                 hide-spin-buttons
                 :min="MIN_MONTHS"
                 :max="MAX_MONTHS"
-                style="max-width: 132px"
+                class="analytics-range-input"
                 @change="applyMonths"
                 @keydown.enter="applyMonths"
               >
@@ -153,7 +153,7 @@
                 hide-spin-buttons
                 :min="MIN_TREND_DAYS"
                 :max="MAX_TREND_DAYS"
-                style="max-width: 120px"
+                class="analytics-range-input"
                 @change="applyDays"
                 @keydown.enter="applyDays"
               >
@@ -175,45 +175,8 @@
         </v-col>
       </v-row>
 
-      <!-- TOP CATEGORIES + CATEGORY COMPARISON -->
       <v-row>
-        <v-col cols="12" md="5">
-          <AppCard
-            title="Monthly Expense Breakdown"
-            title-class="font-weight-bold"
-            class="fill-height analytics-spending-card"
-          >
-            <AppCardBody>
-              <div v-if="!topCategories.length" class="text-center text-on-surface-variant py-8">
-                <v-icon :icon="mdiChartPie" size="40" class="mb-2 opacity-50"></v-icon>
-                <p>No expenses recorded this month</p>
-              </div>
-              <div v-for="c in topCategories" :key="c.name" class="mb-4">
-                <div class="d-flex align-center justify-space-between mb-1">
-                  <div class="d-flex align-center">
-                    <div
-                      class="rounded-circle mr-2"
-                      :style="`width: 10px; height: 10px; background-color: ${c.color}`"
-                    ></div>
-                    <span class="text-body-2 font-weight-medium text-on-surface">{{ c.name }}</span>
-                  </div>
-                  <span class="text-body-2 text-on-surface-variant">
-                    {{ cs }}{{ formatMoney(c.value) }} · {{ c.percent }}%
-                  </span>
-                </div>
-                <v-progress-linear
-                  :model-value="c.percent"
-                  color="primary"
-                  bg-color="surface-bright"
-                  height="6"
-                  rounded
-                ></v-progress-linear>
-              </div>
-            </AppCardBody>
-          </AppCard>
-        </v-col>
-
-        <v-col cols="12" md="7">
+        <v-col cols="12">
           <CategoryComparison />
         </v-col>
       </v-row>
@@ -252,10 +215,11 @@ import { useRoute, useRouter } from 'vue-router'
 import type { AnalyticsResponse } from '@/types'
 import { currencySymbol, formatMoney, useCurrencySymbol } from '@/utils/currency'
 import { themeColors } from '@/utils/color'
+import { BAR_CORNER_RADIUS } from '@/utils/chartStyle'
 import { useTheme } from 'vuetify'
-import { mdiChartPie, mdiTrendingDown, mdiTrendingUp } from '@mdi/js'
+import { mdiTrendingDown, mdiTrendingUp } from '@mdi/js'
 import { todayInput } from '@/utils/date'
-import type { ChartData } from 'chart.js'
+import type { ChartData, TooltipItem, LegendItem } from 'chart.js'
 
 ChartJS.register(
   BarController,
@@ -277,6 +241,13 @@ const theme = useTheme()
 const colors = computed(() =>
   themeColors((name: string) => theme.themes.value.dark?.colors?.[name])
 )
+const expenseHoverColor = computed(() => {
+  const hex = colors.value.error
+  if (!/^#[\da-f]{6}$/i.test(hex)) return hex
+  const rgb = Number.parseInt(hex.slice(1), 16)
+  const channels = [16, 8, 0].map(shift => Math.round(((rgb >> shift) & 255) * 0.9))
+  return `rgb(${channels.join(', ')})`
+})
 const cs = useCurrencySymbol()
 const { showSnack } = useSnackbar()
 
@@ -364,35 +335,50 @@ const AVG_LINE_COLOR = '#ffeb3b'
 // Three bars per month: income, expenses and the net result (income − expense,
 // negative months included). Profit reads blue, an overspent month reads
 // orange; the yellow line is the 3-month moving average of expenses.
-const barChartData = computed<ChartData<'bar' | 'line', number[]>>(() => ({
+const barChartData = computed<ChartData<'bar' | 'line', (number | null)[]>>(() => ({
   labels: monthlyData.value.map(d => d.month),
   datasets: [
     {
       label: 'Income',
       type: 'bar' as const,
+      order: 1,
+      skipNull: true,
       backgroundColor: colors.value.success,
-      borderRadius: 8,
+      borderRadius: BAR_CORNER_RADIUS,
       data: monthlyData.value.map(d => d.income)
     },
     {
       label: 'Expenses',
       type: 'bar' as const,
+      order: 1,
+      skipNull: true,
       backgroundColor: colors.value.error,
-      borderRadius: 8,
+      hoverBackgroundColor: expenseHoverColor.value,
+      borderRadius: BAR_CORNER_RADIUS,
       data: monthlyData.value.map(d => d.expense)
     },
     {
-      label: 'Profit/Loss',
+      label: 'Profit',
       type: 'bar' as const,
-      backgroundColor: monthlyData.value.map(d =>
-        d.net >= 0 ? colors.value.primary : colors.value.warning
-      ),
-      borderRadius: 8,
-      data: monthlyData.value.map(d => d.net)
+      order: 1,
+      skipNull: true,
+      backgroundColor: colors.value.primary,
+      borderRadius: BAR_CORNER_RADIUS,
+      data: monthlyData.value.map(d => (d.net >= 0 ? d.net : null))
+    },
+    {
+      label: 'Loss',
+      type: 'bar' as const,
+      order: 1,
+      skipNull: true,
+      backgroundColor: colors.value.warning,
+      borderRadius: BAR_CORNER_RADIUS,
+      data: monthlyData.value.map(d => (d.net < 0 ? d.net : null))
     },
     {
       label: '3-month avg expense',
       type: 'line' as const,
+      order: 0,
       borderColor: AVG_LINE_COLOR,
       backgroundColor: 'transparent',
       borderWidth: 2,
@@ -411,9 +397,20 @@ const barOptions = {
   plugins: {
     legend: {
       position: 'top' as const,
-      labels: { color: colors.value.muted, usePointStyle: true, pointStyle: 'circle', padding: 20 }
+      labels: {
+        color: colors.value.muted,
+        usePointStyle: true,
+        pointStyle: 'circle',
+        padding: 20,
+        sort: (a: LegendItem, b: LegendItem) => (a.datasetIndex ?? 0) - (b.datasetIndex ?? 0)
+      }
     },
-    tooltip: moneyTooltip
+    tooltip: {
+      ...moneyTooltip,
+      itemSort: (a: TooltipItem<'bar' | 'line'>, b: TooltipItem<'bar' | 'line'>) =>
+        a.datasetIndex - b.datasetIndex,
+      filter: (item: TooltipItem<'bar' | 'line'>) => item.raw !== null
+    }
   },
   scales: {
     x: {
@@ -551,6 +548,10 @@ onMounted(restoreRange)
 </script>
 
 <style scoped>
+.analytics-range-input {
+  flex: 0 1 104px;
+  max-width: 104px;
+}
 .analytics-insights :deep(.stat-card-content) {
   width: 100%;
   overflow-wrap: anywhere;

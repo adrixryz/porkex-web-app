@@ -149,7 +149,7 @@
                 :append-inner-icon="showPassword ? mdiEyeOff : mdiEye"
                 @click:append-inner="showPassword = !showPassword"
                 hide-details
-                class="mb-2"
+                class="mb-4"
               ></AppTextField>
               <AppTextField
                 v-model="newPassword"
@@ -160,7 +160,7 @@
                 :append-inner-icon="showNewPassword ? mdiEyeOff : mdiEye"
                 @click:append-inner="showNewPassword = !showNewPassword"
                 hide-details
-                class="mb-2"
+                class="mb-4"
               ></AppTextField>
               <AppTextField
                 v-model="confirmPassword"
@@ -172,7 +172,7 @@
                 @click:append-inner="showConfirmPassword = !showConfirmPassword"
                 :error="confirmMismatch"
                 :error-messages="confirmMismatch ? 'Passwords do not match' : ''"
-                :hide-details="false"
+                hide-details="auto"
                 class="mb-2"
               ></AppTextField>
               <AppButton

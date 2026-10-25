@@ -37,15 +37,9 @@
 
       <v-row class="mb-4">
         <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
-          <AppSelect
+          <AccountFilter
             v-model="accountFilter"
-            :items="accountOptions"
-            item-title="name"
-            item-value="id"
-            label="Account"
-            density="comfortable"
-            clearable
-            hide-details
+            :accounts="accounts"
             class="budget-account-filter"
           />
 
@@ -319,6 +313,7 @@ import AppPage from '@/components/ui/AppPage.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 
 import AppSelect from '@/components/ui/AppSelect.vue'
+import AccountFilter from '@/components/AccountFilter.vue'
 
 import AppStatCard from '@/components/ui/AppStatCard.vue'
 
@@ -359,14 +354,6 @@ const accountFilter = computed({
     void router.push({ query })
   }
 })
-
-const accountOptions = computed(() =>
-  accounts.value.map(account => ({
-    ...account,
-
-    name: account.archived ? `${account.name} (Archived)` : account.name
-  }))
-)
 
 const selectedAccountArchived = computed(() =>
   accounts.value.some(account => account.id === accountFilter.value && account.archived)
@@ -701,11 +688,5 @@ onMounted(() => void fetchAccounts())
 <style scoped>
 .cursor-pointer {
   cursor: pointer;
-}
-
-.budget-account-filter {
-  max-width: 260px;
-
-  min-width: 180px;
 }
 </style>

@@ -5,6 +5,14 @@
 
     <template v-else>
       <AppPageHeader title="Analytics" subtitle="Track your financial trends and patterns" />
+      <div class="d-flex mb-4">
+        <AccountFilter
+          v-model="accountFilter"
+          :accounts="accounts"
+          class="analytics-account-filter"
+        />
+      </div>
+      <v-alert v-if="accountsError" type="error" class="mb-4">{{ accountsError }}</v-alert>
 
       <!-- INSIGHT CARDS -->
       <v-row class="mb-6 analytics-insights">
@@ -157,6 +165,8 @@
 
 <script setup lang="ts">
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
+import AccountFilter from '@/components/AccountFilter.vue'
+import { useAccounts } from '@/composables/useAccounts'
 import CategoryComparison from '@/components/CategoryComparison.vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
@@ -208,6 +218,18 @@ ChartJS.register(
 
 const route = useRoute()
 const router = useRouter()
+const { accounts, run: fetchAccounts, error: accountsError } = useAccounts()
+const accountFilter = computed({
+  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : null),
+  set: (value: string | null) => {
+    const query = { ...route.query }
+    if (value) query.accountId = value
+    else delete query.accountId
+    void router.push({ query })
+  }
+})
+const accountQuery = () =>
+  accountFilter.value ? `&accountId=${encodeURIComponent(accountFilter.value)}` : ''
 const theme = useTheme()
 // Charts read their palette from the theme instead of hardcoding hexes.
 const colors = computed(() =>
@@ -254,7 +276,7 @@ const EMPTY_ANALYTICS: AnalyticsResponse = {
 // own calendar day: the backend does the math in UTC but starts from this day,
 // so a device west of UTC no longer rolls over in the middle of the evening.
 const analyticsUrl = () =>
-  `/analytics?months=${months.value}&days=${trendDays.value}&today=${todayInput()}`
+  `/analytics?months=${months.value}&days=${trendDays.value}&today=${todayInput()}${accountQuery()}`
 
 const {
   data: analytics,
@@ -268,7 +290,7 @@ const {
   // The range lives in the URL, so each combination is its own cache entry.
   // `today` is only in the request, not the cache key: yesterday's numbers are
   // still worth showing offline, and they show under the stale banner.
-  { cacheKey: () => `/analytics?months=${months.value}&days=${trendDays.value}` }
+  { cacheKey: () => `/analytics?months=${months.value}&days=${trendDays.value}${accountQuery()}` }
 )
 
 const monthlyData = computed(() => analytics.value.monthlyData)
@@ -514,10 +536,11 @@ async function restoreRange() {
   hydrating = false
   await loadAnalytics()
 }
-watch([() => route.query.months, () => route.query.days], () => {
+watch([() => route.query.months, () => route.query.days, () => route.query.accountId], () => {
   if (!hydrating) void restoreRange()
 })
 onMounted(restoreRange)
+onMounted(() => void fetchAccounts())
 </script>
 
 <style scoped>

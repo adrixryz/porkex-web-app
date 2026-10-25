@@ -194,7 +194,7 @@ const periodOptions = [
   { title: 'By Year', value: 'year' }
 ]
 const key = () =>
-  `/analytics/category-comparison?mode=${mode.value}&type=${type.value}&weekStart=${getFirstDayOfWeek()}&anchor=${toDateInput(anchor.value)}`
+  `/analytics/category-comparison?mode=${mode.value}&type=${type.value}&weekStart=${getFirstDayOfWeek()}&anchor=${toDateInput(anchor.value)}${typeof route.query.accountId === 'string' ? `&accountId=${encodeURIComponent(route.query.accountId)}` : ''}`
 const { data, loading, error, run } = useAsyncData<Comparison>(
   signal => fetchJson(`${key()}&today=${todayInput()}`, { signal }),
   { cacheKey: () => `full-previous:${key()}` }

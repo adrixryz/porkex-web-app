@@ -6,7 +6,7 @@ Built with Vue 3, TypeScript and Vuetify. The API is maintained in [porkex-backe
 
 ## Run locally
 
-Use Node 24.11+ within the 24 series or Node 26+, and start the backend on port 3000 first.
+Use Node 26.12.1 (see `.node-version`), or a compatible patched Node 24.22.1+, and start the backend on port 3000 first.
 
 ```bash
 npm ci

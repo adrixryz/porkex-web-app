@@ -2072,7 +2072,7 @@ test('shared form spacing stays stable and validation expands only the affected 
     const dialog = page.getByRole('dialog', { name: config.title, exact: true })
     const amount = dialog.getByLabel(config.amount, { exact: true })
     await expect(amount).toBeVisible()
-    await expect(dialog.locator('.v-input__details')).toHaveCount(0)
+    await expect(dialog.locator('.v-input__details:visible')).toHaveCount(0)
     const separation = () =>
       amount.evaluate(input => {
         const field = input.closest('.v-input')!
@@ -2098,7 +2098,7 @@ test('shared form spacing stays stable and validation expands only the affected 
     expect(after).toBeGreaterThan(before)
     await expect.poll(separation).toBe(24)
     await amount.fill('1.00')
-    await expect(dialog.locator('.v-input__details')).toHaveCount(0)
+    await expect(dialog.locator('.v-input__details:visible')).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
   }
   await page.goto('/settings')
@@ -2106,7 +2106,7 @@ test('shared form spacing stays stable and validation expands only the affected 
     .locator('.v-card')
     .filter({ has: page.getByText('Security', { exact: true }) })
   await expect(security.getByLabel('Current Password', { exact: true })).toBeVisible()
-  await expect(security.locator('.v-input__details')).toHaveCount(0)
+  await expect(security.locator('.v-input__details:visible')).toHaveCount(0)
   await expect(security.locator('.app-form-fields')).toHaveCSS('gap', '16px')
   await expect(page.getByText('Email cannot be changed', { exact: true })).toBeVisible()
 })

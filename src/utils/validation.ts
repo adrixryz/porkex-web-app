@@ -42,6 +42,11 @@ export function mutationError(path: string, method: string, body: string | null)
       return 'Enter valid details.'
     if (path.startsWith('/accounts')) {
       if (
+        payload.excludeFromTotalBalance !== undefined &&
+        typeof payload.excludeFromTotalBalance !== 'boolean'
+      )
+        return 'Choose a valid total balance setting.'
+      if (
         payload.balance !== undefined &&
         (method !== 'PUT' ||
           payload.openingBalance !== undefined ||

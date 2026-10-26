@@ -66,6 +66,16 @@ beforeEach(() => {
   vi.mocked(fetchJson).mockReset()
 })
 
+it('retains account Total exclusion across pending edits without changing its balance', async () => {
+  vi.mocked(fetchJson).mockResolvedValue([account('cash', 50)])
+  const { query } = consumer()
+  await query.run()
+  pending('PUT', { excludeFromTotalBalance: true }, '/accounts/cash')
+  expect(query.accounts.value[0]).toMatchObject({ excludeFromTotalBalance: true, balance: 50 })
+  pending('PUT', { excludeFromTotalBalance: false }, '/accounts/cash')
+  expect(query.accounts.value[0]).toMatchObject({ excludeFromTotalBalance: false, balance: 50 })
+})
+
 it('projects scheduled transfer removal immediately, reverses Undo and never doubles the outbox handoff', async () => {
   vi.mocked(fetchJson).mockResolvedValue([account('cash', 50), account('bank', 100)])
   const { query } = consumer()

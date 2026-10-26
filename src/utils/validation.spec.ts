@@ -5,6 +5,16 @@ import { installTestLocks } from './locks.test-helper'
 
 afterEach(() => vi.unstubAllGlobals())
 describe('local mutation validation', () => {
+  it.each([null, 1, 'true'])('rejects nonboolean account Total exclusion %s', value => {
+    expect(
+      mutationError('/accounts/cash', 'PUT', JSON.stringify({ excludeFromTotalBalance: value }))
+    ).toContain('total balance setting')
+  })
+  it.each([true, false])('accepts boolean account Total exclusion %s', value => {
+    expect(
+      mutationError('/accounts/cash', 'PUT', JSON.stringify({ excludeFromTotalBalance: value }))
+    ).toBeNull()
+  })
   it.each([0, -1, true, [], '1.001', '10000000.01', Infinity, '1e2'])(
     'rejects invalid money %s',
     value => {

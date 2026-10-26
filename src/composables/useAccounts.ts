@@ -101,6 +101,7 @@ export function useAccounts(options: { includeGoals?: boolean } = {}) {
             isMain: false,
             isGoal,
             archived: false,
+            excludeFromTotalBalance: body.excludeFromTotalBalance === true,
             openingBalance: isGoal ? 0 : Number(body.openingBalance || 0),
             balance: isGoal ? 0 : Number(body.openingBalance || 0),
             targetAmount: isGoal ? Number(body.targetAmount) : null
@@ -109,6 +110,8 @@ export function useAccounts(options: { includeGoals?: boolean } = {}) {
           const row = rows.get(id)
           if (!row) continue
           if (typeof body.name === 'string') row.name = body.name
+          if (typeof body.excludeFromTotalBalance === 'boolean')
+            row.excludeFromTotalBalance = body.excludeFromTotalBalance
           if (typeof body.archived === 'boolean') {
             row.archived = body.archived
             row.pendingArchive = body.archived ? 'archive' : 'restore'

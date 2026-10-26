@@ -24,6 +24,7 @@
           :min="0"
           :unchanged-value="account ? originalBalance : undefined"
         />
+        <AppSwitch v-model="form.excludeFromTotalBalance" label="Do not include in total balance" />
         <v-alert v-if="error" type="error">{{ error }}</v-alert>
         <AppButton
           type="submit"
@@ -53,9 +54,10 @@ import { useAccounts } from '@/composables/useAccounts'
 import AppDialog from './ui/AppDialog.vue'
 import AppTextField from './ui/AppTextField.vue'
 import AppButton from './ui/AppButton.vue'
+import AppSwitch from './ui/AppSwitch.vue'
 const props = defineProps<{ modelValue: boolean; account?: Account | null }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
-const form = ref({ name: '', openingBalance: '0' }),
+const form = ref({ name: '', openingBalance: '0', excludeFromTotalBalance: false }),
   clean = ref(''),
   busy = ref(false),
   error = ref('')
@@ -93,6 +95,7 @@ watch(
       editStamp = createEditStamp()
       form.value = {
         name: props.account?.name ?? '',
+        excludeFromTotalBalance: props.account?.excludeFromTotalBalance ?? false,
         openingBalance: String(props.account?.balance ?? 0)
       }
       clean.value = JSON.stringify(form.value)
@@ -119,6 +122,7 @@ async function save() {
       method: props.account ? 'PUT' : 'POST',
       body: JSON.stringify({
         name: form.value.name,
+        excludeFromTotalBalance: form.value.excludeFromTotalBalance,
         ...(props.account
           ? balanceUnchanged.value
             ? {}

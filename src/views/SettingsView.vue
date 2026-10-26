@@ -58,7 +58,7 @@
           </AppCard>
 
           <!-- PREFERENCES -->
-          <AppCard class="mb-4" title="Preferences">
+          <AppCard class="mb-4 preferences-card" title="Preferences">
             <AppCardBody>
               <AppFormFields>
                 <AppSelect
@@ -101,25 +101,30 @@
 
           <!-- BACKUP -->
           <AppCard title="Backup" class="mb-4">
-            <AppCardBody>
-              <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
-                Import or export your complete transaction history as CSV.
-              </p>
-              <div class="d-flex flex-wrap ga-3">
-                <AppActionButton
-                  :icon="mdiUpload"
-                  :disabled="isOffline || exportingCsv"
-                  @click="csvImportOpen = true"
-                  >Import CSV</AppActionButton
-                >
-                <AppActionButton
-                  :icon="mdiDownload"
-                  :loading="exportingCsv"
-                  :disabled="isOffline || exportingCsv"
-                  @click="csvExportOpen = true"
-                  >Export CSV</AppActionButton
-                >
-              </div>
+            <AppCardBody class="d-flex flex-column ga-4">
+              <AppCard title="All Transactions">
+                <AppCardBody>
+                  <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
+                    Import or export your complete transaction history as CSV.
+                  </p>
+                  <div class="d-flex flex-wrap ga-3">
+                    <AppActionButton
+                      :icon="mdiUpload"
+                      :disabled="isOffline || exportingCsv"
+                      @click="csvImportOpen = true"
+                      >Import CSV</AppActionButton
+                    >
+                    <AppActionButton
+                      :icon="mdiDownload"
+                      :loading="exportingCsv"
+                      :disabled="isOffline || exportingCsv"
+                      @click="csvExportOpen = true"
+                      >Export CSV</AppActionButton
+                    >
+                  </div>
+                </AppCardBody>
+              </AppCard>
+              <FullDataBackup @restored="onFullRestore" />
             </AppCardBody>
           </AppCard>
 
@@ -248,6 +253,7 @@ import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import MovementCsvImportDialog from '@/components/MovementCsvImportDialog.vue'
 import MovementCsvExportDialog from '@/components/MovementCsvExportDialog.vue'
+import FullDataBackup from '@/components/FullDataBackup.vue'
 import AppActionButton from '@/components/ui/AppActionButton.vue'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
 import { isOffline } from '@/utils/connection'
@@ -408,6 +414,13 @@ function applyProfile(data: Profile) {
 const loadProfile = async () => {
   const data = await fetchProfile()
   if (!data && profileError.value) showSnack(profileError.value, 'error')
+}
+async function onFullRestore() {
+  currentPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  await loadProfile()
+  if (profile.value.id) applyProfile(profile.value)
 }
 
 // Background refresh must not replace an unfinished edit or an offline choice.

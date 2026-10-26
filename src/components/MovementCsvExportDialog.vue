@@ -17,12 +17,7 @@
           : 'Export all transactions matching this selection?'
       }}
     </p>
-    <dl class="csv-export-summary text-left mb-4">
-      <div v-for="filter in selection?.filters ?? []" :key="filter.label">
-        <dt class="text-on-surface-variant">{{ filter.label }}</dt>
-        <dd class="text-on-surface font-weight-medium">{{ filter.value }}</dd>
-      </div>
-    </dl>
+    <AppExportSummary :entries="selection?.filters ?? []" class="mb-4" />
     <p class="ma-0 text-caption">
       Includes all pages, ordered oldest first. Pending local changes are not included.
     </p>
@@ -39,6 +34,7 @@
 import { ref, watch } from 'vue'
 import { mdiDownload } from '@mdi/js'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
+import AppExportSummary from '@/components/ui/AppExportSummary.vue'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useSnackbar } from '@/composables/useSnackbar'
 import { isOffline } from '@/utils/connection'
@@ -71,24 +67,3 @@ async function exportCsv() {
   }
 }
 </script>
-
-<style scoped>
-.csv-export-summary {
-  padding: 16px;
-  border: 1px solid rgb(var(--v-theme-outline-variant));
-  border-radius: 16px;
-  background: rgb(var(--v-theme-surface-variant));
-}
-.csv-export-summary > div {
-  display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 12px;
-}
-.csv-export-summary > div + div {
-  margin-top: 12px;
-}
-.csv-export-summary dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-</style>

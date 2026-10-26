@@ -446,10 +446,9 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
 export async function onlineApi(path: string, options: RequestInit = {}): Promise<Response> {
   const session = captureSession()
   const notSent = (message: string) => Object.assign(new Error(message), { notSent: true })
-  if (navigator.onLine === false)
-    throw notSent('Connect to the internet to import or export CSV files.')
+  if (navigator.onLine === false) throw notSent('Connect to the internet to transfer backup files.')
   if (!session.token || session.userId === null)
-    throw notSent('Sign in before transferring CSV files.')
+    throw notSent('Sign in before transferring backup files.')
   const confirmation = path === '/transactions/import' && options.method?.toUpperCase() === 'POST'
   const send = async () => {
     assertCurrent(session)
@@ -482,7 +481,7 @@ let synchronizing: Promise<void> | null = null
 
 /** Security actions bypass the offline queue, including blocked changes. */
 export async function securityApi(
-  path: '/password' | '/sessions/revoke',
+  path: '/password' | '/sessions/revoke' | '/backup/restore',
   body?: unknown
 ): Promise<Response> {
   const session = captureSession()
@@ -492,6 +491,12 @@ export async function securityApi(
   try {
     return await withSendLock(session.userId, async () => {
       assertCurrent(session)
+      if (path === '/backup/restore' && (pendingCount.value > 0 || hasLegacyOutbox()))
+        throw new Error('Resolve your pending changes before restoring all data.')
+      if (path === '/backup/restore') {
+        const { assertFullBackupReady } = await import('./fullBackup')
+        assertFullBackupReady(true)
+      }
       const rotationId = crypto.randomUUID()
       localStorage.setItem(
         ROTATION_KEY,
@@ -499,7 +504,7 @@ export async function securityApi(
           id: rotationId,
           userId: session.userId,
           claim: session.token?.split('.')[1] ?? session.token,
-          expires: Date.now() + WRITE_TIMEOUT_MS + 5_000
+          expires: Date.now() + (path === '/backup/restore' ? 180_000 : WRITE_TIMEOUT_MS) + 5_000
         })
       )
       try {
@@ -509,10 +514,14 @@ export async function securityApi(
             method: path === '/password' ? 'PUT' : 'POST',
             headers: requestHeaders(session),
             ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-            signal: withTimeout(undefined, WRITE_TIMEOUT_MS)
+            signal: withTimeout(undefined, path === '/backup/restore' ? 180_000 : WRITE_TIMEOUT_MS)
           })
         } catch {
-          throw new Error('Could not confirm the security change. Sign in again if necessary.')
+          throw new Error(
+            path === '/backup/restore'
+              ? 'Could not confirm the restore. Sign in again if necessary, then reopen Import JSON to check its receipt.'
+              : 'Could not confirm the security change. Sign in again if necessary.'
+          )
         }
         if (response.status === 401) localStorage.removeItem(ROTATION_KEY)
         handleResponse(response, session)

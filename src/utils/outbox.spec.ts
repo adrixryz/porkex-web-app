@@ -36,6 +36,44 @@ beforeEach(() => {
 })
 
 describe('durable account-owned queue', () => {
+  it('only an explicit retry prioritizes state-only account restores behind an archived-account rejection', async () => {
+    const error = 'Restore the archived account before changing its balance.'
+    await enqueue(item({ id: 'blocked', method: 'DELETE', path: '/transfers/old', body: '{}' }))
+    await flushOutbox(async () => new Response(JSON.stringify({ error }), { status: 409 }))
+    const restoreBody = JSON.stringify({
+      archived: false,
+      mutationId: 'restore-id',
+      editedAt: '2026-10-25T12:00:00Z'
+    })
+    await enqueue(
+      item({
+        id: 'unrelated',
+        method: 'PUT',
+        path: '/accounts/other',
+        body: JSON.stringify({ archived: false, name: 'Changed name' })
+      })
+    )
+    await enqueue(
+      item({
+        id: 'other-user',
+        userId: 2,
+        method: 'PUT',
+        path: '/accounts/other-user',
+        body: restoreBody
+      })
+    )
+    await enqueue(item({ id: 'restore', method: 'PUT', path: '/accounts/cash', body: restoreBody }))
+    const send = vi.fn(async (_mutation: QueuedMutation) => response())
+    await flushOutbox(send)
+    expect(send).not.toHaveBeenCalled()
+    await retryFirstBlocked()
+    expect(ownedPending(1).map(value => value.id)).toEqual(['restore', 'blocked', 'unrelated'])
+    expect(ownedPending(1)[0]!.body).toBe(restoreBody)
+    await flushOutbox(send)
+    expect(send.mock.calls.map(([value]) => value.id)).toEqual(['restore', 'blocked', 'unrelated'])
+    expect(ownedPending(2).map(value => value.id)).toEqual(['other-user'])
+  })
+
   it('persists ordered changes and ignores duplicate ids', async () => {
     await enqueue(item({ id: '1' }))
     await enqueue(item({ id: '2' }))

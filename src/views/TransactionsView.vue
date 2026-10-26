@@ -9,21 +9,18 @@
     <!-- LOADING SKELETON -->
     <AppPageSkeleton v-if="loading && !initialLoadComplete" page="transactions" />
     <template v-else>
-      <AppPageHeader class="transactions-header">
-        <template #title>
-          <div class="transactions-heading">
-            <h1 class="text-h4 font-weight-bold text-on-surface">Transactions</h1>
-            <AppSegmentedControl
-              :model-value="filterType"
-              label="Transaction type"
-              :items="[
-                { label: 'Expense', value: 'Expense' },
-                { label: 'Income', value: 'Income' }
-              ]"
-              class="transactions-type-toggle"
-              @update:model-value="filterType = $event === 'Income' ? 'Income' : 'Expense'"
-            />
-          </div>
+      <AppPageHeader title="Transactions" subtitle="Review your income and expenses.">
+        <template #actions>
+          <AppSegmentedControl
+            :model-value="filterType"
+            label="Transaction type"
+            :items="[
+              { label: 'Expense', value: 'Expense' },
+              { label: 'Income', value: 'Income' }
+            ]"
+            class="transactions-type-toggle"
+            @update:model-value="changeTransactionType"
+          />
         </template>
       </AppPageHeader>
 
@@ -31,12 +28,13 @@
       <v-row class="mb-4">
         <v-col cols="12">
           <AppCard class="transactions-filter-card">
-            <AppCardBody>
+            <AppCardBody class="transaction-filter-content">
               <div class="transaction-period">
                 <div class="period-picker">
                   <AppSegmentedControl
                     v-model="periodMode"
                     label="Select period"
+                    :height="44"
                     :items="[
                       { label: 'Day', value: 'day' },
                       { label: 'Week', value: 'week' },
@@ -85,7 +83,7 @@
               </div>
 
               <!-- Account / category / sorting / amount filters -->
-              <div class="transaction-filters mt-3">
+              <div class="transaction-filters">
                 <AppSelect
                   v-model="filterAccount"
                   :items="accountOptions"
@@ -146,7 +144,7 @@
               </div>
 
               <!-- Active filter summary -->
-              <div v-if="hasActiveFilters" class="d-flex align-center flex-wrap ga-2 mt-3">
+              <div v-if="hasActiveFilters" class="d-flex align-center flex-wrap ga-2">
                 <span class="text-caption text-on-surface-variant">Active filters:</span>
                 <v-chip
                   v-if="filterTag"
@@ -252,10 +250,12 @@
                           <AppIconButton
                             :icon="mdiPencilOutline"
                             :label="`Edit ${tx.description || tx.category?.name}`"
+                            :size="32"
                             color="primary"
                             @click="editTx(tx)"
                           />
                           <MovementShortcutsMenu
+                            :size="32"
                             @duplicate="duplicate(tx)"
                             @favorite="duplicate(tx, true)"
                             @delete="confirmDelete(tx)"
@@ -369,18 +369,22 @@
                       >
                         {{ tx.type === 'Income' ? '+' : '-' }}{{ cs }}{{ formatMoney(tx.amount) }}
                       </td>
-                      <td class="text-center">
-                        <AppIconButton
-                          :icon="mdiPencilOutline"
-                          :label="`Edit ${tx.comment || tx.description || tx.category?.name}`"
-                          color="primary"
-                          @click="editTx(tx)"
-                        />
-                        <MovementShortcutsMenu
-                          @duplicate="duplicate(tx)"
-                          @favorite="duplicate(tx, true)"
-                          @delete="confirmDelete(tx)"
-                        />
+                      <td class="text-center transaction-actions-cell">
+                        <div class="d-inline-flex flex-nowrap align-center">
+                          <AppIconButton
+                            :icon="mdiPencilOutline"
+                            :label="`Edit ${tx.comment || tx.description || tx.category?.name}`"
+                            :size="32"
+                            color="primary"
+                            @click="editTx(tx)"
+                          />
+                          <MovementShortcutsMenu
+                            :size="32"
+                            @duplicate="duplicate(tx)"
+                            @favorite="duplicate(tx, true)"
+                            @delete="confirmDelete(tx)"
+                          />
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -701,8 +705,28 @@ const transactions = computed(() =>
 )
 const totalPages = computed(() => list.value?.totalPages ?? 1)
 
+function changeTransactionType(value: unknown) {
+  const next = value === 'Income' ? 'Income' : 'Expense'
+  if (next === filterType.value) return
+  filterType.value = next
+  if (
+    filterCategory.value !== null &&
+    !categories.value?.some(
+      category => category.id === filterCategory.value && category.type === next
+    )
+  )
+    filterCategory.value = null
+}
+
 const categoryOptions = computed(() =>
-  (categories.value ?? []).map(c => ({ title: c.name, value: c.id, color: c.color }))
+  (categories.value ?? [])
+    .filter(category => category.type === filterType.value)
+    .map(c => ({
+      title: c.name,
+      value: c.id,
+      color: c.color,
+      position: c.position
+    }))
 )
 
 const sortOptions = [
@@ -1046,22 +1070,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.transactions-header :deep(.v-col > div) {
-  width: 100%;
-  min-width: 0;
-}
 .transactions-csv-actions {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 12px;
-}
-.transactions-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  transition: gap 0.22s ease;
 }
 .transactions-type-toggle {
   flex-shrink: 1;
@@ -1070,14 +1083,6 @@ onMounted(async () => {
 @media (max-width: 599px) {
   .transactions-csv-actions > .v-btn {
     flex: 1;
-  }
-  .transactions-heading {
-    gap: 8px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .transactions-heading {
-    transition: none;
   }
 }
 .hover-row {
@@ -1137,17 +1142,27 @@ onMounted(async () => {
   width: 150px;
 }
 .col-actions {
-  width: 128px;
+  width: 96px;
+}
+.transaction-actions-cell {
+  padding-inline: 8px !important;
+  white-space: nowrap;
 }
 
 .description-cell {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  padding-block: 12px;
 }
 
 .transactions-filter-card {
   container-type: inline-size;
   container-name: transaction-filters;
+}
+.transaction-filter-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 .transaction-period {
   display: flex;
@@ -1224,6 +1239,6 @@ onMounted(async () => {
   white-space: normal;
 }
 .tx-table :deep(.description-cell) {
-  white-space: nowrap;
+  white-space: normal;
 }
 </style>

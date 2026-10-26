@@ -3,7 +3,7 @@
     <!-- LOADING SKELETON -->
     <AppPageSkeleton v-if="loading && !hasLoaded" page="categories" />
     <template v-else>
-      <AppPageHeader title="Categories">
+      <AppPageHeader title="Categories" subtitle="Organize your income and expenses.">
         <template #actions>
           <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
             New Category
@@ -16,88 +16,87 @@
           <AppSegmentedControl
             v-model="filterType"
             label="Filter by type"
+            :disabled="reordering || dragging !== null"
             :items="[
               { label: 'Expense', value: 'Expense' },
               { label: 'Income', value: 'Income' }
             ]"
           />
-
-          <v-spacer class="d-none d-sm-block"></v-spacer>
-
-          <AppSegmentedControl
-            v-model="period"
-            label="Filter by period"
-            :items="[
-              { label: 'Day', value: 'day' },
-              { label: 'Week', value: 'week' },
-              { label: 'Month', value: 'month' },
-              { label: 'Year', value: 'year' }
-            ]"
-          />
         </v-col>
       </v-row>
 
-      <v-row>
-        <v-col cols="12" sm="6" md="4" v-for="cat in filteredCategories" :key="cat.id">
-          <AppCard class="cat-card fill-height">
-            <AppCardBody>
-              <AppEntityHeader
-                :title="cat.name"
-                :icon="mdiTagOutline"
-                :color="cat.color ?? undefined"
-                ><template #subtitle
-                  ><div class="d-flex align-center ga-2 mt-1">
-                    <v-chip
-                      size="x-small"
-                      :color="cat.type === 'Income' ? 'success' : 'error'"
-                      variant="tonal"
-                    >
-                      {{ cat.type === 'Income' ? 'Income' : 'Expense' }}
-                    </v-chip>
-                    <span class="text-caption text-on-surface-variant">
-                      {{ cat.transactionCount }} movement{{ cat.transactionCount === 1 ? '' : 's' }}
-                    </span>
-                  </div></template
-                ><template #actions
-                  ><AppIconButton
-                    :icon="mdiPencilOutline"
-                    :label="`Edit ${cat.name}`"
-                    color="primary"
-                    @click="editCat(cat)" />
-                  <AppIconButton
-                    :icon="mdiDeleteOutline"
-                    :label="`Delete ${cat.name}`"
-                    color="error"
-                    @click="confirmDelete(cat)" /></template
-              ></AppEntityHeader>
-              <v-divider class="my-3"></v-divider>
-              <div class="d-flex align-baseline justify-space-between">
-                <span class="text-caption text-on-surface-variant">Total {{ periodLabel }}</span>
-                <span
-                  class="text-subtitle-1 font-weight-bold"
-                  :class="cat.type === 'Income' ? 'text-success' : 'text-error'"
-                >
-                  {{ cs }}{{ formatMoney(cat.total) }}
-                </span>
-              </div>
-            </AppCardBody>
-          </AppCard>
-        </v-col>
-        <v-col v-if="filteredCategories.length === 0" cols="12">
-          <AppEmptyState
-            :icon="mdiShapePlusOutline"
-            :title="`No ${filterLabel} categories yet`"
-            :description="`Create one to start organizing your ${filterLabel === 'income' ? 'earnings' : 'spending'}.`"
-            padding="12"
+      <div
+        :ref="
+          element => {
+            list = element as HTMLElement
+          }
+        "
+      >
+        <v-row>
+          <v-col
+            cols="12"
+            sm="6"
+            md="4"
+            v-for="cat in filteredCategories"
+            :key="cat.id"
+            :data-category-id="cat.id"
           >
-            <template #actions>
-              <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
-                New {{ filterLabel }} category
-              </AppButton>
-            </template>
-          </AppEmptyState>
-        </v-col>
-      </v-row>
+            <AppCard class="cat-card fill-height">
+              <AppCardBody>
+                <AppEntityHeader
+                  :title="cat.name"
+                  :icon="mdiTagOutline"
+                  :color="cat.color ?? undefined"
+                  ><template #subtitle
+                    ><div class="d-flex align-center ga-2 mt-1">
+                      <v-chip
+                        size="x-small"
+                        :color="cat.type === 'Income' ? 'success' : 'error'"
+                        variant="tonal"
+                      >
+                        {{ cat.type === 'Income' ? 'Income' : 'Expense' }}
+                      </v-chip>
+                    </div></template
+                  ><template #actions
+                    ><AppDragHandle
+                      :label="`Reorder ${cat.name}; arrow keys move it`"
+                      :disabled="reordering"
+                      @pointerdown="startDrag($event, cat.id)"
+                      @keydown.up.prevent="move(filteredCategories.indexOf(cat), -1)"
+                      @keydown.down.prevent="move(filteredCategories.indexOf(cat), 1)"
+                      @keydown.left.prevent="move(filteredCategories.indexOf(cat), -1)"
+                      @keydown.right.prevent="move(filteredCategories.indexOf(cat), 1)"
+                      @keydown.esc="cancelDrag" />
+                    <AppIconButton
+                      :icon="mdiPencilOutline"
+                      :label="`Edit ${cat.name}`"
+                      color="primary"
+                      @click="editCat(cat)" />
+                    <AppIconButton
+                      :icon="mdiDeleteOutline"
+                      :label="`Delete ${cat.name}`"
+                      color="error"
+                      @click="confirmDelete(cat)" /></template
+                ></AppEntityHeader>
+              </AppCardBody>
+            </AppCard>
+          </v-col>
+          <v-col v-if="filteredCategories.length === 0" cols="12">
+            <AppEmptyState
+              :icon="mdiShapePlusOutline"
+              :title="`No ${filterLabel} categories yet`"
+              :description="`Create one to start organizing your ${filterLabel === 'income' ? 'earnings' : 'spending'}.`"
+              padding="12"
+            >
+              <template #actions>
+                <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
+                  New {{ filterLabel }} category
+                </AppButton>
+              </template>
+            </AppEmptyState>
+          </v-col>
+        </v-row>
+      </div>
     </template>
 
     <!-- CREATE/EDIT DIALOG -->
@@ -171,6 +170,7 @@
       :title="deleteTitle"
       :confirm-label="needsReassignment ? 'Move & Delete' : 'Delete'"
       :loading="deleting"
+      :error="deleteError"
       :confirm-disabled="!canDelete"
       :cancel-disabled="deleting"
       persistent
@@ -183,55 +183,54 @@
           <v-icon :icon="mdiTagOutline" color="white" size="28"></v-icon>
         </v-avatar>
       </template>
-      <template v-if="needsReassignment">
-        It has {{ deletingCat?.allTimeCount ?? 0 }} movement{{
-          deletingCat?.allTimeCount === 1 ? '' : 's'
-        }}
-        in total. Choose which category takes them, or cancel to keep the category.
-      </template>
-      <template v-else>This action cannot be undone.</template>
-      <p class="mt-2">
-        {{
-          needsReassignment
-            ? 'Linked favorites will use the replacement category.'
-            : 'Favorites using this category will also be removed.'
-        }}
-      </p>
-      <template v-if="(deletingCat?.budgetCount ?? 0) > 0">
-        <br />
-        <span class="text-warning">
+      <AppFormFields :gap="16">
+        <p v-if="needsReassignment">
+          It has {{ deletingCat?.allTimeCount ?? 0 }} movement{{
+            deletingCat?.allTimeCount === 1 ? '' : 's'
+          }}
+          in total. Choose which category takes them, or cancel to keep the category.
+        </p>
+        <p v-else>This action cannot be undone.</p>
+        <p>
+          {{
+            needsReassignment
+              ? 'Linked favorites will use the replacement category.'
+              : 'Favorites using this category will also be removed.'
+          }}
+        </p>
+        <p v-if="(deletingCat?.budgetCount ?? 0) > 0" class="text-warning">
           Its {{ deletingCat?.budgetCount }} budget{{
             (deletingCat?.budgetCount ?? 0) === 1 ? '' : 's'
           }}
           will be deleted with it.
-        </span>
-      </template>
-      <template v-if="(deletingCat?.recurringCount ?? 0) > 0">
-        <br />
-        <span class="text-warning">
+        </p>
+        <p v-if="(deletingCat?.recurringCount ?? 0) > 0" class="text-warning">
           Its {{ deletingCat?.recurringCount }} recurring rule{{
             (deletingCat?.recurringCount ?? 0) === 1 ? '' : 's'
           }}
           will be deleted with it.
-        </span>
-      </template>
-      <AppSelect
-        v-if="needsReassignment"
-        v-model="reassignTo"
-        :items="reassignOptions"
-        item-title="title"
-        item-value="value"
-        label="Move transactions to"
-        density="comfortable"
-        rounded="xl"
-        hide-details
-        class="mb-6 text-left"
-      ></AppSelect>
+        </p>
+        <CategorySelect
+          v-if="needsReassignment"
+          v-model="reassignTo"
+          :items="reassignOptions"
+          label="Move transactions to"
+          density="comfortable"
+          rounded="xl"
+          hide-details
+          class="text-left"
+          @update:model-value="deleteError = ''"
+        ></CategorySelect>
+      </AppFormFields>
     </AppConfirmDialog>
   </AppPage>
 </template>
 
 <script setup lang="ts">
+import CategorySelect from '@/components/CategorySelect.vue'
+import AppDragHandle from '@/components/ui/AppDragHandle.vue'
+import { useCategoryOrder } from '@/composables/useCategoryOrder'
+import { useReorderableList } from '@/composables/useReorderableList'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
@@ -241,7 +240,7 @@ import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 import { transactionTypeOptions } from '@/utils/transactionTypes'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mutationFeedback } from '@/utils/mutationFeedback'
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useSnackbar } from '@/composables/useSnackbar'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -255,10 +254,7 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
 import { api, fetchJson, isQueuedResponse } from '@/utils/api'
 import { useAsyncData } from '@/composables/useAsyncData'
-import type { Category, PeriodFilter } from '@/types'
-import { formatMoney, useCurrencySymbol } from '@/utils/currency'
-import { getDefaultPeriod } from '@/utils/preferences'
-import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, toDateOnly } from '@/utils/date'
+import type { Category } from '@/types'
 import {
   mdiCheck,
   mdiDeleteOutline,
@@ -268,24 +264,12 @@ import {
   mdiTagOutline
 } from '@mdi/js'
 
-const cs = useCurrencySymbol()
-
 const dialog = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
 const submitting = ref(false)
 const filterType = ref('Expense')
 const filterLabel = computed(() => (filterType.value === 'Income' ? 'income' : 'expense'))
-const period = ref<PeriodFilter>(getDefaultPeriod())
-const periodLabel = computed(() =>
-  period.value === 'day'
-    ? 'today'
-    : period.value === 'week'
-      ? 'this week'
-      : period.value === 'month'
-        ? 'this month'
-        : 'this year'
-)
 const catForm = ref({ name: '', type: 'Expense', color: '#EA4335' })
 const clientId = ref('')
 const cleanForm = ref('')
@@ -296,33 +280,12 @@ useUnsavedChanges(
 
 // Delete confirm
 const deleteDialog = ref(false)
+const deleteError = ref('')
 const deletingCat = ref<Category | null>(null)
 const deleteTitle = computed(() => `Delete "${deletingCat.value?.name ?? ''}"?`)
 const reassignTo = ref<number | null>(null)
 const deleting = ref(false)
 const { showSnack } = useSnackbar()
-
-// The range travels as calendar days ('YYYY-MM-DD'); the backend maps each
-// one to the full UTC day, so the totals match what the user sees.
-const categoriesUrl = () => {
-  const params = new URLSearchParams()
-  const today = new Date()
-  if (period.value === 'day') {
-    params.set('from', toDateOnly(today))
-    params.set('to', toDateOnly(today))
-  } else if (period.value === 'week') {
-    params.set('from', toDateOnly(startOfWeek()))
-    params.set('to', toDateOnly(endOfWeek()))
-  } else if (period.value === 'month') {
-    params.set('from', toDateOnly(startOfMonth()))
-    params.set('to', toDateOnly(endOfMonth()))
-  } else {
-    params.set('from', toDateOnly(new Date(today.getFullYear(), 0, 1)))
-    params.set('to', toDateOnly(new Date(today.getFullYear(), 11, 31)))
-  }
-  const qs = params.toString()
-  return `/categories${qs ? `?${qs}` : ''}`
-}
 
 const {
   data: categories,
@@ -330,8 +293,8 @@ const {
   hasLoaded,
   error: categoriesError,
   run: fetchCategories
-} = useAsyncData<Category[]>(signal => fetchJson<Category[]>(categoriesUrl(), { signal }), [], {
-  cacheKey: categoriesUrl
+} = useAsyncData<Category[]>(signal => fetchJson<Category[]>('/categories', { signal }), [], {
+  cacheKey: '/categories'
 })
 
 const colorOptions = [
@@ -364,16 +327,49 @@ const colorOptions = [
   '#A1887F'
 ]
 
-const filteredCategories = computed(() => categories.value.filter(c => c.type === filterType.value))
-
-const reassignOptions = computed(() =>
-  categories.value
-    .filter(c => c.type === deletingCat.value?.type && c.id !== deletingCat.value?.id)
-    .map(c => ({ title: c.name, value: c.id }))
+const categoryOrder = useCategoryOrder(() => categories.value)
+const reordering = ref(false)
+const {
+  ordered: filteredCategories,
+  list,
+  dragging,
+  startDrag,
+  cancelDrag,
+  move
+} = useReorderableList({
+  source: () => categoryOrder.value.filter(category => category.type === filterType.value),
+  busy: () => reordering.value,
+  attribute: 'data-category-id',
+  save: async items => {
+    reordering.value = true
+    try {
+      const response = await api('/categories/order', {
+        method: 'PUT',
+        body: JSON.stringify({ ids: items.map(category => category.id) })
+      })
+      if (!response.ok)
+        throw new Error((await response.json()).error || 'Could not save category order.')
+      if (!isQueuedResponse(response)) await loadCategories()
+      showSnack(...mutationFeedback(isQueuedResponse(response), 'Category order updated.'))
+    } catch (error) {
+      showSnack(error instanceof Error ? error.message : 'Could not save category order.', 'error')
+    } finally {
+      reordering.value = false
+    }
+  }
+})
+useUnsavedChanges(
+  () => false,
+  () => reordering.value || dragging.value !== null
 )
 
-// A category can only be deleted when it has no movements at all; the selected
-// period does not matter here, so the all-time count is the one that counts.
+const reassignOptions = computed(() =>
+  categoryOrder.value.filter(
+    c => c.type === deletingCat.value?.type && c.id !== deletingCat.value?.id
+  )
+)
+
+// Deletion checks all history even though cards only show catalogue details.
 const needsReassignment = computed(() => (deletingCat.value?.allTimeCount ?? 0) > 0)
 
 const canDelete = computed(() => !needsReassignment.value || reassignTo.value !== null)
@@ -433,12 +429,14 @@ const submitCat = async () => {
 }
 
 const confirmDelete = (cat: Category) => {
+  deleteError.value = ''
   deletingCat.value = cat
   reassignTo.value = null
   deleteDialog.value = true
 }
 
 const closeDelete = () => {
+  deleteError.value = ''
   deleteDialog.value = false
   deletingCat.value = null
   reassignTo.value = null
@@ -447,6 +445,7 @@ const closeDelete = () => {
 const doDelete = async () => {
   if (!deletingCat.value) return
   deleting.value = true
+  deleteError.value = ''
   const query = reassignTo.value !== null ? `?reassignTo=${reassignTo.value}` : ''
   try {
     const res = await api(`/categories/${deletingCat.value.id}${query}`, { method: 'DELETE' })
@@ -464,24 +463,22 @@ const doDelete = async () => {
       closeDelete()
     } else {
       const data = await res.json().catch(() => null)
-      // The count shown in the dialog is scoped to the selected period, so the
-      // server can still find movements outside it. Reopen asking for a target.
+      // The catalogue may have changed since loading. Ask for a fresh target.
       if (data?.needsReassignment) {
         deletingCat.value = { ...deletingCat.value, allTimeCount: data.transactionCount ?? 0 }
         reassignTo.value = null
-        showSnack('Pick where those transactions should go.', 'error')
+        deleteError.value = 'Pick where those transactions should go.'
       } else {
-        showSnack(data?.error || 'Cannot delete', 'error')
+        deleteError.value = data?.error || 'Could not delete the category.'
       }
     }
   } catch (e) {
     console.error(e)
-    showSnack(e instanceof Error ? e.message : 'Could not save the change.', 'error')
+    deleteError.value = e instanceof Error ? e.message : 'Could not delete the category.'
   }
   deleting.value = false
 }
 
-watch(period, loadCategories)
 onMounted(loadCategories)
 </script>
 

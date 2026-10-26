@@ -1,6 +1,6 @@
 <template>
   <AppPage>
-    <AppPageHeader title="Accounts"
+    <AppPageHeader title="Accounts" subtitle="Manage your accounts and balances."
       ><template #actions
         ><AppButton
           color="primary"
@@ -15,8 +15,8 @@
         ></template
       ></AppPageHeader
     >
-    <v-alert v-if="error || accountsError || transfersError" type="error" class="mb-4">{{
-      error || accountsError || transfersError
+    <v-alert v-if="accountsError || transfersError" type="error" class="mb-4">{{
+      accountsError || transfersError
     }}</v-alert>
     <AppPageSkeleton v-if="loading && !hasLoaded" page="accounts" :header="false" />
     <v-row v-else
@@ -25,7 +25,17 @@
           ><AppCardBody>
             <AppEntityHeader
               :title="account.name"
-              :subtitle="account.archived ? 'Archived' : undefined"
+              :icon="mdiWalletOutline"
+              color="success"
+              :subtitle="
+                account.pendingArchive === 'restore'
+                  ? 'Restoration pending'
+                  : account.pendingArchive === 'archive'
+                    ? 'Archiving pending'
+                    : account.archived
+                      ? 'Archived'
+                      : undefined
+              "
             >
               <template #title
                 ><span class="font-weight-bold">{{ account.name }}</span></template
@@ -59,12 +69,17 @@
                   @click="deletingAccount = account"
               /></template>
             </AppEntityHeader>
-            <p class="text-h6 mt-3">{{ cs }}{{ formatMoney(account.balance) }}</p>
-            <PendingBalance :account="account" /> </AppCardBody></AppCard></v-col
+            <p class="text-h6 mt-3 mb-0">
+              {{ cs }}{{ formatMoney(account.projectedBalance ?? account.balance) }}
+            </p>
+            <PendingBalance
+              :account="account"
+              :show-expected="false"
+            /> </AppCardBody></AppCard></v-col
     ></v-row>
     <AppCard
       title="Account Movements"
-      keep-actions-inline
+      title-class="font-weight-bold"
       class="mt-6 overflow-hidden account-movements"
     >
       <template #header-actions>
@@ -73,7 +88,7 @@
           :items="historyAccounts"
           :item-title="historyAccountTitle"
           item-value="id"
-          label="Filter by Account"
+          label="Account"
           clearable
           density="compact"
           hide-details
@@ -89,31 +104,33 @@
           <AppSkeleton type="rows" :rows="4" />
         </div>
         <AppEmptyState
-          v-else-if="!history.items.length"
+          v-else-if="!visibleMovements.length"
           :icon="mdiSwapHorizontal"
           title="No account movements yet"
           description="Transfers, opening balances and balance adjustments will appear here."
           padding="8"
         />
         <v-list
-          v-if="history.items.length"
+          v-if="visibleMovements.length"
           bg-color="transparent"
           class="py-0"
           aria-label="Account movements"
         >
-          <template v-for="(transfer, index) in history.items" :key="transfer.id">
-            <v-list-item class="px-4 py-2 transfer-history-row">
+          <template v-for="(transfer, index) in visibleMovements" :key="transfer.id">
+            <v-list-item class="px-6 py-2 transfer-history-row">
               <TransferSummary v-if="transfer.kind === 'transfer'" :transfer="transfer">
                 <template #actions>
                   <AppIconButton
                     :icon="mdiPencilOutline"
                     :label="`Edit transfer from ${transfer.source.name} to ${transfer.destination.name}`"
+                    :size="32"
                     color="primary"
                     @click="editTransfer(transfer)"
                   />
                   <AppIconButton
                     :icon="mdiDeleteOutline"
                     :label="`Delete transfer from ${transfer.source.name} to ${transfer.destination.name}`"
+                    :size="32"
                     color="error"
                     @click="deleting = transfer"
                   />
@@ -146,6 +163,7 @@
                   <AppIconButton
                     :icon="mdiPencilOutline"
                     :label="`Edit balance adjustment for ${transfer.accountName}`"
+                    :size="32"
                     :color="
                       historyAccounts.some(account => account.id === transfer.accountId)
                         ? 'primary'
@@ -157,13 +175,14 @@
                   <AppIconButton
                     :icon="mdiDeleteOutline"
                     :label="`Delete balance adjustment for ${transfer.accountName}`"
+                    :size="32"
                     color="error"
                     @click="deletingAdjustment = transfer"
                   />
                 </template>
               </AccountHistoryRow>
             </v-list-item>
-            <v-divider v-if="index < history.items.length - 1" class="border-outline-variant" />
+            <v-divider v-if="index < visibleMovements.length - 1" class="border-outline-variant" />
           </template>
         </v-list>
         <v-pagination
@@ -182,6 +201,7 @@
     <AppConfirmDialog
       :model-value="!!deletingAdjustment"
       title="Delete balance adjustment?"
+      :error="error"
       confirm-label="Delete"
       :loading="busy"
       @update:model-value="deletingAdjustment = null"
@@ -193,6 +213,7 @@
     <AppConfirmDialog
       :model-value="!!deleting"
       title="Delete transfer?"
+      :error="error"
       confirm-label="Delete"
       :loading="busy"
       @update:model-value="deleting = null"
@@ -203,6 +224,7 @@
     <AppConfirmDialog
       :model-value="!!archiving"
       title="Archive account?"
+      :error="error"
       confirm-label="Archive"
       color="warning"
       :loading="busy"
@@ -214,6 +236,7 @@
     <AppConfirmDialog
       :model-value="!!restoring"
       title="Restore account?"
+      :error="error"
       confirm-label="Restore"
       color="warning"
       :loading="busy"
@@ -224,6 +247,7 @@
     <AppConfirmDialog
       :model-value="!!deletingAccount"
       title="Delete account?"
+      :error="error"
       confirm-label="Delete"
       :loading="busy"
       @update:model-value="deletingAccount = null"
@@ -237,9 +261,11 @@
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { hiddenAccountMovementPaths, scheduleAccountMovementDelete } from '@/utils/undoDelete'
 import {
   mdiSwapHorizontal,
+  mdiWalletOutline,
   mdiPlus,
   mdiPencilOutline,
   mdiArchiveOutline,
@@ -285,6 +311,9 @@ const accountDialog = ref(false),
   error = ref(''),
   accountFilter = ref<string | null>(null),
   page = ref(1)
+watch([deletingAdjustment, deleting, archiving, restoring, deletingAccount], () => {
+  error.value = ''
+})
 function editTransfer(transfer: Transfer) {
   editingTransfer.value = transfer
   transferDialog.value = true
@@ -316,6 +345,15 @@ const {
 async function refresh() {
   await Promise.all([run(), load(), loadHistoryAccounts()])
 }
+const movementPath = (movement: (Transfer & { kind: 'transfer' }) | BalanceAdjustment) =>
+  movement.kind === 'transfer'
+    ? `/transfers/${movement.id}`
+    : `/accounts/balance-adjustments/${encodeURIComponent(movement.id)}`
+const visibleMovements = computed(() =>
+  history.value.items.filter(
+    movement => !hiddenAccountMovementPaths.value.has(movementPath(movement))
+  )
+)
 watch(
   () => history.value.page,
   actual => {
@@ -347,8 +385,10 @@ async function mutate(path: string, method: string, body?: unknown) {
   }
 }
 async function remove() {
-  if (deleting.value)
-    await mutate(`/transfers/${deleting.value.id}`, 'DELETE', { previousTransfer: deleting.value })
+  if (!deleting.value) return
+  await scheduleMovementRemoval(`/transfers/${deleting.value.id}`, 'transfer', {
+    previousTransfer: deleting.value
+  })
 }
 async function restore() {
   if (restoring.value)
@@ -362,11 +402,31 @@ async function removeAccount() {
   if (deletingAccount.value) await mutate(`/accounts/${deletingAccount.value.id}`, 'DELETE')
 }
 async function removeAdjustment() {
-  if (deletingAdjustment.value)
-    await mutate(
-      `/accounts/balance-adjustments/${encodeURIComponent(deletingAdjustment.value.id)}`,
-      'DELETE'
-    )
+  if (!deletingAdjustment.value) return
+  const adjustment = deletingAdjustment.value
+  if (historyAccounts.value.find(account => account.id === adjustment.accountId)?.archived) {
+    error.value = 'Restore the archived account before changing its balance.'
+    return
+  }
+  await scheduleMovementRemoval(
+    `/accounts/balance-adjustments/${encodeURIComponent(adjustment.id)}`,
+    `balance adjustment for ${adjustment.accountName}`,
+    { previousAdjustment: adjustment }
+  )
+}
+async function scheduleMovementRemoval(path: string, label: string, body?: unknown) {
+  if (busy.value) return
+  busy.value = true
+  error.value = ''
+  try {
+    await scheduleAccountMovementDelete(path, label, body)
+    deleting.value = null
+    deletingAdjustment.value = null
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
 }
 async function archive() {
   if (archiving.value)
@@ -379,28 +439,17 @@ async function archive() {
 </script>
 
 <style scoped>
-.account-movements :deep(.app-card-header) {
-  padding-inline: 16px !important;
+.account-movements :deep(.app-card-heading-with-actions) {
+  flex: 1 0 auto;
+  white-space: nowrap;
 }
 .history-account-filter {
-  flex: 0 1 230px;
-  width: 230px;
+  flex: 0 0 155px;
+  width: 155px;
   max-width: 100%;
 }
 .transfer-history-row:hover {
   background: rgba(var(--v-theme-on-surface), 0.03);
-}
-@media (max-width: 599px) {
-  .account-movements :deep(.app-card-header) {
-    padding-inline: 8px !important;
-  }
-  .history-account-filter {
-    width: 150px;
-    flex-basis: 150px;
-  }
-  .transfer-history-row {
-    padding-inline: 8px !important;
-  }
 }
 .account-summary {
   min-width: 0;

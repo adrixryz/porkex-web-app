@@ -60,9 +60,8 @@
             :title="item.title"
             :to="item.route"
             :active="route.path === item.route"
-            rounded="lg"
             color="primary"
-            class="mb-1"
+            class="mb-1 app-navigation-item"
           ></v-list-item>
         </v-list>
 
@@ -73,9 +72,8 @@
               :title="userName"
               to="/settings"
               :active="route.path === '/settings'"
-              rounded="lg"
               color="primary"
-              class="mb-1"
+              class="mb-1 app-navigation-item"
             ></v-list-item>
           </v-list>
         </template>
@@ -204,10 +202,10 @@ import {
   mdiChartBar,
   mdiPiggyBankOutline,
   mdiRepeat,
-  mdiShapeOutline,
+  mdiTagOutline,
   mdiSwapHorizontal,
   mdiWalletOutline,
-  mdiFlagOutline,
+  mdiBullseyeArrow,
   mdiViewDashboardOutline
 } from '@mdi/js'
 
@@ -303,9 +301,9 @@ const navItems = [
   { title: 'Dashboard', icon: mdiViewDashboardOutline, route: '/' },
   { title: 'Transactions', icon: mdiSwapHorizontal, route: '/transactions' },
   { title: 'Accounts', icon: mdiWalletOutline, route: '/accounts' },
-  { title: 'Categories', icon: mdiShapeOutline, route: '/categories' },
+  { title: 'Categories', icon: mdiTagOutline, route: '/categories' },
+  { title: 'Goals', icon: mdiBullseyeArrow, route: '/goals' },
   { title: 'Budgets', icon: mdiPiggyBankOutline, route: '/budgets' },
-  { title: 'Goals', icon: mdiFlagOutline, route: '/goals' },
   { title: 'Recurring', icon: mdiRepeat, route: '/recurring' },
   { title: 'Analytics', icon: mdiChartBar, route: '/analytics' }
 ]

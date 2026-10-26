@@ -1,0 +1,79 @@
+/* Shared control sizes. Dialogs and Preferences retain their form-field sizes. */
+html:root {
+  --porkex-control-height: 40px;
+  --porkex-toggle-height: 44px;
+}
+
+/* Shared Vuetify controls, including dialogs teleported outside #app. */
+html:root
+  .v-btn:not(
+    :where(.v-dialog *, .app-segmented-control *, .quick-actions-button, .app-form-action)
+  ) {
+  height: var(--porkex-control-height) !important;
+  min-height: var(--porkex-control-height) !important;
+  max-height: var(--porkex-control-height) !important;
+}
+
+html:root
+  .v-btn--icon:not(
+    :where(.v-dialog *, .app-segmented-control *, .quick-actions-button, .app-form-action)
+  ) {
+  width: var(--porkex-control-height) !important;
+  min-width: var(--porkex-control-height) !important;
+}
+
+html:root .quick-actions-button {
+  width: 56px !important;
+  min-width: 56px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+}
+
+html:root .v-select .v-field {
+  --v-input-control-height: var(--porkex-control-height);
+  --v-field-input-padding-top: 8px;
+  --v-field-input-padding-bottom: 8px;
+  height: var(--porkex-control-height) !important;
+  min-height: var(--porkex-control-height) !important;
+}
+
+html:root .v-select .v-field__input {
+  min-height: var(--porkex-control-height) !important;
+  padding-block: 8px !important;
+}
+
+html:root .v-dialog .v-select .v-field,
+html:root .preferences-card .v-select .v-field {
+  --v-input-control-height: 56px;
+  --v-field-input-padding-top: 16px;
+  --v-field-input-padding-bottom: 16px;
+  height: 56px !important;
+  min-height: 56px !important;
+}
+
+html:root .v-dialog .v-select .v-field__input,
+html:root .preferences-card .v-select .v-field__input {
+  min-height: 56px !important;
+  padding-block: 16px !important;
+}
+
+html:root .app-text-field .v-field:has(input[type='search']) {
+  --v-input-control-height: var(--porkex-toggle-height);
+  --v-field-input-padding-top: 10px;
+  --v-field-input-padding-bottom: 10px;
+  height: var(--porkex-toggle-height) !important;
+}
+
+html:root .app-text-field .v-field:has(input[type='search']) .v-field__input {
+  min-height: var(--porkex-toggle-height) !important;
+  padding-block: 10px !important;
+}
+
+html:root .v-select .v-field__append-inner,
+html:root .v-select .v-field__prepend-inner,
+html:root .app-text-field .v-field:has(input[type='search']) .v-field__append-inner,
+html:root .app-text-field .v-field:has(input[type='search']) .v-field__prepend-inner {
+  align-self: center;
+  padding-block: 0;
+}

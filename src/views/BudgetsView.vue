@@ -36,7 +36,10 @@
       <!-- PERIOD TOGGLE -->
 
       <v-row class="mb-4">
-        <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
+        <v-col
+          cols="12"
+          class="d-flex flex-column flex-sm-row flex-wrap align-start align-sm-center ga-4"
+        >
           <AccountFilter
             v-model="accountFilter"
             :accounts="accounts"
@@ -46,41 +49,44 @@
           <AppSegmentedControl
             v-model="period"
             label="Budget period"
-            :items="[
-              { label: 'This month', value: 'MONTH' },
-              { label: 'This week', value: 'WEEK' }
-            ]"
-            class="ml-auto"
+            :items="budgetPeriods"
+            class="ml-sm-auto"
           />
         </v-col>
       </v-row>
 
       <!-- SUMMARY -->
 
-      <v-row v-if="totals" class="mb-4">
-        <v-col cols="12" sm="6" md="4">
+      <v-row v-if="totals" class="mb-4 budget-stats">
+        <v-col cols="4">
           <AppStatCard
             label="Total limit"
+            responsive-text
+            :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(totals.amount)}`"
-            :caption="`across ${totals.count} ${totals.count === 1 ? 'budget' : 'budgets'}`"
+            :caption="`${totals.count} ${totals.count === 1 ? 'budget' : 'budgets'}`"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
         </v-col>
 
-        <v-col cols="12" sm="6" md="4">
+        <v-col cols="4">
           <AppStatCard
             label="Spent"
+            responsive-text
+            :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(totals.spent)}`"
-            :caption="`${overallPercent}% of the limit used`"
+            :caption="`${overallPercent}% used`"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
         </v-col>
 
-        <v-col cols="12" sm="12" md="4">
+        <v-col cols="4">
           <AppStatCard
             label="Remaining"
+            responsive-text
+            :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(remainingTotal)}`"
             :value-class="remainingTotal < 0 ? 'text-error' : 'text-success'"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
@@ -91,7 +97,7 @@
                 <span class="text-error">{{ overBudgetCount }} over budget</span>
               </template>
 
-              <template v-else>Everything within the limits</template>
+              <template v-else>Within limits</template>
             </template>
           </AppStatCard>
         </v-col>
@@ -103,7 +109,7 @@
         <v-col cols="12">
           <AppEmptyState
             :icon="mdiPiggyBankOutline"
-            :title="`No budgets for ${period === 'MONTH' ? 'this month' : 'this week'}`"
+            :title="`No budgets for ${budgetRangeName(period)}`"
             description="Set a limit on a category to know when you are getting close to the limit."
             padding="12"
           />
@@ -123,7 +129,7 @@
                 class="mb-3"
                 ><template #subtitle
                   >{{ b.account?.name || 'Main' }} ·
-                  {{ b.period === 'MONTH' ? 'Monthly' : 'Weekly' }} limit</template
+                  {{ budgetPeriodName(b.period) }} limit</template
                 ><template #actions
                   ><AppIconButton
                     :icon="mdiPencilOutline"
@@ -212,8 +218,8 @@
 
           <AppSelect
             v-model="form.period"
-            :items="periodOptions"
-            item-title="title"
+            :items="budgetPeriods"
+            item-title="repeatLabel"
             item-value="value"
             label="Repeats"
           ></AppSelect>
@@ -265,6 +271,13 @@
 </template>
 
 <script setup lang="ts">
+import {
+  budgetPeriods,
+  budgetPeriodName,
+  budgetRangeName,
+  initialBudgetPeriod
+} from '@/utils/budgetPeriods'
+import { useCategorySortedRecords } from '@/composables/useCategoryOrder'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
 
@@ -361,7 +374,7 @@ const selectedAccountArchived = computed(() =>
 
 const EMPTY_BUDGETS: BudgetsResponse = { budgets: [], totals: [] }
 
-const period = ref<BudgetPeriod>(route.query.period === 'WEEK' ? 'WEEK' : 'MONTH')
+const period = ref<BudgetPeriod>(initialBudgetPeriod(route.query.period))
 
 // `today` anchors the weekly/monthly window to the user's own calendar day:
 
@@ -398,13 +411,15 @@ const {
   { cacheKey: () => `/budgets?weekStart=${getFirstDayOfWeek()}` }
 )
 
-const budgets = computed(() =>
-  data.value.budgets.filter(
-    b =>
-      b.period === period.value &&
-      (accountFilter.value === null ||
-        (b.accountId ?? `main-${getUser()?.id}`) === accountFilter.value)
-  )
+const budgets = useCategorySortedRecords(
+  () =>
+    data.value.budgets.filter(
+      b =>
+        b.period === period.value &&
+        (accountFilter.value === null ||
+          (b.accountId ?? `main-${getUser()?.id}`) === accountFilter.value)
+    ),
+  () => accounts.value
 )
 
 const totals = computed(() =>
@@ -422,6 +437,13 @@ const totals = computed(() =>
 const remainingTotal = computed(() =>
   totals.value ? round2(totals.value.amount - totals.value.spent) : 0
 )
+const summaryValueLength = computed(() =>
+  Math.max(
+    `${cs.value}${formatMoney(totals.value?.amount ?? 0)}`.length,
+    `${cs.value}${formatMoney(totals.value?.spent ?? 0)}`.length,
+    `${cs.value}${formatMoney(remainingTotal.value)}`.length
+  )
+)
 
 const overBudgetCount = computed(() => budgets.value.filter(b => b.overBudget).length)
 
@@ -434,12 +456,6 @@ const overallPercent = computed(() => {
 })
 
 const round2 = (n: number) => Math.round(n * 100) / 100
-
-const periodOptions = [
-  { title: 'Every month', value: 'MONTH' },
-
-  { title: 'Every week', value: 'WEEK' }
-]
 
 const progressColor = (b: Budget) => {
   if (b.overBudget) return 'error'
@@ -468,7 +484,7 @@ const form = ref({
 
   amount: '',
 
-  period: 'MONTH' as BudgetPeriod
+  period: 'WEEK' as BudgetPeriod
 })
 
 const cleanForm = ref('')
@@ -686,6 +702,11 @@ onMounted(() => void fetchAccounts())
 </script>
 
 <style scoped>
+@media (max-width: 599px) {
+  .budget-stats {
+    --v-col-gap-x: 8px;
+  }
+}
 .cursor-pointer {
   cursor: pointer;
 }

@@ -15,7 +15,14 @@
     <v-alert v-if="message" class="mb-3" :type="messageType" density="compact">{{
       message
     }}</v-alert>
-    <div ref="list" class="tag-list">
+    <div
+      :ref="
+        element => {
+          list = element as HTMLElement
+        }
+      "
+      class="tag-list"
+    >
       <div
         v-for="(tag, index) in ordered"
         :key="tag.id"
@@ -23,15 +30,11 @@
         class="tag-row"
         :class="{ dragging: dragging === tag.id }"
       >
-        <AppIconButton
-          :icon="mdiDragVertical"
+        <AppDragHandle
           :label="`Reorder ${tag.name}; arrow keys move it`"
           class="drag-handle"
           :disabled="busy"
           @pointerdown="startDrag($event, tag.id)"
-          @pointermove="moveDrag"
-          @pointerup="finishDrag"
-          @pointercancel="cancelDrag"
           @keydown.up.prevent="move(index, -1)"
           @keydown.down.prevent="move(index, 1)"
           @keydown.esc="cancelDrag"
@@ -94,10 +97,12 @@
   </AppConfirmDialog>
 </template>
 <script setup lang="ts">
+import AppDragHandle from '@/components/ui/AppDragHandle.vue'
+import { useReorderableList } from '@/composables/useReorderableList'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
-import { onUnmounted, ref, watch } from 'vue'
-import { mdiCheck, mdiDeleteOutline, mdiDragVertical } from '@mdi/js'
+import { ref, watch } from 'vue'
+import { mdiCheck, mdiDeleteOutline } from '@mdi/js'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'
 import AppDialog from '@/components/ui/AppDialog.vue'
@@ -113,17 +118,18 @@ const emit = defineEmits<{ 'update:modelValue': [open: boolean]; removed: [ids: 
 const { tags, refreshTags } = useTags()
 const { showSnack } = useSnackbar()
 const names = ref<Record<string, string>>({})
-const ordered = ref<Tag[]>([])
 const newName = ref('')
 const newId = ref(crypto.randomUUID())
 const busy = ref(false)
 const message = ref('')
 const messageType = ref<'error' | 'info' | 'success'>('error')
 const deleting = ref<Tag | null>(null)
-const list = ref<HTMLElement>()
-const dragging = ref<string | null>(null)
-let press: ReturnType<typeof setTimeout> | undefined
-let initial: string[] = []
+const { ordered, list, dragging, startDrag, cancelDrag, move } = useReorderableList({
+  source: () => tags.value,
+  busy: () => busy.value,
+  save: items => write('/tags/order', 'PUT', { ids: items.map(tag => tag.id) }),
+  attribute: 'data-tag-id'
+})
 watch(
   [tags, () => props.modelValue],
   (_value, previous) => {
@@ -203,53 +209,6 @@ async function remove() {
     deleting.value = null
   }
 }
-async function saveOrder() {
-  await write('/tags/order', 'PUT', { ids: ordered.value.map(tag => tag.id) })
-}
-async function move(index: number, offset: number) {
-  if (busy.value || index + offset < 0 || index + offset >= ordered.value.length) return
-  const [item] = ordered.value.splice(index, 1)
-  ordered.value.splice(index + offset, 0, item!)
-  await saveOrder()
-}
-function startDrag(event: PointerEvent, id: string) {
-  if (busy.value || (event.pointerType === 'mouse' && event.button !== 0)) return
-  initial = ordered.value.map(tag => tag.id)
-  const target = event.currentTarget as HTMLElement
-  target.setPointerCapture(event.pointerId)
-  clearTimeout(press)
-  press = setTimeout(() => {
-    dragging.value = id
-  }, 250)
-}
-function moveDrag(event: PointerEvent) {
-  if (!dragging.value) return
-  const row = document
-    .elementFromPoint(event.clientX, event.clientY)
-    ?.closest<HTMLElement>('[data-tag-id]')
-  if (row?.dataset.tagId && row.dataset.tagId !== dragging.value) {
-    const from = ordered.value.findIndex(tag => tag.id === dragging.value)
-    const to = ordered.value.findIndex(tag => tag.id === row.dataset.tagId)
-    const [tag] = ordered.value.splice(from, 1)
-    ordered.value.splice(to, 0, tag!)
-  }
-  const bounds = list.value?.getBoundingClientRect()
-  if (bounds && list.value) {
-    if (event.clientY < bounds.top + 35) list.value.scrollTop -= 15
-    if (event.clientY > bounds.bottom - 35) list.value.scrollTop += 15
-  }
-}
-async function finishDrag() {
-  clearTimeout(press)
-  if (!dragging.value) return
-  dragging.value = null
-  if (ordered.value.some((tag, index) => tag.id !== initial[index])) await saveOrder()
-}
-function cancelDrag() {
-  clearTimeout(press)
-  dragging.value = null
-  ordered.value = [...tags.value]
-}
 watch(
   () => props.modelValue,
   open => {
@@ -261,7 +220,6 @@ watch(
     }
   }
 )
-onUnmounted(cancelDrag)
 </script>
 <style scoped>
 .tag-list {
@@ -278,10 +236,6 @@ onUnmounted(cancelDrag)
 .tag-row > .v-input {
   min-width: 0;
   flex: 1;
-}
-.drag-handle {
-  touch-action: none;
-  cursor: grab;
 }
 .dragging {
   background: rgba(255, 255, 255, 0.08);

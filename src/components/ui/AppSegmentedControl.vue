@@ -18,7 +18,10 @@
       v-for="item in items"
       :key="item.value"
       :value="item.value"
-      :height="buttonHeight"
+      :aria-pressed="model === item.value"
+      :height="segmentHeight"
+      :size="compact ? 'small' : undefined"
+      :style="compact ? { fontSize: '0.75rem', lineHeight: '1.25rem' } : undefined"
       variant="text"
     >
       {{ item.label }}
@@ -35,14 +38,26 @@ const props = withDefaults(
     items: { label: string; value: T }[]
     block?: boolean
     buttonHeight?: number
+    height?: number
+    compact?: boolean
   }>(),
-  { buttonHeight: 40 }
+  { buttonHeight: 32, height: 44, compact: false }
+)
+// The outer pill includes 5px padding and a 1px border on both sides.
+const segmentHeight = computed(() =>
+  props.height === undefined ? props.buttonHeight : Math.max(0, props.height - 12)
 )
 const selectedIndex = computed(() => props.items.findIndex(item => item.value === model.value))
 const controlStyle = computed(() => ({
   '--segment-count': props.items.length,
-  '--segment-height': `${props.buttonHeight}px`,
-  '--control-width': props.block ? '100%' : `${Math.max(280, props.items.length * 88)}px`
+  '--segment-height': `${segmentHeight.value}px`,
+  '--control-height': props.height === undefined ? 'auto' : `${props.height}px`,
+  '--segment-font-size': props.compact ? '0.75rem' : '0.875rem',
+  '--control-width': props.block
+    ? '100%'
+    : `${props.compact ? props.items.length * 92 : Math.max(280, props.items.length * 88)}px`,
+  minWidth: props.block ? 0 : props.compact ? `${props.items.length * 92}px` : undefined,
+  flexShrink: props.compact && !props.block ? 0 : undefined
 }))
 const thumbStyle = computed(() => ({ transform: `translateX(${selectedIndex.value * 100}%)` }))
 </script>
@@ -55,7 +70,7 @@ const thumbStyle = computed(() => ({ transform: `translateX(${selectedIndex.valu
   flex: 0 1 auto;
   width: var(--control-width);
   max-width: 100%;
-  height: auto !important;
+  height: var(--control-height) !important;
   gap: 0 !important;
   box-sizing: border-box;
   container-type: inline-size;
@@ -86,7 +101,7 @@ const thumbStyle = computed(() => ({ transform: `translateX(${selectedIndex.valu
   border-radius: 999px !important;
   background: transparent !important;
   color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.875rem;
+  font-size: var(--segment-font-size);
   letter-spacing: normal;
   transition:
     color 0.16s ease,
@@ -99,9 +114,8 @@ const thumbStyle = computed(() => ({ transform: `translateX(${selectedIndex.valu
 }
 @media (max-width: 599px) {
   .app-segmented-control :deep(.v-btn) {
-    height: max(44px, var(--segment-height)) !important;
     padding-inline: 2px;
-    font-size: clamp(0.625rem, calc(100cqi / var(--segment-count) / 4.5), 0.875rem);
+    font-size: clamp(0.625rem, calc(100cqi / var(--segment-count) / 4.5), var(--segment-font-size));
   }
 }
 @media (prefers-reduced-motion: reduce) {

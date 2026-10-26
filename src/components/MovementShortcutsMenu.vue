@@ -5,8 +5,9 @@
         v-bind="props"
         :icon="mdiDotsHorizontal"
         color="grey"
+        :size="size"
         label="Movement shortcuts" /></template
-    ><v-list density="compact" class="movement-menu"
+    ><v-list density="compact" class="movement-menu app-action-menu"
       ><v-list-item
         title="Duplicate"
         :prepend-icon="mdiContentCopy"
@@ -26,17 +27,6 @@
 <script setup lang="ts">
 import { mdiContentCopy, mdiDeleteOutline, mdiDotsHorizontal, mdiStarOutline } from '@mdi/js'
 import AppIconButton from './ui/AppIconButton.vue'
+withDefaults(defineProps<{ size?: string | number }>(), { size: 'small' })
 const emit = defineEmits<{ duplicate: []; favorite: []; delete: [] }>()
 </script>
-
-<style scoped>
-.movement-menu {
-  --v-list-prepend-gap: 8px;
-}
-.movement-menu :deep(.v-list-item-title) {
-  font-weight: 700;
-}
-.movement-menu :deep(.v-list-item__prepend > .v-icon) {
-  opacity: 1;
-}
-</style>

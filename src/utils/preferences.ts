@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import type { DecimalSeparator, PeriodFilter, WeekDay } from '@/types'
 
-// Display preferences: the period the transactions and categories filters open
+// Display preferences: the period the Dashboard and Transactions filters open
 // with, where a week starts and how amounts are formatted. Like the currency
 // they live both in the account (the backend keeps them in the User row) and in
 // localStorage, so the UI is right from the first paint and works offline while

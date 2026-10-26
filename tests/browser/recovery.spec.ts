@@ -7,7 +7,8 @@ test.beforeEach(async ({ page }, info) => {
   // Existing flows explicitly close drafts; targeted protection tests override this handler.
   page.on('dialog', dialog => dialog.accept())
   token = `${info.project.name}-${info.testId}@example.test`
-  if (info.title.startsWith('closed registration')) return
+  if (info.title.startsWith('closed registration') || info.title.startsWith('authentication tabs'))
+    return
   await page.addInitScript(key => {
     if (sessionStorage.getItem('test-session')) return
     sessionStorage.setItem('test-session', 'yes')
@@ -28,12 +29,14 @@ test('navigation lists the requested view order with English labels', async ({ p
     'Transactions',
     'Accounts',
     'Categories',
-    'Budgets',
     'Goals',
+    'Budgets',
     'Recurring',
     'Analytics'
   ])
   await expect(links.last()).toBeVisible()
+  for (const link of await page.locator('.app-navigation-item').all())
+    await expect(link).toHaveCSS('border-radius', '12px')
   expect(await page.locator('html').getAttribute('lang')).toBe('en')
 })
 
@@ -205,7 +208,7 @@ test('offline shell, durable write, reconnection and visible refresh', async ({
   const offlineSnackbar = page
     .locator('.v-snackbar__wrapper')
     .filter({ hasText: 'Change saved on this device; waiting to sync.' })
-  await expect(offlineSnackbar).toHaveCSS('border-radius', '12px')
+  await expect(offlineSnackbar).toHaveCSS('border-radius', '16px')
   expect(
     await page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
   ).toBe(1)
@@ -215,7 +218,7 @@ test('offline shell, durable write, reconnection and visible refresh', async ({
     .locator('.v-alert')
     .filter({ hasText: 'No connection. Showing the last saved copy.' })
   await expect(staleAlert).toBeVisible()
-  await expect(staleAlert).toHaveCSS('border-radius', '12px')
+  await expect(staleAlert).toHaveCSS('border-radius', '16px')
   await context.setOffline(false)
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await expect(page.getByText('Offline lunch', { exact: true }).first()).toBeVisible()
@@ -355,10 +358,7 @@ test('period selection stays mounted during loading and fits mobile without stre
 
   for (const width of [1280, 600, 390, 320]) {
     await page.setViewportSize({ width, height: 900 })
-    await expect(toggle.getByRole('button').first()).toHaveCSS(
-      'height',
-      width < 600 ? '44px' : '40px'
-    )
+    await expect(toggle.getByRole('button').first()).toHaveCSS('height', '32px')
     await toggle.evaluate(async element => {
       await Promise.all(
         element
@@ -399,7 +399,7 @@ test('period selection stays mounted during loading and fits mobile without stre
       expect(layout).toHaveLength(5)
       for (const button of layout) {
         const diagnostic = JSON.stringify({ viewport: width, ...button })
-        expect(button.height, diagnostic).toBeGreaterThanOrEqual(width < 600 ? 44 : 40)
+        expect(button.height, diagnostic).toBeGreaterThanOrEqual(32)
         expect(button.inside, diagnostic).toBe(true)
         expect(button.labelFits, diagnostic).toBe(true)
       }
@@ -934,12 +934,12 @@ test('tag manager creates, renames, reorders and globally deletes without losing
     await page.getByRole('button', { name: 'Show 1 tags', exact: true }).click()
     const tagMenu = page.locator('.v-menu > .v-overlay__content')
     await expect(tagMenu).toBeVisible()
-    await expect(tagMenu).toHaveCSS('border-radius', '12px')
+    await expect(tagMenu).toHaveCSS('border-radius', '16px')
     await expect(tagMenu).toHaveCSS('border-top-width', '1px')
     await expect(tagMenu).toHaveCSS('background-color', 'rgb(10, 10, 10)')
     const tagItem = page.getByRole('listitem').filter({ hasText: /^Renamed$/ })
     await expect(tagItem).toBeVisible()
-    await expect(tagItem).toHaveCSS('border-radius', '8px')
+    await expect(tagItem).toHaveCSS('border-radius', '12px')
     await page.keyboard.press('Escape')
   } else await expect(page.getByText('Renamed', { exact: true }).first()).toBeVisible()
   await quickAction(page, 'Expense')
@@ -1011,7 +1011,7 @@ test('undo survives navigation and an expired deletion survives reload', async (
   const undoSnackbar = page
     .locator('.v-snackbar__wrapper')
     .filter({ has: page.getByRole('button', { name: 'Undo', exact: true }) })
-  await expect(undoSnackbar).toHaveCSS('border-radius', '12px')
+  await expect(undoSnackbar).toHaveCSS('border-radius', '16px')
   await page.evaluate(() => {
     history.pushState({}, '', '/')
     window.dispatchEvent(new PopStateEvent('popstate'))
@@ -1197,6 +1197,110 @@ test('next-only edit and skip preserve the rule base and target exact dates', as
     .toBe('2090-01-02T00:00:00.000Z')
 })
 
+test('budget and recurring toggles start a left-aligned row on mobile', async ({ page }) => {
+  for (const [path, label] of [
+    ['/budgets', 'Budget period'],
+    ['/recurring', 'Recurring type'],
+    ['/transactions', 'Transaction type']
+  ]) {
+    await page.goto(path!)
+    const account =
+      path === '/transactions'
+        ? page.getByRole('heading', { name: 'Transactions', exact: true })
+        : page.locator('.account-filter').first()
+    const toggle = page.getByRole('group', { name: label, exact: true })
+    for (const width of [320, 480]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(toggle).toBeVisible()
+      await expect
+        .poll(async () => {
+          const a = await account.boundingBox(),
+            t = await toggle.boundingBox()
+          return !!a && !!t && Math.abs(t.x - a.x) < 1 && t.y >= a.y + a.height + 15
+        })
+        .toBe(true)
+    }
+  }
+})
+
+test('movement shortcuts match quick action menu typography', async ({ page }) => {
+  await state(page, {
+    rows: [
+      {
+        id: 1,
+        amount: 5,
+        type: 'Expense',
+        categoryId: 1,
+        category: { name: 'Food', color: '#34A853' },
+        description: 'Menu typography',
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      }
+    ]
+  })
+  await page.goto('/transactions')
+  await page.getByRole('button', { name: 'Quick actions', exact: true }).click()
+  const typography = (element: Element) => {
+    const style = getComputedStyle(element)
+    return {
+      size: style.fontSize,
+      weight: style.fontWeight,
+      spacing: style.letterSpacing,
+      lineHeight: style.lineHeight
+    }
+  }
+  const quick = await page
+    .locator('.quick-actions-menu .v-list-item-title')
+    .first()
+    .evaluate(typography)
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
+  const movement = await page
+    .locator('.movement-menu .v-list-item-title')
+    .first()
+    .evaluate(typography)
+  expect(movement).toEqual(quick)
+})
+
+test('transaction filter rows keep moderate spacing on mobile and desktop', async ({
+  page
+}, info) => {
+  await page.goto('/transactions?accountId=main-1')
+  const content = page.locator('.transaction-filter-content')
+  await expect(content.getByText('Active filters:', { exact: true })).toBeVisible()
+  for (const width of [320, 480, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect
+      .poll(() =>
+        content.evaluate(element => {
+          const rows = [...element.children]
+          return (
+            rows.length === 3 &&
+            rows
+              .slice(1)
+              .every(
+                (row, index) =>
+                  Math.abs(
+                    row.getBoundingClientRect().top -
+                      rows[index]!.getBoundingClientRect().bottom -
+                      20
+                  ) < 1
+              )
+          )
+        })
+      )
+      .toBe(true)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+    await page.screenshot({
+      path: info.outputPath(`transaction-filter-spacing-${width}.png`),
+      fullPage: true,
+      animations: 'disabled'
+    })
+  }
+})
+
 test('transaction layouts and filter controls fit narrow and wide screens', async ({
   page
 }, info) => {
@@ -1249,7 +1353,7 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
       .getByRole('button')
     await expect(buttons).toHaveCount(2)
     for (const button of await buttons.all()) {
-      await expect(button).toHaveCSS('height', width < 600 ? '44px' : '40px')
+      await expect(button).toHaveCSS('height', '32px')
     }
     const layout = await page.locator('.transaction-filters').evaluate(element => {
       const rects = Array.from(element.children).map(child => child.getBoundingClientRect())
@@ -1288,10 +1392,30 @@ test('transaction layouts and filter controls fit narrow and wide screens', asyn
         expect(layout.tops[index]).toBeGreaterThan(layout.tops[index - 1])
       expect(Math.abs(layout.widths[1] - layout.range)).toBeLessThan(1)
     }
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-      `Page overflows at ${width}px`
-    ).toBe(true)
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            if (document.documentElement.scrollWidth <= innerWidth) return []
+            return [
+              {
+                tag: 'HTML',
+                classes: 'viewport-overflow',
+                right: document.documentElement.scrollWidth
+              },
+              ...Array.from(document.querySelectorAll('main *'))
+                .map(element => ({
+                  tag: element.tagName,
+                  classes: element.className,
+                  right: element.getBoundingClientRect().right
+                }))
+                .filter(element => element.right > innerWidth + 1)
+                .slice(0, 12)
+            ]
+          }),
+        { message: `Page overflows at ${width}px` }
+      )
+      .toEqual([])
     if (width === 1280) {
       const headers = await page.locator('.tx-table th').allTextContents()
       expect(headers.map(text => text.trim())).toEqual([
@@ -1404,11 +1528,11 @@ test('category selects show the color of each category', async ({ page }) => {
   await filter.locator('.v-field').click()
   const menu = page.locator('.v-select__content')
   await expect(menu).toBeVisible()
-  await expect(menu).toHaveCSS('border-radius', '12px')
+  await expect(menu).toHaveCSS('border-radius', '16px')
   await expect(menu).toHaveCSS('border-top-width', '1px')
   await expect(menu).toHaveCSS('background-color', 'rgb(10, 10, 10)')
   const food = page.getByRole('option', { name: 'Food', exact: true })
-  await expect(food).toHaveCSS('border-radius', '8px')
+  await expect(food).toHaveCSS('border-radius', '12px')
   const foodDot = food.locator('.category-dot')
   await expect(foodDot).toBeVisible()
   expect(await foodDot.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(
@@ -1467,7 +1591,9 @@ test('recurring category colors match in new and edit dialogs for expenses and i
   }
 })
 
-test('recent transaction comments and amounts align in fixed columns', async ({ page }, info) => {
+test('recent transaction comments wrap completely and amounts remain right aligned', async ({
+  page
+}, info) => {
   const date = new Date().toISOString()
   await state(page, {
     rows: [
@@ -1501,20 +1627,47 @@ test('recent transaction comments and amounts align in fixed columns', async ({ 
     await page.setViewportSize({ width, height: 900 })
     const columns = await card.locator('.summary-row').evaluateAll(rows =>
       rows.map(row => {
-        const comment = row.querySelector('.summary-comment')!.getBoundingClientRect()
+        const comment = row.querySelector<HTMLElement>('.summary-comment')!
         const amount = row.querySelector('.summary-amount')!.getBoundingClientRect()
-        return { comment: comment.left, amount: amount.right }
+        return {
+          amount: amount.right,
+          commentFits: comment.scrollHeight <= comment.clientHeight + 1,
+          clamp: getComputedStyle(comment).webkitLineClamp,
+          ellipsis: getComputedStyle(comment).textOverflow === 'ellipsis'
+        }
       })
     )
     expect(columns).toHaveLength(4)
-    for (const key of ['comment', 'amount'] as const)
-      expect(
-        Math.max(...columns.map(row => row[key])) - Math.min(...columns.map(row => row[key]))
-      ).toBeLessThan(1)
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-      `Page overflows at ${width}px`
-    ).toBe(true)
+      Math.max(...columns.map(row => row.amount)) - Math.min(...columns.map(row => row.amount))
+    ).toBeLessThan(1)
+    expect(columns.every(row => row.commentFits && row.clamp === 'none' && !row.ellipsis)).toBe(
+      true
+    )
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            if (document.documentElement.scrollWidth <= innerWidth) return []
+            return [
+              {
+                tag: 'HTML',
+                classes: 'viewport-overflow',
+                right: document.documentElement.scrollWidth
+              },
+              ...Array.from(document.querySelectorAll('main *'))
+                .map(element => ({
+                  tag: element.tagName,
+                  classes: element.className,
+                  right: element.getBoundingClientRect().right
+                }))
+                .filter(element => element.right > innerWidth + 1)
+                .slice(0, 12)
+            ]
+          }),
+        { message: `Page overflows at ${width}px` }
+      )
+      .toEqual([])
     await card.screenshot({
       path: info.outputPath(`recent-transactions-${width}.png`),
       animations: 'disabled'
@@ -2053,7 +2206,8 @@ test('accounts and goals separate confirmed balances from queued transfers', asy
     )
   })
   await page.goto('/accounts')
-  await expect(page.getByText('-$5.00 pending · Expected $95.00', { exact: true })).toBeVisible()
+  await expect(page.getByText('-$5.00 pending', { exact: true })).toBeVisible()
+  await expect(page.getByText('$95.00', { exact: true })).toBeVisible()
   await page.goto('/goals')
   await expect(page.getByText('+$5.00 pending · Expected $25.00', { exact: true })).toBeVisible()
   await page.screenshot({ path: info.outputPath('pending-goal-balance.png'), fullPage: true })
@@ -2109,4 +2263,116 @@ test('shared form spacing stays stable and validation expands only the affected 
   await expect(security.locator('.v-input__details:visible')).toHaveCount(0)
   await expect(security.locator('.app-form-fields')).toHaveCSS('gap', '16px')
   await expect(page.getByText('Email cannot be changed', { exact: true })).toBeVisible()
+})
+
+test('desktop transaction action buttons stay in one horizontal row', async ({ page }) => {
+  const date = new Date().toISOString()
+  await state(page, {
+    rows: [
+      {
+        id: 1,
+        amount: 10,
+        type: 'Expense',
+        categoryId: 1,
+        category: { name: 'Food', color: '#EA4335' },
+        date,
+        createdAt: date,
+        comment: 'Dinner'
+      }
+    ]
+  })
+  await page.goto('/transactions')
+  for (const width of [1280, 1440, 1600]) {
+    await page.setViewportSize({ width, height: 900 })
+    const actions = page.locator('.transaction-actions-cell').first()
+    await expect(actions).toBeVisible()
+    const buttons = await actions.locator('button').evaluateAll(elements =>
+      elements.map(element => ({
+        x: element.getBoundingClientRect().x,
+        y: element.getBoundingClientRect().y,
+        width: element.getBoundingClientRect().width
+      }))
+    )
+    expect(buttons).toHaveLength(2)
+    expect(Math.abs(buttons[0]!.y - buttons[1]!.y)).toBeLessThan(1)
+    expect(buttons[1]!.x).toBeGreaterThanOrEqual(buttons[0]!.x + buttons[0]!.width - 1)
+  }
+})
+
+test('transaction category options follow Expense and Income and clear incompatible selections', async ({
+  page
+}) => {
+  await page.goto('/transactions')
+  const select = page.locator('.category-filter')
+  await select.click()
+  await expect(page.getByRole('option', { name: 'Food', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'Salary', exact: true })).toHaveCount(0)
+  await page.getByRole('option', { name: 'Food', exact: true }).click()
+  await expect(page).toHaveURL(/category=1/)
+  await page
+    .getByRole('group', { name: 'Transaction type', exact: true })
+    .getByRole('button', { name: 'Income', exact: true })
+    .click()
+  await expect(page).toHaveURL(/type=Income/)
+  expect(new URL(page.url()).searchParams.has('category')).toBe(false)
+  await select.click()
+  await expect(page.getByRole('option', { name: 'Salary', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'Food', exact: true })).toHaveCount(0)
+  await page.getByRole('option', { name: 'Salary', exact: true }).click()
+  await expect(page).toHaveURL(/category=2/)
+  await page.reload()
+  await expect(select).toContainText('Salary')
+})
+
+test('category comparison keeps Period and type together below the date on mobile', async ({
+  page
+}) => {
+  await page.goto('/analytics')
+  const card = page.getByRole('region', { name: 'Category Comparison', exact: true })
+  for (const width of [320, 390, 599]) {
+    await page.setViewportSize({ width, height: 900 })
+    const positions = await card.locator('.comparison-controls').evaluate(element => {
+      const field = element.querySelector('.v-field')!.getBoundingClientRect()
+      const toggle = element.querySelector('.app-segmented-control')!.getBoundingClientRect()
+      const nav = element
+        .parentElement!.querySelector('.comparison-navigation')!
+        .getBoundingClientRect()
+      return {
+        fieldCenter: field.y + field.height / 2,
+        toggleCenter: toggle.y + toggle.height / 2,
+        fieldTop: field.y,
+        navBottom: nav.bottom,
+        right: element.getBoundingClientRect().right,
+        width: innerWidth
+      }
+    })
+    expect(Math.abs(positions.fieldCenter - positions.toggleCenter)).toBeLessThan(1)
+    expect(positions.fieldTop).toBeGreaterThanOrEqual(positions.navBottom)
+    expect(positions.right).toBeLessThanOrEqual(positions.width)
+    const text = card.locator('.comparison-selector .v-select__selection-text')
+    expect(await text.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+})
+
+test('authentication tabs have rounded corners and primary actions retain modal sizing', async ({
+  page
+}) => {
+  await page.route('**/auth/config', route =>
+    route.fulfill({ json: { registrationEnabled: true } })
+  )
+  await page.goto('/login')
+  for (const width of [1280, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const tab of await page.getByRole('tab').all())
+      await expect(tab).toHaveCSS('border-radius', '12px')
+    const action = page.locator('form button[type=submit]')
+    await expect(action).toHaveClass(/v-btn--size-large/)
+    const height = await action.evaluate(element => element.getBoundingClientRect().height)
+    expect(height).toBeGreaterThan(40)
+    await page.getByRole('tab', { name: 'Sign Up', exact: true }).click()
+    await expect(action).toHaveText('Create Account')
+    expect(await action.evaluate(element => element.getBoundingClientRect().height)).toBe(height)
+    await page.getByRole('tab', { name: 'Log In', exact: true }).click()
+  }
 })

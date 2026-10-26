@@ -64,7 +64,7 @@
     </AppCard>
     <AppCard v-for="item in scheduledDeletes" :key="item.id" class="mb-3">
       <AppCardBody>
-        Delete {{ item.transaction.category?.name || 'movement' }} · {{ item.transaction.amount }}
+        Delete {{ scheduledDeleteLabel(item) }}
         <p class="text-caption">
           Waiting for deletion · {{ new Date(item.deadline).toLocaleTimeString('en-US') }}
         </p>
@@ -273,7 +273,7 @@ import {
   type QueuedMutation
 } from '@/utils/outbox'
 import { getUser, syncPendingWrites, fetchJson } from '@/utils/api'
-import { scheduledDeletes, undoDelete } from '@/utils/undoDelete'
+import { scheduledDeletes, scheduledDeleteLabel, undoDelete } from '@/utils/undoDelete'
 import { mutationError } from '@/utils/validation'
 import { readCache } from '@/utils/cache'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
@@ -412,6 +412,7 @@ function describe(item: QueuedMutation) {
 function canEdit(item: QueuedMutation) {
   return (
     item.method !== 'DELETE' &&
+    !item.path.endsWith('/order') &&
     item.outcome !== 'unknown' &&
     (item.attempts === 0 || item.outcome === 'rejected') &&
     [

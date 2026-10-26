@@ -2,6 +2,7 @@ import { computed } from 'vue'
 import { useAsyncData } from './useAsyncData'
 import { fetchJson, getUser, getSessionIdentity } from '@/utils/api'
 import { outboxRevision, pendingForDisplay } from '@/utils/outbox'
+import { scheduledDeletionMutations } from '@/utils/undoDelete'
 import type { Account } from '@/types'
 
 const inFlight = new Map<string, Promise<Account[]>>()
@@ -33,7 +34,14 @@ export function useAccounts(options: { includeGoals?: boolean } = {}) {
     const userId = getUser()?.id
     const confirmedAccounts = new Map(query.data.value.map(row => [row.id, row]))
     const rows = new Map(query.data.value.map(row => [row.id, { ...row }]))
-    const pending = userId ? pendingForDisplay(userId) : []
+    const queued = userId ? pendingForDisplay(userId) : []
+    const queuedIds = new Set(queued.map(operation => operation.id))
+    const pending = [
+      ...queued,
+      ...scheduledDeletionMutations.value.filter(
+        operation => operation.userId === userId && !queuedIds.has(operation.id)
+      )
+    ]
     const unknown = new Set<string>()
     const movements = new Map<string, Record<string, unknown>>()
     const transfers = new Map<string, Record<string, unknown>>()
@@ -101,7 +109,10 @@ export function useAccounts(options: { includeGoals?: boolean } = {}) {
           const row = rows.get(id)
           if (!row) continue
           if (typeof body.name === 'string') row.name = body.name
-          if (typeof body.archived === 'boolean') row.archived = body.archived
+          if (typeof body.archived === 'boolean') {
+            row.archived = body.archived
+            row.pendingArchive = body.archived ? 'archive' : 'restore'
+          }
           if (body.targetAmount !== undefined) row.targetAmount = Number(body.targetAmount)
           if (body.balance !== undefined) {
             row.openingBalance += Number(body.balance) - row.balance
@@ -116,7 +127,24 @@ export function useAccounts(options: { includeGoals?: boolean } = {}) {
       const movement = /^\/transactions(?:\/\d+)?$/.test(operation.path)
       const transfer = /^\/transfers(?:\/[^/]+)?$/.test(operation.path)
       if (!movement && !transfer) {
-        if (operation.path.startsWith('/accounts/balance-adjustments/')) markUnknown([])
+        if (operation.path.startsWith('/accounts/balance-adjustments/')) {
+          const original = body.previousAdjustment as Record<string, unknown> | undefined
+          const accountId = typeof original?.accountId === 'string' ? original.accountId : undefined
+          if (
+            operation.method === 'DELETE' &&
+            operation.outcome !== 'unknown' &&
+            accountId &&
+            typeof original?.balance === 'number' &&
+            typeof original.previousBalance === 'number' &&
+            Number.isFinite(original.balance) &&
+            Number.isFinite(original.previousBalance)
+          ) {
+            add(
+              accountId,
+              Math.round(original.previousBalance * 100) - Math.round(original.balance * 100)
+            )
+          } else markUnknown(accountId ? [accountId] : [])
+        }
         continue
       }
       const key = operation.path

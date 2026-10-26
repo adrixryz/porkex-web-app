@@ -12,10 +12,11 @@
     <slot name="icon">
       <v-icon v-if="icon" :icon="icon" size="56" :color="color" class="mb-4"></v-icon>
     </slot>
-    <p class="text-h6 font-weight-medium mb-2">{{ title }}</p>
+    <p class="text-h6 font-weight-medium mt-0 mb-2">{{ title }}</p>
     <div v-if="message || $slots.default" class="text-body-2 text-on-surface-variant mb-6">
       <slot>{{ message }}</slot>
     </div>
+    <v-alert v-if="error" type="error" class="mb-6 text-start">{{ error }}</v-alert>
     <div class="d-flex flex-wrap justify-center ga-3">
       <AppButton variant="outlined" :disabled="loading || cancelDisabled" @click="cancel">
         {{ cancelLabel }}
@@ -41,6 +42,7 @@ withDefaults(
   defineProps<{
     title: string
     message?: string
+    error?: string
     confirmLabel?: string
     cancelLabel?: string
     color?: string
@@ -53,6 +55,7 @@ withDefaults(
   }>(),
   {
     message: '',
+    error: '',
     confirmLabel: 'Confirm',
     cancelLabel: 'Cancel',
     color: 'error',

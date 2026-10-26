@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, type Ref } from 'vue'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { useAccounts } from './useAccounts'
 import { fetchJson } from '@/utils/api'
 import { refreshPendingCount } from '@/utils/outbox'
 import type { Account } from '@/types'
+import { scheduledDeletionMutations } from '@/utils/undoDelete'
+
+vi.mock('@/utils/undoDelete', async () => ({
+  scheduledDeletionMutations: (await import('vue')).ref([])
+}))
+const scheduledPreview = scheduledDeletionMutations as Ref<typeof scheduledDeletionMutations.value>
 
 vi.mock('@/utils/api', () => ({
   fetchJson: vi.fn(),
@@ -56,7 +62,69 @@ function pending(method: string, body: object, path = '/transfers', extra = {}) 
 }
 beforeEach(() => {
   localStorage.clear()
+  scheduledPreview.value = []
   vi.mocked(fetchJson).mockReset()
+})
+
+it('projects scheduled transfer removal immediately, reverses Undo and never doubles the outbox handoff', async () => {
+  vi.mocked(fetchJson).mockResolvedValue([account('cash', 50), account('bank', 100)])
+  const { query } = consumer()
+  await query.run()
+  const body = { previousTransfer: { sourceId: 'cash', destinationId: 'bank', amount: 5 } }
+  scheduledPreview.value = [
+    {
+      id: 'operation',
+      userId: 1,
+      method: 'DELETE',
+      path: '/transfers/id',
+      body: JSON.stringify(body)
+    }
+  ]
+  expect(query.accounts.value.map(row => row.projectedBalance)).toEqual([55, 95])
+  scheduledPreview.value = []
+  expect(query.accounts.value.map(row => row.projectedBalance)).toEqual([50, 100])
+  scheduledPreview.value = [
+    {
+      id: 'operation',
+      userId: 1,
+      method: 'DELETE',
+      path: '/transfers/id',
+      body: JSON.stringify(body)
+    }
+  ]
+  pending('DELETE', body, '/transfers/id')
+  expect(query.accounts.value.map(row => row.projectedBalance)).toEqual([55, 95])
+  scheduledPreview.value = []
+  expect(query.accounts.value.map(row => row.projectedBalance)).toEqual([55, 95])
+})
+
+it('reverses the exact adjustment delta and restores the balance on Undo', async () => {
+  vi.mocked(fetchJson).mockResolvedValue([account('cash', 30), account('bank', 100)])
+  const { query } = consumer()
+  await query.run()
+  const path = '/accounts/balance-adjustments/account%3Aedit%3Aid'
+  scheduledPreview.value = [
+    {
+      id: 'adjustment',
+      userId: 1,
+      method: 'DELETE',
+      path,
+      body: JSON.stringify({
+        previousAdjustment: { accountId: 'cash', balance: 30, previousBalance: 50 }
+      })
+    }
+  ]
+  expect(query.accounts.value.map(row => row.projectedBalance)).toEqual([50, 100])
+  scheduledPreview.value = []
+  expect(query.accounts.value[0]!.projectedBalance).toBe(30)
+  pending(
+    'DELETE',
+    { previousAdjustment: { accountId: 'cash', balance: 30, previousBalance: 50 } },
+    path,
+    { outcome: 'unknown' }
+  )
+  expect(query.accounts.value[0]!.projectedBalance).toBeUndefined()
+  expect(query.accounts.value[1]!.projectedBalance).toBe(100)
 })
 
 it('shares concurrent catalogue requests without letting one unmount cancel another consumer', async () => {

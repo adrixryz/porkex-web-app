@@ -16,24 +16,28 @@
           @previous="navigate(-1)"
           @next="navigate(1)"
         />
-        <AppSelect
-          :model-value="mode"
-          :items="periodOptions"
-          label="Period"
-          density="compact"
-          hide-details
-          class="comparison-selector"
-          @update:model-value="selectMode"
-        />
-        <AppSelect
-          :model-value="type"
-          :items="['Expense', 'Income']"
-          label="Type"
-          density="compact"
-          hide-details
-          class="comparison-selector"
-          @update:model-value="selectType"
-        />
+        <div class="comparison-controls">
+          <AppSelect
+            :model-value="mode"
+            :items="periodOptions"
+            label="Period"
+            density="compact"
+            hide-details
+            class="comparison-selector"
+            @update:model-value="selectMode"
+          />
+          <AppSegmentedControl
+            :model-value="type"
+            :items="[
+              { label: 'Expense', value: 'Expense' },
+              { label: 'Income', value: 'Income' }
+            ]"
+            label="Comparison type"
+            compact
+            block
+            @update:model-value="selectType"
+          />
+        </div>
       </div>
     </template>
     <v-progress-linear v-if="loading" indeterminate height="2" />
@@ -113,6 +117,7 @@ import AppCard from '@/components/ui/AppCard.vue'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
 import AppEmptyState from '@/components/ui/AppEmptyState.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
+import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
 import AppPeriodNavigation from '@/components/ui/AppPeriodNavigation.vue'
 import CategoryDot from '@/components/CategoryDot.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
@@ -283,9 +288,19 @@ onMounted(() => {
 .comparison-navigation {
   flex: 0 1 auto;
 }
+.comparison-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 150fr) minmax(0, 184fr);
+  align-items: center;
+  gap: 12px;
+  flex: 0 1 346px;
+  width: 346px;
+  max-width: 100%;
+  min-width: 0;
+}
 .comparison-selector {
-  width: 150px;
-  flex: 1 1 130px;
+  width: 100%;
+  min-width: 0;
 }
 .comparison-content {
   display: grid;
@@ -332,14 +347,25 @@ onMounted(() => {
 @media (max-width: 599px) {
   .comparison-filters {
     width: 100%;
+    justify-content: center;
   }
   .comparison-navigation {
     flex: 1 1 100%;
     justify-content: center;
   }
-  .comparison-selector {
-    width: auto;
-    flex: 1 1 120px;
+  .comparison-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .comparison-selector :deep(.v-field) {
+    --v-field-padding-start: 12px;
+    --v-field-padding-end: 8px;
+  }
+  .comparison-selector :deep(.v-field__input) {
+    font-size: 0.75rem;
+    padding-inline: 8px 0 !important;
+  }
+  .comparison-selector :deep(.v-select__selection-text) {
+    font-size: 0.75rem;
   }
 }
 </style>

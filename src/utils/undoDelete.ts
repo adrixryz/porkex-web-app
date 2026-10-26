@@ -2,15 +2,31 @@ import { computed, ref, watch } from 'vue'
 import { transactionTypeReviver } from './transactionTypes'
 import type { Transaction } from '@/types'
 import { activeWrites, getUser, isAuthenticated, syncPendingWrites, USER_CHANGE_EVENT } from './api'
-import { enqueue, outboxRevision, ownedPending, withOutboxLock, withSendLock } from './outbox'
+import {
+  enqueue,
+  outboxRevision,
+  ownedPending,
+  withOutboxLock,
+  withSendLock,
+  type QueuedMutation
+} from './outbox'
 import { ensurePersistentStorage } from './storagePersistence'
 
 const KEY = 'porkex_scheduled_deletes'
 const LOCK = 'porkex-scheduled-deletes'
 const WINDOW = 8_000
 const confirmed = new Map<number, Set<number>>()
+const confirmedAccountPaths = new Map<number, Set<string>>()
+const accountMovementPath =
+  /^\/(?:transfers\/[A-Za-z0-9_-]+|accounts\/balance-adjustments\/account%3A(?:create|edit)%3A[A-Za-z0-9_-]+)$/i
 window.addEventListener('porkex-delete-confirmed', event => {
   const { userId, path } = (event as CustomEvent<{ userId: number; path: string }>).detail
+  if (accountMovementPath.test(path)) {
+    const paths = confirmedAccountPaths.get(userId) ?? new Set<string>()
+    paths.add(path)
+    confirmedAccountPaths.set(userId, paths)
+    revision.value++
+  }
   if (!/^\/transactions\/\d+$/.test(path)) return
   const ids = confirmed.get(userId) ?? new Set<number>()
   ids.add(Number(path.split('/')[2]))
@@ -21,7 +37,8 @@ interface ScheduledDelete {
   id: string
   userId: number
   deadline: number
-  transaction: Transaction
+  transaction?: Transaction
+  operation?: { path: string; body?: string; label: string }
 }
 const entries = ref<ScheduledDelete[]>([])
 const revision = ref(0)
@@ -38,7 +55,10 @@ function read(): ScheduledDelete[] {
         typeof item.id === 'string' &&
         Number.isInteger(item.userId) &&
         Number.isFinite(item.deadline) &&
-        Number.isInteger(item.transaction?.id)
+        (Number.isInteger(item.transaction?.id) ||
+          (accountMovementPath.test(item.operation?.path) &&
+            typeof item.operation?.label === 'string' &&
+            (item.operation.body === undefined || typeof item.operation.body === 'string')))
     )
   )
     throw new Error('Scheduled deletions could not be read. The stored copy has been preserved.')
@@ -73,6 +93,28 @@ export const scheduledDeletes = computed(() => {
   const userId = isAuthenticated() ? getUser()?.id : undefined
   return entries.value.filter(item => item.userId === userId)
 })
+function deletionMutation(
+  item: ScheduledDelete
+): Pick<QueuedMutation, 'id' | 'method' | 'path' | 'body' | 'outcome'> {
+  return {
+    id: item.id,
+    method: 'DELETE',
+    path: item.operation?.path ?? `/transactions/${item.transaction!.id}`,
+    body: item.operation
+      ? (item.operation.body ?? null)
+      : JSON.stringify({
+          previousTransaction: {
+            accountId: item.transaction!.accountId,
+            amount: item.transaction!.amount,
+            type: item.transaction!.type
+          }
+        })
+  }
+}
+export const scheduledDeletionMutations = computed(() => {
+  void revision.value
+  return entries.value.map(item => ({ ...deletionMutation(item), userId: item.userId }))
+})
 export async function undoDelete(id: string) {
   const userId = getUser()?.id
   const clickedAt = Date.now()
@@ -95,7 +137,9 @@ export const hiddenTransactionIds = computed(() => {
   if (!userId) return new Set<number>()
   const ids = [
     ...(confirmed.get(userId) ?? []),
-    ...entries.value.filter(item => item.userId === userId).map(item => item.transaction.id)
+    ...entries.value
+      .filter(item => item.userId === userId && item.transaction)
+      .map(item => item.transaction!.id)
   ]
   try {
     for (const operation of ownedPending(userId))
@@ -107,6 +151,37 @@ export const hiddenTransactionIds = computed(() => {
   return new Set(ids)
 })
 export async function scheduleDelete(transaction: Transaction) {
+  return scheduleDeletion({ transaction })
+}
+export function scheduleAccountMovementDelete(path: string, label: string, body?: unknown) {
+  if (!accountMovementPath.test(path)) throw new Error('Invalid account movement deletion.')
+  return scheduleDeletion({
+    operation: { path, label, ...(body ? { body: JSON.stringify(body) } : {}) }
+  })
+}
+export function scheduledDeleteLabel(item: ScheduledDelete) {
+  return (
+    item.operation?.label ??
+    `${item.transaction?.category?.name || 'movement'} · ${item.transaction?.amount}`
+  )
+}
+export const hiddenAccountMovementPaths = computed(() => {
+  void revision.value
+  void outboxRevision.value
+  const userId = isAuthenticated() ? getUser()?.id : undefined
+  if (!userId) return new Set<string>()
+  const paths = new Set(confirmedAccountPaths.get(userId))
+  for (const item of entries.value)
+    if (item.userId === userId && item.operation) paths.add(item.operation.path)
+  try {
+    for (const item of ownedPending(userId))
+      if (item.method === 'DELETE' && accountMovementPath.test(item.path)) paths.add(item.path)
+  } catch {
+    /* The outbox reports damaged storage. */
+  }
+  return paths
+})
+async function scheduleDeletion(target: Pick<ScheduledDelete, 'transaction' | 'operation'>) {
   void ensurePersistentStorage()
   const userId = getUser()?.id
   if (!isAuthenticated() || !userId) throw new Error('Sign in before deleting a movement.')
@@ -114,13 +189,22 @@ export async function scheduleDelete(transaction: Transaction) {
   try {
     await withOutboxLock(LOCK, async () => {
       const all = read()
-      if (all.some(item => item.userId === userId && item.transaction.id === transaction.id)) return
+      if (
+        all.some(
+          item =>
+            item.userId === userId &&
+            (target.transaction
+              ? item.transaction?.id === target.transaction.id
+              : item.operation?.path === target.operation?.path)
+        )
+      )
+        return
       const now = Date.now()
       const deadline = now + WINDOW
       const value = all.map(item =>
         item.userId === userId && item.deadline > now ? { ...item, deadline } : item
       )
-      value.push({ id: crypto.randomUUID(), userId, deadline, transaction })
+      value.push({ id: crypto.randomUUID(), userId, deadline, ...target })
       write(value)
       clock.value = now
       deleteError.value = ''
@@ -169,17 +253,8 @@ export async function publishScheduledDeletes() {
         // Copy first, remove second. A crash between keys safely repeats the
         // same queue ID; a repeated DELETE is already idempotent (404 is done).
         await enqueue({
-          id: item.id,
-          userId,
-          method: 'DELETE',
-          path: `/transactions/${item.transaction.id}`,
-          body: JSON.stringify({
-            previousTransaction: {
-              accountId: item.transaction.accountId,
-              amount: item.transaction.amount,
-              type: item.transaction.type
-            }
-          })
+          ...deletionMutation(item),
+          userId
         })
         write(read().filter(value => value.id !== item.id))
       }

@@ -3,6 +3,8 @@ import { clearAuth, setToken, setUser } from './api'
 import { deferred, installTestLocks } from './locks.test-helper'
 import {
   hiddenTransactionIds,
+  hiddenAccountMovementPaths,
+  scheduleAccountMovementDelete,
   publishScheduledDeletes,
   scheduleDelete,
   startUndoRecovery,
@@ -10,6 +12,7 @@ import {
   waitingDeletes
 } from './undoDelete'
 import type { Transaction } from '@/types'
+import { ownedPending } from './outbox'
 const row = (id: number): Transaction => ({
   id,
   amount: 10,
@@ -42,6 +45,34 @@ it('has no idle timer and cancels the only deadline timer on Undo', async () => 
   expect(vi.getTimerCount()).toBe(1)
   await undoDeletes()
   expect(vi.getTimerCount()).toBe(0)
+})
+
+it('persists account movement deletions, restores them with Undo and publishes their original payload', async () => {
+  const path = '/transfers/undo-transfer'
+  const previousTransfer = { sourceId: 'main-1', destinationId: 'cash', amount: 20 }
+  await scheduleAccountMovementDelete(path, 'transfer', { previousTransfer })
+  expect(hiddenAccountMovementPaths.value.has(path)).toBe(true)
+  expect(hiddenTransactionIds.value.size).toBe(0)
+  stop?.()
+  stop = startUndoRecovery()
+  expect(waitingDeletes.value).toHaveLength(1)
+  await undoDeletes()
+  expect(hiddenAccountMovementPaths.value.has(path)).toBe(false)
+  expect(ownedPending(1)).toHaveLength(0)
+  for (const target of [path, '/accounts/balance-adjustments/account%3Acreate%3Acash']) {
+    await scheduleAccountMovementDelete(target, 'account movement', { previousTransfer })
+  }
+  stop?.()
+  vi.setSystemTime(Date.now() + 9_000)
+  await publishScheduledDeletes()
+  const pending = ownedPending(1)
+  expect(pending.map(item => item.path)).toEqual([
+    path,
+    '/accounts/balance-adjustments/account%3Acreate%3Acash'
+  ])
+  expect(JSON.parse(pending[0]!.body!)).toEqual({ previousTransfer })
+  await publishScheduledDeletes()
+  expect(ownedPending(1)).toHaveLength(2)
 })
 
 it('suspends its deadline timer while hidden and publishes on resume', async () => {

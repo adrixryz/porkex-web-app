@@ -6,7 +6,7 @@ export interface EditStamp {
 export function requiresEditStamp(method: string, path: string): boolean {
   return (
     method === 'PUT' &&
-    /^\/(?:profile|(?:transactions|categories|budgets|recurring)\/\d+|(?:accounts|transfers|goals|favorites)\/.+)$/.test(
+    /^\/(?:profile|categories\/order|(?:transactions|categories|budgets|recurring)\/\d+|(?:accounts|transfers|goals|favorites)\/.+)$/.test(
       path
     )
   )

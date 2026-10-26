@@ -160,8 +160,8 @@ export function mutationError(path: string, method: string, body: string | null)
     )
       return 'End date must be valid and on or after the start date.'
   }
-  if (budget && !['WEEK', 'MONTH'].includes(String(data.period)))
-    return 'Choose a weekly or monthly budget.'
+  if (budget && !['WEEK', 'MONTH', 'YEAR'].includes(String(data.period)))
+    return 'Choose a weekly, monthly or yearly budget.'
   if (category) {
     if (!validCatalogName(data.name, 60))
       return `Category name must contain 1–60 characters. ${catalogNameHint}`

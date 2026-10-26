@@ -1,6 +1,6 @@
 <template>
   <div v-bind="$attrs">
-    <v-alert v-if="error || loadError" type="error" class="mb-4">{{ error || loadError }}</v-alert>
+    <v-alert v-if="loadError" type="error" class="mb-4">{{ loadError }}</v-alert>
     <AppPageSkeleton v-if="loading && !hasLoaded" page="goals" :header="false" />
     <AppEmptyState
       v-else-if="!goals.length"
@@ -28,7 +28,7 @@
                   :icon="mdiDeleteOutline"
                   :label="`Remove ${goal.name}`"
                   color="error"
-                  @click="deleting = goal" /></template
+                  @click="confirmRemove(goal)" /></template
             ></AppEntityHeader>
             <div class="d-flex flex-wrap align-baseline justify-space-between ga-2 mb-2">
               <span class="text-h6 font-weight-bold">{{ cs }}{{ formatMoney(goal.balance) }}</span>
@@ -130,7 +130,8 @@
     title="Remove goal?"
     confirm-label="Remove"
     :loading="busy"
-    @update:model-value="deleting = null"
+    :error="error"
+    @update:model-value="closeRemove"
     @confirm="remove"
     >Withdraw all funds first. Transfer history will remain available.</AppConfirmDialog
   >
@@ -142,7 +143,7 @@ import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
 defineOptions({ inheritAttrs: false })
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { mdiPlus, mdiMinus, mdiPencilOutline, mdiDeleteOutline, mdiBullseyeArrow } from '@mdi/js'
 import type { Account } from '@/types'
 import { useAccounts } from '@/composables/useAccounts'
@@ -202,7 +203,19 @@ function newGoal() {
   edit(null)
 }
 defineExpose({ newGoal })
+function closeRemove() {
+  deleting.value = null
+  error.value = ''
+}
+function confirmRemove(goal: Account) {
+  error.value = ''
+  deleting.value = goal
+}
+watch(dialog, open => {
+  if (!open) error.value = ''
+})
 function fund(goal: Account, out: boolean) {
+  error.value = ''
   selected.value = goal
   withdraw.value = out
   transferOpen.value = true

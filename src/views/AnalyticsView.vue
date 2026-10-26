@@ -4,14 +4,11 @@
     <AppPageSkeleton v-if="loading && !hasLoaded" page="analytics" />
 
     <template v-else>
-      <AppPageHeader title="Analytics" subtitle="Track your financial trends and patterns" />
-      <div class="d-flex mb-4">
-        <AccountFilter
-          v-model="accountFilter"
-          :accounts="accounts"
-          class="analytics-account-filter"
-        />
-      </div>
+      <AppPageHeader title="Analytics" subtitle="Track your financial trends and patterns">
+        <template #actions>
+          <AccountFilter v-model="accountFilter" :accounts="accounts" />
+        </template>
+      </AppPageHeader>
       <v-alert v-if="accountsError" type="error" class="mb-4">{{ accountsError }}</v-alert>
 
       <!-- INSIGHT CARDS -->

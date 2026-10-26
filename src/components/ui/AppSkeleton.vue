@@ -63,18 +63,13 @@ withDefaults(
   flex-shrink: 0;
 }
 .app-skeleton--field {
-  height: 56px;
+  height: 40px;
   border-radius: 999px;
 }
 .app-skeleton--segmented {
   width: 280px;
-  height: 52px;
+  height: 44px;
   border-radius: 999px;
-}
-@media (max-width: 599px) {
-  .app-skeleton--segmented {
-    height: 56px;
-  }
 }
 .app-skeleton--chart {
   height: 320px;
@@ -82,7 +77,8 @@ withDefaults(
 }
 .app-skeleton--circle {
   width: 200px;
-  height: 200px;
+  height: auto;
+  aspect-ratio: 1;
   border-radius: 50%;
 }
 .app-skeleton-row {
@@ -109,7 +105,6 @@ withDefaults(
 }
 @media (max-width: 480px) {
   .app-skeleton-row {
-    padding-inline: 16px;
     gap: 8px;
   }
 }

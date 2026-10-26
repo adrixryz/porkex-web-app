@@ -155,9 +155,13 @@ const props = withDefaults(
   defineProps<{
     modelValue: boolean
     rule?: RecurringRule | null
+    defaultAccountId?: string
+    defaultType?: TxType
   }>(),
   {
-    rule: null
+    rule: null,
+    defaultAccountId: undefined,
+    defaultType: 'Expense'
   }
 )
 
@@ -248,8 +252,10 @@ const reset = () => {
   clientId.value = crypto.randomUUID()
   const rule = props.rule
   form.value = {
-    accountId: rule?.accountId ?? `main-${getUser()?.id}`,
-    type: rule?.type ?? 'Expense',
+    accountId: rule
+      ? (rule.accountId ?? `main-${getUser()?.id}`)
+      : (props.defaultAccountId ?? `main-${getUser()?.id}`),
+    type: rule?.type ?? props.defaultType,
     amount: rule ? String(rule.amount) : '',
     description: rule?.description ?? '',
     categoryId: rule?.categoryId ?? null,

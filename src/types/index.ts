@@ -4,6 +4,8 @@
 export type TxType = 'Income' | 'Expense'
 
 export interface Account {
+  excludeFromTotalBalance?: boolean
+  pendingArchive?: 'archive' | 'restore'
   pendingBalanceDelta?: number
   projectedBalance?: number
   pendingBalanceUnknown?: boolean
@@ -50,7 +52,7 @@ export interface Favorite extends MovementDraft {
   name: string
 }
 
-/** The period filters the transactions and categories screens offer. */
+/** Calendar periods used by Dashboard, Transactions and account preferences. */
 export type PeriodFilter = 'day' | 'week' | 'month' | 'year'
 
 export type WeekDay =
@@ -65,6 +67,7 @@ export type WeekDay =
 export type DecimalSeparator = '.' | ','
 
 export interface Category {
+  position?: number
   id: number
   name: string
   type: TxType
@@ -211,7 +214,7 @@ export interface CurrencyOption {
   name: string
 }
 
-export type BudgetPeriod = 'WEEK' | 'MONTH'
+export type BudgetPeriod = 'WEEK' | 'MONTH' | 'YEAR'
 
 export interface Budget {
   id: number
@@ -224,7 +227,7 @@ export interface Budget {
   remaining: number
   usagePercent: number
   overBudget: boolean
-  category: Pick<Category, 'id' | 'name' | 'color' | 'type'>
+  category: Pick<Category, 'id' | 'name' | 'color' | 'type' | 'position'>
 }
 
 export interface BudgetTotals {
@@ -237,7 +240,7 @@ export interface BudgetTotals {
 
 export interface BudgetsResponse {
   budgets: Budget[]
-  /** One entry per period: mixing WEEK and MONTH would count movements twice. */
+  /** One entry per period: mixing WEEK, MONTH and YEAR would count movements repeatedly. */
   totals: BudgetTotals[]
 }
 

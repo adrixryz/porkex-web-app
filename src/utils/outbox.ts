@@ -172,7 +172,11 @@ export async function retryFirstBlocked() {
   const item = firstBlockedMutation.value
   if (!item || item.userId !== currentUserId) return
   await withSendLock(item.userId, async () => {
-    await updateItem(item.id, stored => {
+    await withOutboxLock(STORAGE_LOCK, async () => {
+      if (currentUserId !== item.userId) throw new Error('The session changed.')
+      const all = readAll()
+      const stored = all.find(value => value.id === item.id && value.userId === item.userId)
+      if (!stored) return
       let body = stored.body
       if (requiresEditStamp(stored.method, stored.path) && body) {
         const payload = JSON.parse(body) as Record<string, unknown>
@@ -182,7 +186,7 @@ export async function retryFirstBlocked() {
               'This older edit has no original save time. Apply it now as a new edit?'
             )
           )
-            return stored
+            return
           body = JSON.stringify({
             ...payload,
             mutationId: crypto.randomUUID(),
@@ -190,7 +194,42 @@ export async function retryFirstBlocked() {
           })
         }
       }
-      return { ...stored, body, status: 'pending', lastError: undefined }
+      // A restore queued behind an archived-account rejection is its prerequisite.
+      // Only an explicit Retry may move these state-only repairs ahead of the blocker.
+      const restores =
+        stored.lastError === 'Restore the archived account before changing its balance.'
+          ? all.slice(all.indexOf(stored) + 1).filter(value => {
+              if (
+                value.userId !== item.userId ||
+                value.status !== 'pending' ||
+                value.method !== 'PUT' ||
+                !/^\/accounts\/[A-Za-z0-9_-]+$/.test(value.path)
+              )
+                return false
+              try {
+                const patch = JSON.parse(value.body ?? '{}')
+                return (
+                  patch?.archived === false &&
+                  typeof patch.mutationId === 'string' &&
+                  typeof patch.editedAt === 'string' &&
+                  Object.keys(patch).every(key =>
+                    ['archived', 'mutationId', 'editedAt'].includes(key)
+                  )
+                )
+              } catch {
+                return false
+              }
+            })
+          : []
+      const remaining = all.filter(value => !restores.includes(value))
+      const index = remaining.indexOf(stored)
+      remaining.splice(index, 1, ...restores, {
+        ...stored,
+        body,
+        status: 'pending',
+        lastError: undefined
+      })
+      writeAll(remaining)
     })
     lastFlushError.value = ''
   })

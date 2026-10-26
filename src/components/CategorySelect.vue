@@ -1,5 +1,5 @@
 <template>
-  <AppSelect item-title="name" item-value="id" label="Category" v-bind="$attrs">
+  <AppSelect item-title="name" item-value="id" label="Category" :items="ordered" v-bind="$attrs">
     <template #selection="{ item }">
       <CategoryDot :color="item.color" />{{ item.name ?? item.title }}
     </template>
@@ -17,5 +17,17 @@
 import AppSelect from '@/components/ui/AppSelect.vue'
 import CategoryDot from '@/components/CategoryDot.vue'
 
+import { useCategoryOrder } from '@/composables/useCategoryOrder'
+const props = defineProps<{
+  items?: {
+    id?: number
+    value?: number
+    position?: number
+    name?: string
+    title?: string
+    color?: string | null
+  }[]
+}>()
+const ordered = useCategoryOrder(() => props.items ?? [])
 defineOptions({ inheritAttrs: false })
 </script>

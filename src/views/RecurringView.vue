@@ -7,25 +7,49 @@
     <template v-else>
       <!-- HEADER -->
 
-      <AppPageHeader
-        title="Recurring"
-        subtitle="Movements that repeat on a schedule, for income and expenses."
-      >
+      <AppPageHeader title="Recurring" subtitle="Manage your recurring transactions.">
         <template #actions>
-          <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
+          <AppButton
+            color="primary"
+            :prepend-icon="mdiPlus"
+            :disabled="selectedAccountArchived"
+            @click="openDialog()"
+          >
             New Rule
           </AppButton>
         </template>
       </AppPageHeader>
 
+      <v-alert v-if="accountsError" type="error" class="mb-4">{{ accountsError }}</v-alert>
+      <div class="d-flex flex-column flex-sm-row flex-wrap align-start align-sm-center ga-4 mb-6">
+        <AccountFilter v-model="accountFilter" :accounts="accounts" />
+        <AppSegmentedControl
+          v-model="filterType"
+          label="Recurring type"
+          :items="[
+            { label: 'Expense', value: 'Expense' },
+            { label: 'Income', value: 'Income' }
+          ]"
+          class="ml-sm-auto"
+        />
+      </div>
+
       <!-- EMPTY STATE -->
 
-      <v-row v-if="rules.length === 0">
+      <v-row v-if="visibleRules.length === 0">
         <v-col cols="12">
           <AppEmptyState
             :icon="mdiRepeat"
-            title="No recurring rules yet"
-            description="Recreate the rent, the salary or any movement that comes back on its own."
+            :title="
+              rules.length
+                ? `No ${filterType.toLowerCase()} recurring rules${accountFilter ? ' for this account' : ''}`
+                : 'No recurring rules yet'
+            "
+            :description="
+              rules.length
+                ? 'Choose another account or transaction type.'
+                : 'Recreate the rent, the salary or any movement that comes back on its own.'
+            "
             padding="12"
           />
         </v-col>
@@ -34,16 +58,16 @@
       <!-- RULE LIST -->
 
       <v-row v-else>
-        <v-col cols="12" md="6" v-for="r in rules" :key="r.id">
+        <v-col cols="12" md="6" v-for="r in visibleRules" :key="r.id">
           <AppCard class="fill-height">
-            <AppCardBody>
+            <AppCardBody class="recurring-rule-content">
               <AppEntityHeader
                 :title="r.description"
                 :icon="mdiRepeat"
                 :color="r.category?.color ?? undefined"
-                class="mb-3"
                 ><template #subtitle
-                  >{{ r.category?.name }} · {{ scheduleLabel(r.frequency, r.interval) }}</template
+                  >{{ r.category?.name }} · {{ accountName(r) }} ·
+                  {{ scheduleLabel(r.frequency, r.interval) }}</template
                 ><template #actions
                   ><AppIconButton
                     v-if="!isEnded(r)"
@@ -93,19 +117,14 @@
                 </span>
               </div>
 
-              <v-alert
-                v-if="r.nextException"
-                density="compact"
-                variant="tonal"
-                type="info"
-                class="mt-2"
+              <v-alert v-if="r.nextException" density="compact" variant="tonal" type="info"
                 >Next only: {{ cs }}{{ formatMoney(r.nextException.amount)
                 }}<span v-if="r.nextException.comment">
                   · {{ r.nextException.comment }}</span
                 ></v-alert
               >
 
-              <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-2 mt-2">
+              <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-2">
                 <AppActionButton :icon="mdiSkipNextOutline" @click="skipRule = r"
                   >Skip next</AppActionButton
                 >
@@ -115,7 +134,7 @@
                 >
               </div>
 
-              <p v-if="r.endDate" class="text-caption text-on-surface-variant mt-3 mb-0">
+              <p v-if="r.endDate" class="text-caption text-on-surface-variant ma-0">
                 Until {{ formatDateOnly(r.endDate) }}
               </p>
             </AppCardBody>
@@ -126,7 +145,13 @@
 
     <!-- CREATE/EDIT DIALOG -->
 
-    <RecurringDialog v-model="dialog" :rule="editingRule" @saved="onSaved" />
+    <RecurringDialog
+      v-model="dialog"
+      :rule="editingRule"
+      :default-account-id="accountFilter || undefined"
+      :default-type="filterType"
+      @saved="onSaved"
+    />
 
     <TransactionDialog
       v-model="nextDialog"
@@ -203,7 +228,10 @@ import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'
 
 import { mutationFeedback } from '@/utils/mutationFeedback'
 
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAccounts } from '@/composables/useAccounts'
+import AccountFilter from '@/components/AccountFilter.vue'
 
 import TransactionDialog from '@/components/TransactionDialog.vue'
 
@@ -237,7 +265,8 @@ import { formatDateOnly, toDateInput } from '@/utils/date'
 
 import { scheduleLabel } from '@/utils/recurring'
 
-import type { RecurringRule, Transaction } from '@/types'
+import type { RecurringRule, Transaction, TxType } from '@/types'
+import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
 
 import {
   mdiDeleteOutline,
@@ -250,6 +279,39 @@ import {
 } from '@mdi/js'
 
 const cs = useCurrencySymbol()
+const route = useRoute()
+const router = useRouter()
+const { accounts, run: fetchAccounts, error: accountsError } = useAccounts()
+const accountFilter = computed({
+  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : null),
+  set: (value: string | null) => {
+    const query = { ...route.query }
+    if (value) query.accountId = value
+    else delete query.accountId
+    void router.push({ query })
+  }
+})
+const filterType = computed<TxType>({
+  get: () => (route.query.type === 'Income' ? 'Income' : 'Expense'),
+  set: value => {
+    void router.push({ query: { ...route.query, type: value } })
+  }
+})
+const selectedAccountArchived = computed(() =>
+  accounts.value.some(account => account.id === accountFilter.value && account.archived)
+)
+const ruleAccountId = (rule: RecurringRule) =>
+  rule.accountId ?? accounts.value.find(account => account.isMain)?.id
+const accountName = (rule: RecurringRule) =>
+  accounts.value.find(account => account.id === ruleAccountId(rule))?.name ??
+  (rule.accountId ? 'Unavailable account' : 'Main')
+const visibleRules = computed(() =>
+  rules.value.filter(
+    rule =>
+      rule.type === filterType.value &&
+      (!accountFilter.value || ruleAccountId(rule) === accountFilter.value)
+  )
+)
 
 const { showSnack } = useSnackbar()
 
@@ -490,5 +552,31 @@ const loadRules = async () => {
   if (loadError.value) showSnack(loadError.value, 'error')
 }
 
-onMounted(loadRules)
+onMounted(() => {
+  void loadRules()
+  void fetchAccounts()
+})
 </script>
+
+<style scoped>
+.recurring-rule-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (max-width: 399px) {
+  .recurring-rule-content :deep(.app-entity-header) {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .recurring-rule-content :deep(.app-entity-header__heading) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .recurring-rule-content :deep(.app-entity-header__actions) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+</style>

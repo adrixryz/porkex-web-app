@@ -15,7 +15,7 @@
       </div>
 
       <!-- TABS -->
-      <v-tabs v-model="tab" color="primary" align-tabs="center" class="mb-2">
+      <v-tabs v-model="tab" color="primary" align-tabs="center" class="mb-2 auth-tabs">
         <v-tab value="login">Log In</v-tab>
         <v-tab v-if="registrationState !== 'disabled'" value="register">Sign Up</v-tab>
       </v-tabs>
@@ -90,7 +90,7 @@
               type="submit"
               color="primary"
               size="large"
-              class="w-100 font-weight-bold"
+              class="w-100 font-weight-bold app-form-action"
               :loading="loading"
               :disabled="
                 !form.email.trim() ||
@@ -238,3 +238,10 @@ const submit = async () => {
   loading.value = false
 }
 </script>
+
+<style scoped>
+.auth-tabs :deep(.v-tab) {
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+</style>

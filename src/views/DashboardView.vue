@@ -5,54 +5,62 @@
 
     <!-- ACTUAL CONTENT -->
     <template v-else>
-      <div class="dashboard-overview">
-        <!-- HEADER -->
-        <AppPageHeader class="dashboard-balance">
-          <template #title>
-            <div class="balance-controls mb-2 d-flex align-center ga-2">
-              <AppSelect
-                v-model="selectedAccountId"
-                :items="balanceOptions"
-                item-title="name"
-                item-value="id"
-                aria-label="Balance account"
-                hide-details
-                density="compact"
-                class="balance-select"
-              />
-              <AppIconButton
-                :icon="hideBalances ? mdiEyeOffOutline : mdiEyeOutline"
-                :label="hideBalances ? 'Show balances' : 'Hide balances'"
-                @click="toggleBalances"
-              />
-            </div>
-            <div class="balance-period-row">
-              <h1
-                class="text-h3 font-weight-bold"
-                :class="
-                  !hideBalances && summary.globalBalance < 0 ? 'text-error' : 'text-on-surface'
-                "
-              >
-                {{ hideBalances ? '****' : cs + formatMoney(summary.globalBalance) }}
-              </h1>
-              <AppPeriodNavigation
-                :label="periodLabel"
-                :can-go-forward="periodOffset < 0"
-                :can-go-back="canGoBack"
-                class="dashboard-period-navigation"
-                @previous="canGoBack && periodOffset--"
-                @next="periodOffset < 0 && periodOffset++"
-              />
-            </div>
-          </template>
-        </AppPageHeader>
-
-        <!-- KPI CARDS -->
-        <v-row class="mb-6 dashboard-kpis">
+      <DashboardOverview>
+        <template #account>
+          <div class="balance-controls d-flex align-center ga-2">
+            <AppSelect
+              v-model="selectedAccountId"
+              :items="balanceOptions"
+              item-title="name"
+              item-value="id"
+              aria-label="Balance account"
+              hide-details
+              density="compact"
+              class="balance-select"
+            />
+            <AppIconButton
+              :icon="hideBalances ? mdiEyeOffOutline : mdiEyeOutline"
+              :label="hideBalances ? 'Show balances' : 'Hide balances'"
+              :size="32"
+              @click="toggleBalances"
+            />
+          </div>
+          <h1
+            class="dashboard-total text-h3 font-weight-bold"
+            :class="!hideBalances && summary.globalBalance < 0 ? 'text-error' : 'text-on-surface'"
+          >
+            {{ hideBalances ? '****' : cs + formatMoney(summary.globalBalance) }}
+          </h1>
+        </template>
+        <template #period>
+          <AppSegmentedControl
+            v-model="dashboardPeriod"
+            label="Dashboard period"
+            :items="[
+              { label: 'Day', value: 'day' },
+              { label: 'Week', value: 'week' },
+              { label: 'Month', value: 'month' },
+              { label: 'Year', value: 'year' }
+            ]"
+            block
+            :height="44"
+          />
+          <AppPeriodNavigation
+            :label="periodLabel"
+            :can-go-forward="periodOffset < 0"
+            :can-go-back="canGoBack"
+            class="dashboard-period-navigation"
+            @previous="canGoBack && periodOffset--"
+            @next="periodOffset < 0 && periodOffset++"
+          />
+        </template>
+        <template #stats>
           <v-col cols="4">
             <AppStatCard
               label="Income"
+              :value-sizing-length="kpiValueLength"
               responsive
+              compact
               :value="hideBalances ? '****' : `+${cs}${formatMoney(summary.totalIncome)}`"
               :icon="mdiArrowUpCircleOutline"
               color="success"
@@ -62,7 +70,9 @@
           <v-col cols="4">
             <AppStatCard
               label="Expenses"
+              :value-sizing-length="kpiValueLength"
               responsive
+              compact
               :value="hideBalances ? '****' : `-${cs}${formatMoney(summary.totalExpense)}`"
               :icon="mdiArrowDownCircleOutline"
               color="error"
@@ -72,15 +82,17 @@
           <v-col cols="4">
             <AppStatCard
               label="Transactions"
+              :value-sizing-length="kpiValueLength"
               responsive
+              compact
               :value="hideBalances ? '****' : summary.transactionCount"
               :icon="mdiReceiptTextOutline"
               color="primary"
               value-class="text-on-surface"
             />
           </v-col>
-        </v-row>
-      </div>
+        </template>
+      </DashboardOverview>
       <v-alert v-if="dbError || budgetsError" type="warning" class="mb-4">
         {{ dbError || budgetsError }}
       </v-alert>
@@ -88,7 +100,11 @@
       <!-- MAIN TWO COLUMNS -->
       <v-row>
         <v-col cols="12" md="8" order="2" order-md="1">
-          <AppCard title="Recent Transactions" class="overflow-hidden fill-height">
+          <AppCard
+            title="Recent Transactions"
+            title-class="font-weight-bold"
+            class="overflow-hidden fill-height"
+          >
             <template #header-actions>
               <AppButton
                 variant="text"
@@ -132,7 +148,12 @@
 
         <!-- PIE CHART -->
         <v-col cols="12" md="4" order="1" order-md="2">
-          <AppCard title="Transactions Breakdown" keep-actions-inline class="fill-height">
+          <AppCard
+            title="Transactions Breakdown"
+            title-class="font-weight-bold"
+            keep-actions-inline
+            class="fill-height"
+          >
             <template #header-actions
               ><AppButton
                 variant="text"
@@ -147,6 +168,7 @@
               <AppSegmentedControl
                 v-model="breakdownType"
                 label="Transaction breakdown type"
+                :height="44"
                 :items="[
                   { label: 'Expense', value: 'Expense' },
                   { label: 'Income', value: 'Income' }
@@ -199,7 +221,12 @@
       <!-- BUDGETS AT A GLANCE -->
       <v-row>
         <v-col cols="12">
-          <AppCard title="Budget Summary" keep-actions-inline class="overflow-hidden">
+          <AppCard
+            title="Budget Summary"
+            title-class="font-weight-bold"
+            keep-actions-inline
+            class="overflow-hidden"
+          >
             <template #header-actions>
               <AppButton
                 variant="text"
@@ -237,7 +264,7 @@
                         >
                           · {{ b.account?.name || 'Main' }}</span
                         ><span class="text-caption text-medium-emphasis">
-                          · {{ b.period === 'WEEK' ? 'Weekly' : 'Monthly' }}</span
+                          · {{ budgetPeriodName(b.period) }}</span
                         ></span
                       >
                       <span
@@ -289,6 +316,8 @@
 </template>
 
 <script setup lang="ts">
+import { dashboardBudgetPeriod, budgetPeriodName } from '@/utils/budgetPeriods'
+import { useCategorySortedRecords } from '@/composables/useCategoryOrder'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import { useRoute, useRouter } from 'vue-router'
 import QuickActions from '@/components/QuickActions.vue'
@@ -307,7 +336,7 @@ import AppCard from '@/components/ui/AppCard.vue'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
 import AppEmptyState from '@/components/ui/AppEmptyState.vue'
 import AppPage from '@/components/ui/AppPage.vue'
-import AppPageHeader from '@/components/ui/AppPageHeader.vue'
+import DashboardOverview from '@/components/DashboardOverview.vue'
 import AppStatCard from '@/components/ui/AppStatCard.vue'
 import AppPeriodNavigation from '@/components/ui/AppPeriodNavigation.vue'
 import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
@@ -355,6 +384,7 @@ const EMPTY_DASHBOARD: DashboardResponse = {
 const route = useRoute(),
   router = useRouter()
 const {
+  accounts,
   activeAccounts,
   hasLoaded: accountsLoaded,
   loading: accountsLoading,
@@ -388,7 +418,11 @@ const accountQuery = () =>
   selectedAccountId.value === 'global'
     ? ''
     : `&accountId=${encodeURIComponent(selectedAccountId.value)}`
-const dashboardPeriod = computed(getDefaultPeriod)
+const defaultPeriod = computed(getDefaultPeriod)
+const dashboardPeriod = ref(defaultPeriod.value)
+watch(defaultPeriod, value => {
+  dashboardPeriod.value = value
+})
 const periodOffset = ref(0)
 watch(dashboardPeriod, () => {
   periodOffset.value = 0
@@ -456,13 +490,21 @@ function toggleBalances() {
   }
 }
 const summary = computed(() => db.value)
+const kpiValueLength = computed(() =>
+  hideBalances.value
+    ? 4
+    : Math.max(
+        `+${cs.value}${formatMoney(summary.value.totalIncome)}`.length,
+        `-${cs.value}${formatMoney(summary.value.totalExpense)}`.length,
+        String(summary.value.transactionCount).length
+      )
+)
 onMounted(() => void fetchAccounts())
 
 // Budgets retain their own weekly/monthly cycle; Default Period chooses which
-// cycle appears here. The client's calendar day and preferred week start anchor it.
-const budgetPeriod = computed(() =>
-  ['day', 'week'].includes(dashboardPeriod.value) ? 'WEEK' : 'MONTH'
-)
+// cycle appears here; the selected period can override it for this visit.
+// The client's calendar day and preferred week start anchor it.
+const budgetPeriod = computed(() => dashboardBudgetPeriod(dashboardPeriod.value))
 const budgetsCacheKey = () =>
   `/budgets?period=${budgetPeriod.value}&weekStart=${getFirstDayOfWeek()}&today=${toDateOnly(periodAnchor.value)}${accountQuery()}`
 const {
@@ -482,7 +524,10 @@ const visibleRecent = computed(() =>
   db.value.recentTransactions.filter(tx => !hiddenTransactionIds.value.has(tx.id)).slice(0, 8)
 )
 
-const summaryBudgets = computed(() => budgets.value.budgets)
+const summaryBudgets = useCategorySortedRecords(
+  () => budgets.value.budgets,
+  () => accounts.value
+)
 const breakdownType = ref('Expense')
 const breakdownItems = computed(() =>
   breakdownType.value === 'Income' ? (db.value.incomePieChartData ?? []) : db.value.pieChartData
@@ -561,60 +606,14 @@ onMounted(loadDashboard)
   white-space: nowrap;
   text-align: right;
 }
-.balance-period-row {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.balance-controls {
+  min-height: 44px;
 }
-.balance-period-row > h1 {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-size: clamp(18px, 5vw, 32px);
+.dashboard-total {
+  margin: 0;
+  font-size: 32px;
   line-height: 1.25;
-}
-.dashboard-period-navigation {
-  flex: 0 0 auto;
-  max-width: 240px;
-}
-.dashboard-balance :deep(.v-col > div) {
-  width: 100%;
-  min-width: 0;
-}
-@media (min-width: 960px) {
-  .balance-controls {
-    justify-content: center;
-  }
-  .balance-controls .balance-select {
-    flex: 0 1 160px;
-  }
-  .balance-period-row {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 8px;
-  }
-  .dashboard-overview {
-    display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
-    align-items: center;
-    gap: 24px;
-    margin-bottom: 24px;
-  }
-  .dashboard-overview > .dashboard-balance,
-  .dashboard-overview > .dashboard-kpis {
-    min-width: 0;
-    margin: 0 !important;
-  }
-  .dashboard-balance > :deep(.v-col) {
-    padding: 0;
-  }
-}
-@media (max-width: 959px) {
-  .dashboard-period-navigation {
-    margin-left: auto;
-  }
+  white-space: nowrap;
 }
 .balance-select {
   flex: 0 1 160px;
@@ -622,35 +621,24 @@ onMounted(loadDashboard)
   min-width: 0;
   max-width: 160px;
 }
+@media (max-width: 599px) {
+  .balance-controls {
+    flex: 1 1 132px;
+  }
+  .dashboard-total {
+    flex: 0 0 auto;
+    margin-left: auto;
+    text-align: right;
+    font-size: 24px;
+  }
+}
 .hover-item {
   transition: background-color 0.2s;
 }
 .hover-item:hover {
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
-@media (max-width: 599px) {
-  .recent-transaction-item {
-    padding-inline: 8px !important;
-  }
-  .dashboard-kpis {
-    margin-left: -4px;
-    margin-right: -4px;
-  }
-  .dashboard-kpis > .v-col {
-    padding-left: 4px;
-    padding-right: 4px;
-  }
-}
 @media (max-width: 480px) {
-  .balance-period-row {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .balance-period-row > h1 {
-    white-space: nowrap;
-    overflow-wrap: normal;
-    flex-shrink: 0;
-  }
   .budget-summary-amount {
     flex-shrink: 1;
     flex-wrap: wrap;

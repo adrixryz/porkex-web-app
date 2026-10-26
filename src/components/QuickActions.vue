@@ -13,7 +13,7 @@
         class="quick-actions-button"
       />
     </template>
-    <v-list density="compact" class="quick-actions-menu" aria-label="Quick actions">
+    <v-list density="compact" class="quick-actions-menu app-action-menu" aria-label="Quick actions">
       <v-list-item
         title="Expense"
         :prepend-icon="mdiMinus"
@@ -95,13 +95,6 @@ function movementSaved({ queued, superseded }: { queued: boolean; superseded?: b
   height: 80px;
 }
 .quick-actions-menu {
-  --v-list-prepend-gap: 8px;
   min-width: 170px;
-}
-.quick-actions-menu :deep(.v-list-item-title) {
-  font-weight: 700;
-}
-.quick-actions-menu :deep(.v-list-item__prepend > .v-icon) {
-  opacity: 1;
 }
 </style>

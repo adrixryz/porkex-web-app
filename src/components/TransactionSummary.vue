@@ -63,7 +63,7 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
 <style scoped>
 .summary-row {
   display: grid;
-  grid-template-columns: 36px minmax(96px, 1fr) minmax(0, 1fr) 126px;
+  grid-template-columns: 36px minmax(96px, 1fr) minmax(0, 1fr) max-content;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -86,20 +86,18 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
 }
 .summary-comment {
   min-width: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 .summary-amount {
   text-align: right;
   font-weight: bold;
   font-size: 13px;
+  white-space: nowrap;
 }
 @media (max-width: 599px) {
   .summary-row {
-    grid-template-columns: 32px 96px minmax(0, 1fr) 100px;
+    grid-template-columns: 32px minmax(80px, 1fr) minmax(0, 1fr) max-content;
     gap: 8px;
   }
   .summary-row :deep(.v-avatar) {
@@ -116,7 +114,7 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
     height: 28px !important;
   }
   .summary-row {
-    grid-template-columns: 28px 76px minmax(0, 1fr) 96px;
+    grid-template-columns: 28px minmax(72px, 1fr) minmax(0, 1fr) max-content;
     gap: 6px;
   }
   .summary-amount {
@@ -125,7 +123,7 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
 }
 @media (max-width: 599px) {
   .summary-row--compact-spacing {
-    grid-template-columns: 36px minmax(112px, 2fr) minmax(0, 1fr) clamp(104px, 26vw, 126px);
+    grid-template-columns: 36px minmax(96px, 1fr) minmax(0, 1fr) max-content;
     gap: 6px 8px;
   }
   .summary-row--compact-spacing .summary-meta > :first-child {
@@ -143,7 +141,12 @@ const comment = computed(() => props.transaction.comment ?? props.transaction.de
 }
 @media (max-width: 359px) {
   .summary-row--compact-spacing {
+    grid-template-columns: 28px minmax(60px, 1fr) minmax(0, 1fr) max-content;
     gap: 6px;
+  }
+  .summary-row--compact-spacing :deep(.v-avatar) {
+    width: 28px !important;
+    height: 28px !important;
   }
 }
 </style>

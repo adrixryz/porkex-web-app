@@ -4,6 +4,416 @@ import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 import { readFile } from 'node:fs/promises'
 
+test('recurring account filters preserve history and rule cards show their account with balanced gaps', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Recurring owner',
+      email: `recurring-account-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const cash = randomUUID()
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: cash, name: 'Cash', openingBalance: 0 }
+      })
+    ).status()
+  ).toBe(201)
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const salary = categories.find((category: { type: string }) => category.type === 'Income')
+  const food = categories.find((category: { type: string }) => category.type === 'Expense')
+  for (const [accountId, description] of [
+    [`main-${user.id}`, 'Main salary'],
+    [cash, 'Cash salary'],
+    [`main-${user.id}`, 'Weekly lunch']
+  ]) {
+    const created = await page.request.post('/api/recurring', {
+      headers,
+      data: {
+        clientId: randomUUID(),
+        accountId,
+        categoryId: description === 'Weekly lunch' ? food.id : salary.id,
+        description,
+        type: description === 'Weekly lunch' ? 'Expense' : 'Income',
+        amount: 100,
+        frequency: 'MONTH',
+        interval: 1,
+        startDate: '2090-01-01',
+        endDate: null,
+        active: true
+      }
+    })
+    expect(created.status()).toBe(201)
+    if (description === 'Main salary') {
+      const rule = await created.json()
+      expect(
+        (
+          await page.request.put(`/api/recurring/${rule.id}/occurrences/2090-01-01`, {
+            headers,
+            data: {
+              kind: 'EDIT',
+              amount: 125,
+              comment: 'Next salary',
+              categoryId: salary.id,
+              tagIds: []
+            }
+          })
+        ).status()
+      ).toBe(200)
+    }
+  }
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/recurring')
+  await expect(page.getByText('Weekly lunch', { exact: true })).toBeVisible()
+  await expect(page.getByText('Main salary', { exact: true })).toHaveCount(0)
+  const toggle = page.getByRole('group', { name: 'Recurring type', exact: true })
+  await toggle.getByRole('button', { name: 'Income', exact: true }).click()
+  await expect(page.getByText('Weekly lunch', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Main salary', { exact: true })).toBeVisible()
+  await expect(page.getByText('Cash salary', { exact: true })).toBeVisible()
+  const card = page.locator('.recurring-rule-content').filter({ hasText: 'Main salary' })
+  await expect(card).toContainText(`${salary.name} · Main · Every month`)
+  for (const width of [320, 480, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(page.getByRole('combobox', { name: 'Account', exact: true })).toBeVisible()
+    await expect
+      .poll(() =>
+        card.evaluate(element => {
+          const children = [...element.children]
+          return children
+            .slice(1)
+            .every(
+              (child, index) =>
+                Math.abs(
+                  child.getBoundingClientRect().top -
+                    children[index]!.getBoundingClientRect().bottom -
+                    12
+                ) < 1
+            )
+        })
+      )
+      .toBe(true)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+    await page.screenshot({
+      path: info.outputPath(`recurring-account-${width}.png`),
+      fullPage: true,
+      animations: 'disabled'
+    })
+  }
+  await page.locator('.account-filter').click()
+  await page.getByRole('option', { name: 'Cash', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  await expect(page.getByText('Main salary', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Cash salary', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('combobox', { name: 'Account', exact: true })).toHaveValue('Cash')
+  await page.getByRole('button', { name: 'New Rule', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New Recurring Rule', exact: true })
+  await expect(
+    dialog
+      .getByRole('group', { name: 'Rule type', exact: true })
+      .getByRole('button', { name: 'Income', exact: true })
+  ).toHaveClass(/\bv-btn--active\b/)
+  await expect(dialog.getByRole('combobox', { name: 'Account', exact: true })).toHaveValue('Cash')
+  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await page
+    .locator('.account-filter')
+    .getByRole('button', { name: 'Clear Account', exact: true })
+    .click()
+  await expect(page).toHaveURL(/\/recurring\?type=Income$/)
+  await expect(page.getByText('Main salary', { exact: true })).toBeVisible()
+  await page.goBack()
+  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  await expect(page.getByText('Main salary', { exact: true })).toHaveCount(0)
+})
+
+test('Retry confirms a queued account restoration before its blocked balance deletion', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Restore owner',
+      email: `restore-blocked-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const cash = randomUUID()
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: cash, name: 'Blocked Cash', openingBalance: 50 }
+      })
+    ).status()
+  ).toBe(201)
+  for (const data of [{ balance: 0 }, { archived: true }]) {
+    expect(
+      (
+        await page.request.put(`/api/accounts/${cash}`, {
+          headers,
+          data: { ...data, mutationId: randomUUID(), editedAt: new Date().toISOString() }
+        })
+      ).status()
+    ).toBe(200)
+  }
+  const history = await (await page.request.get('/api/accounts/movements', { headers })).json()
+  const adjustment = history.items.find(
+    (row: { kind: string }) => row.kind === 'balance-adjustment'
+  )
+  await page.addInitScript(
+    ({ token, user, adjustment }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+      if (!sessionStorage.getItem('restore-test-seeded')) {
+        localStorage.setItem(
+          'porkex_outbox',
+          JSON.stringify([
+            {
+              id: crypto.randomUUID(),
+              userId: user.id,
+              method: 'DELETE',
+              path: `/accounts/balance-adjustments/${encodeURIComponent(adjustment.id)}`,
+              body: null,
+              createdAt: Date.now(),
+              attempts: 0,
+              status: 'pending'
+            }
+          ])
+        )
+        sessionStorage.setItem('restore-test-seeded', 'true')
+      }
+    },
+    { token, user, adjustment }
+  )
+  await page.goto('/accounts')
+  await expect(
+    page
+      .getByRole('alert')
+      .filter({ hasText: 'Restore the archived account before changing its balance.' })
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Restore Blocked Cash', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: 'Restore account?', exact: true })
+    .getByRole('button', { name: 'Restore', exact: true })
+    .click()
+  await expect(page.getByText('Restoration pending', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('Restoration pending', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    )
+    .toBe(0)
+  await expect(page.getByText('Restoration pending', { exact: true })).toHaveCount(0)
+  const accounts = await (await page.request.get('/api/accounts', { headers })).json()
+  expect(accounts.find((row: { id: string }) => row.id === cash)).toMatchObject({
+    archived: false,
+    balance: 50
+  })
+})
+
+test('account movements support durable Undo and refresh balances after deletion completes', async ({
+  page
+}, info) => {
+  test.setTimeout(60_000)
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Undo owner',
+      email: `account-undo-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const cash = randomUUID()
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 100, mutationId: randomUUID(), editedAt: new Date().toISOString() }
+      })
+    ).status()
+  ).toBe(200)
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: cash, name: 'Undo Cash', openingBalance: 50 }
+      })
+    ).status()
+  ).toBe(201)
+  expect(
+    (
+      await page.request.post('/api/transfers', {
+        headers,
+        data: {
+          id: randomUUID(),
+          sourceId: `main-${user.id}`,
+          destinationId: cash,
+          amount: 20,
+          comment: '',
+          date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
+        }
+      })
+    ).status()
+  ).toBe(201)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/accounts')
+  const history = async () =>
+    (await (await page.request.get('/api/accounts/movements', { headers })).json()).items
+  for (const [label, title, kind] of [
+    ['Delete transfer from Main to Undo Cash', 'Delete transfer?', 'transfer'],
+    ['Delete balance adjustment for Undo Cash', 'Delete balance adjustment?', 'opening-balance']
+  ]) {
+    const remove = page.getByRole('button', { name: label, exact: true })
+    const cashCard = page
+      .locator('.v-card')
+      .filter({ has: page.getByText('Undo Cash', { exact: true }) })
+      .first()
+    const before = kind === 'transfer' ? '$70.00' : '$50.00'
+    const after = kind === 'transfer' ? '$50.00' : '$0.00'
+    await expect(cashCard.getByText(before, { exact: true })).toBeVisible()
+    await remove.click()
+    await page
+      .getByRole('dialog', { name: title, exact: true })
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click()
+    await expect(remove).toHaveCount(0)
+    await expect(cashCard.getByText(after, { exact: true })).toBeVisible()
+    await expect(cashCard.getByRole('status')).toContainText('pending')
+    expect(
+      (await history()).some(
+        (row: { kind: string; accountId: string }) =>
+          row.kind === kind && (kind === 'transfer' || row.accountId === cash)
+      )
+    ).toBe(true)
+    await page.reload()
+    await expect(cashCard.getByText(after, { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(remove).toBeVisible()
+    await expect(cashCard.getByText(before, { exact: true })).toBeVisible()
+    await expect(cashCard.getByRole('status')).toHaveCount(0)
+    await remove.click()
+    const deleted = page.waitForResponse(
+      response =>
+        response.request().method() === 'DELETE' &&
+        response
+          .url()
+          .includes(kind === 'transfer' ? '/api/transfers/' : '/api/accounts/balance-adjustments/')
+    )
+    await page
+      .getByRole('dialog', { name: title, exact: true })
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click()
+    expect((await deleted).ok()).toBe(true)
+    await expect
+      .poll(async () =>
+        (await history()).some(
+          (row: { kind: string; accountId: string }) =>
+            row.kind === kind && (kind === 'transfer' || row.accountId === cash)
+        )
+      )
+      .toBe(false)
+    await expect(
+      cashCard.getByText(kind === 'transfer' ? '$50.00' : '$0.00', { exact: true })
+    ).toBeVisible()
+  }
+})
+
+test('account action errors stay inside their dialog and clear between actions', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Adjustment owner',
+      email: `adjustment-errors-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const accountId = randomUUID()
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: accountId, name: 'Archived Cash', openingBalance: 50 }
+      })
+    ).status()
+  ).toBe(201)
+  for (const data of [{ balance: 0 }, { archived: true }]) {
+    expect(
+      (
+        await page.request.put(`/api/accounts/${accountId}`, {
+          headers,
+          data: { ...data, mutationId: randomUUID(), editedAt: new Date().toISOString() }
+        })
+      ).status()
+    ).toBe(200)
+  }
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/accounts')
+  const message = 'Restore the archived account before changing its balance.'
+  const deleteButton = page
+    .getByRole('button', { name: 'Delete balance adjustment for Archived Cash', exact: true })
+    .first()
+  await deleteButton.click()
+  const confirmation = page.getByRole('dialog', { name: 'Delete balance adjustment?', exact: true })
+  await confirmation.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(confirmation.getByRole('alert')).toHaveText(message)
+  await expect(page.getByRole('alert')).toHaveCount(1)
+  await page.screenshot({ path: info.outputPath('delete-adjustment-error.png'), fullPage: true })
+  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await page
+    .getByRole('button', { name: 'Edit balance adjustment for Archived Cash', exact: true })
+    .first()
+    .click()
+  const edit = page.getByRole('dialog', { name: 'Edit balance adjustment', exact: true })
+  await expect(edit.getByRole('alert')).toHaveCount(0)
+  await edit.getByLabel('Adjusted balance', { exact: true }).fill('300')
+  await edit.getByRole('button', { name: 'Update', exact: true }).click()
+  await expect(edit.getByRole('alert')).toHaveText(message)
+  await expect(page.getByRole('alert')).toHaveCount(1)
+  page.once('dialog', dialog => dialog.accept())
+  await edit.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await deleteButton.click()
+  await expect(confirmation.getByRole('alert')).toHaveCount(0)
+})
+
 test('analytics account filters scope every chart and survive history at narrow widths', async ({
   page
 }, info) => {

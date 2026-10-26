@@ -213,7 +213,7 @@ body {
    The extra body selector also beats Vuetify's own 4px radius rule. */
 body .v-menu > .v-overlay__content {
   border: 1px solid rgba(var(--v-theme-on-surface), 0.24);
-  border-radius: 12px;
+  border-radius: 16px;
   background: rgb(var(--v-theme-surface));
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   overflow: hidden;
@@ -225,13 +225,27 @@ body .v-menu > .v-overlay__content .v-list {
   padding: 6px;
 }
 body .v-menu > .v-overlay__content .v-list-item {
-  border-radius: 8px;
+  border-radius: 12px;
+  margin: 4px 0px;
+  transition: background 0.12s ease;
+}
+.app-action-menu {
+  --v-list-prepend-gap: 8px;
+}
+.app-action-menu .v-list-item-title {
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 700;
+  letter-spacing: 0.03125em;
+}
+.app-action-menu .v-list-item__prepend > .v-icon {
+  opacity: 1;
 }
 
 /* ── Snackbars, toasts and notice banners ────────────────────────────── */
 body .v-snackbar__wrapper,
 body .v-alert {
-  border-radius: 12px;
+  border-radius: 16px;
 }
 
 /* ── Dialogs: keep long forms scrollable on short viewports ──────────── */
@@ -248,4 +262,8 @@ body .v-alert {
 /* ── Flat cards (Vercel: hairline borders, no shadows) ───────────────── */
 .v-card.elevation-1 {
   box-shadow: none;
+}
+
+.app-navigation-item {
+  border-radius: 12px;
 }

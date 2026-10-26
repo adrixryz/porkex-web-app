@@ -28,7 +28,17 @@ const options = computed(() =>
 </script>
 <style scoped>
 .account-filter {
-  max-width: min(260px, 100%);
-  min-width: min(180px, 100%);
+  width: 200px;
+  min-width: 200px;
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+@media (max-width: 599px) {
+  .account-filter {
+    width: 180px;
+    min-width: 180px;
+    max-width: 180px;
+    flex: 0 0 auto;
+  }
 }
 </style>

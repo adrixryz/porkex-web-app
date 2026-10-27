@@ -793,3 +793,49 @@ describe('legacy migration across app upgrades', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('cold or temporarily unavailable API gateways', () => {
+  it.each([408, 502, 503, 504])(
+    'durably queues a write after HTTP %s with its original client ID',
+    async status => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('{}', { status }))
+      )
+      try {
+        const response = await api('/transactions', {
+          method: 'POST',
+          body: '{"amount":5,"clientId":"cold-save"}'
+        })
+        expect(response.status).toBe(202)
+        expect(pendingCount.value).toBe(1)
+        const send = vi.fn(async (_mutation: QueuedMutation) => new Response('{}'))
+        await flushOutbox(send)
+        expect(JSON.parse(send.mock.calls[0]![0].body!)).toMatchObject({
+          clientId: 'cold-save',
+          amount: 5
+        })
+        expect(pendingCount.value).toBe(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
+  )
+  it.each([400, 409])(
+    'keeps rejected HTTP %s visible for correction without queueing it',
+    async status => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('{}', { status }))
+      )
+      try {
+        expect((await api('/transactions', { method: 'POST', body: '{"amount":5}' })).status).toBe(
+          status
+        )
+        expect(pendingCount.value).toBe(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
+  )
+})

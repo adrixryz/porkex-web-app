@@ -2376,3 +2376,65 @@ test('authentication tabs have rounded corners and primary actions retain modal 
     await page.getByRole('tab', { name: 'Log In', exact: true }).click()
   }
 })
+
+test('a cold backend keeps cached data usable and saves new writes until it wakes', async ({
+  page
+}) => {
+  const date = new Date().toISOString()
+  await state(page, {
+    rows: [
+      {
+        id: 1,
+        amount: 10,
+        type: 'Expense',
+        categoryId: 1,
+        category: { name: 'Food', color: '#EA4335' },
+        date,
+        createdAt: date,
+        comment: 'Previously loaded lunch'
+      }
+    ]
+  })
+  await page.goto('/transactions')
+  await expect(page.getByText('Previously loaded lunch', { exact: true })).toBeVisible()
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready
+  })
+  await page.reload()
+  await expect(page.getByText('Previously loaded lunch', { exact: true })).toBeVisible()
+  let cold = true
+  const attempts: string[] = []
+  await page.route('**/api/**', async route => {
+    if (route.request().method() === 'POST' && route.request().url().endsWith('/api/transactions'))
+      attempts.push(route.request().postDataJSON().clientId)
+    if (cold) await route.fulfill({ status: 503, json: { error: 'The backend is starting.' } })
+    else await route.continue()
+  })
+  await page.reload()
+  await expect(page.getByText('Previously loaded lunch', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true)
+  const dialog = await openExpense(page, 'Cold backend lunch')
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    )
+    .toBe(1)
+  await page.reload()
+  await expect(page.getByText('Previously loaded lunch', { exact: true })).toBeVisible()
+  cold = false
+  await expect(page.getByText('Cold backend lunch', { exact: true }).first()).toBeVisible({
+    timeout: 20000
+  })
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('porkex_outbox') || '[]').length)
+    )
+    .toBe(0)
+  const saved = await state(page)
+  expect(
+    saved.rows.filter((row: { comment: string }) => row.comment === 'Cold backend lunch')
+  ).toHaveLength(1)
+  expect(new Set(attempts).size).toBe(1)
+})

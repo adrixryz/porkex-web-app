@@ -4,6 +4,65 @@ import { test, expect } from '@playwright/test'
 import { expectIncomeExpenseChart } from './charts'
 import { readFile } from 'node:fs/promises'
 
+test('account Total exclusion saves from its switch and persists after reload', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Total owner',
+      email: `total-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 1000, mutationId: randomUUID(), editedAt: new Date().toISOString() }
+      })
+    ).status()
+  ).toBe(200)
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: `cash-${user.id}`, name: 'Cash', openingBalance: 200 }
+      })
+    ).status()
+  ).toBe(201)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/')
+  await expect(page.locator('.dashboard-total')).toHaveText('$1,200.00')
+  await page.goto('/accounts')
+  await page.getByRole('button', { name: 'Edit Cash', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: 'Edit account', exact: true })
+  await dialog.getByLabel('Do not include in total balance', { exact: true }).check()
+  await dialog.getByRole('button', { name: 'Update', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.goto('/')
+  await expect(page.locator('.dashboard-total')).toHaveText('$1,000.00')
+  await page.reload()
+  await expect(page.locator('.dashboard-total')).toHaveText('$1,000.00')
+  await page.goto('/accounts')
+  await page.getByRole('button', { name: 'Edit Cash', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'Edit account', exact: true })
+  await expect(dialog.getByLabel('Do not include in total balance', { exact: true })).toBeChecked()
+  await dialog.getByLabel('Do not include in total balance', { exact: true }).uncheck()
+  await dialog.getByRole('button', { name: 'Update', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await page.goto('/')
+  await expect(page.locator('.dashboard-total')).toHaveText('$1,200.00')
+})
+
 test('recurring account filters preserve history and rule cards show their account with balanced gaps', async ({
   page
 }, info) => {
@@ -117,7 +176,7 @@ test('recurring account filters preserve history and rule cards show their accou
   }
   await page.locator('.account-filter').click()
   await page.getByRole('option', { name: 'Cash', exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  await expect(page).toHaveURL(/account=cash/)
   await expect(page.getByText('Main salary', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Cash salary', { exact: true })).toBeVisible()
   await page.reload()
@@ -138,7 +197,7 @@ test('recurring account filters preserve history and rule cards show their accou
   await expect(page).toHaveURL(/\/recurring\?type=Income$/)
   await expect(page.getByText('Main salary', { exact: true })).toBeVisible()
   await page.goBack()
-  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  await expect(page).toHaveURL(/account=cash/)
   await expect(page.getByText('Main salary', { exact: true })).toHaveCount(0)
 })
 
@@ -437,7 +496,7 @@ test('analytics account filters scope every chart and survive history at narrow 
   ).toBe(201)
   const categories = await (await page.request.get('/api/categories', { headers })).json()
   const expense = categories.find((category: { type: string }) => category.type === 'Expense')
-  const day = new Date().toISOString().slice(0, 10)
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
   expect(
     (
       await page.request.post('/api/transactions', {
@@ -454,13 +513,20 @@ test('analytics account filters scope every chart and survive history at narrow 
     { token, user }
   )
   await page.goto('/analytics')
-  await page.locator('.analytics-account-filter').click()
+  await page.locator('.account-filter').click()
   await page.getByRole('option', { name: 'Analytics Cash', exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  await expect(page).toHaveURL(/account=analytics-cash/)
   const comparison = page.getByRole('region', { name: 'Category Comparison', exact: true })
   await expect(comparison.getByText(expense.name, { exact: true })).toBeVisible()
   for (const width of [320, 480, 1280]) {
     await page.setViewportSize({ width, height: 900 })
+    await expect
+      .poll(() =>
+        page
+          .locator('.account-filter')
+          .evaluate(element => Math.round(element.getBoundingClientRect().width))
+      )
+      .toBe(width < 600 ? 180 : 200)
     await expect(page.getByRole('combobox', { name: 'Account', exact: true })).toBeVisible()
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
@@ -486,16 +552,30 @@ test('analytics account filters scope every chart and survive history at narrow 
       animations: 'disabled'
     })
   }
-  await page.locator('.analytics-account-filter').click()
+  await page.locator('.account-filter').click()
   await page.getByRole('option', { name: 'Main', exact: true }).click()
   await expect(comparison.getByText(expense.name, { exact: true })).toHaveCount(0)
   await page.goBack()
-  await expect(page).toHaveURL(new RegExp(`accountId=${cash}`))
+  await expect(page).toHaveURL(/account=analytics-cash/)
   await expect(comparison.getByText(expense.name, { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('combobox', { name: 'Account', exact: true })).toHaveValue(
     'Analytics Cash'
   )
+  await comparison
+    .getByRole('group', { name: 'Comparison type', exact: true })
+    .getByRole('button', { name: 'Income', exact: true })
+    .click()
+  await expect(page).toHaveURL(/comparisonType=Income/)
+  await expect(page.getByRole('combobox', { name: 'Account', exact: true })).toHaveValue(
+    'Analytics Cash'
+  )
+  await page.goBack()
+  await expect(
+    comparison
+      .getByRole('group', { name: 'Comparison type', exact: true })
+      .getByRole('button', { name: 'Expense', exact: true })
+  ).toHaveClass(/\bv-btn--active\b/)
 })
 
 for (const committed of [false, true])
@@ -1463,7 +1543,7 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
     await page.getByRole('button', { name: 'Show 1 tags', exact: true }).click()
     await page.getByText('Lunch', { exact: true }).filter({ visible: true }).click()
   }
-  await expect(page).toHaveURL(new RegExp(`tagId=${tagId}`))
+  await expect(page).toHaveURL(/tag=lunch/)
   await expect(page.locator('.tag-pill[aria-pressed="true"]')).toHaveCount(1)
   await page.getByRole('button', { name: 'Movement shortcuts', exact: true }).first().click()
   await page.getByText('Duplicate', { exact: true }).click()
@@ -1504,4 +1584,466 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
   await confirmation.getByRole('button', { name: 'Discard', exact: true }).click()
   await expect(center.getByText('No pending changes.', { exact: true })).toBeVisible()
   await context.setOffline(false)
+})
+
+test('category handles persist order across pickers and offline recovery, with colored reassignment', async ({
+  page,
+  context
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Category owner',
+      email: `category-order-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const expenses = categories.filter((category: { type: string }) => category.type === 'Expense')
+  expect(expenses.length).toBeGreaterThan(2)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/categories')
+  const cards = page.locator('[data-category-id]')
+  await expect(cards).toHaveCount(expenses.length)
+  await expect(cards.first()).not.toContainText('Total')
+  const first = expenses[0]
+  const second = expenses[1]
+  await page
+    .getByRole('button', { name: `Reorder ${first.name}; arrow keys move it`, exact: true })
+    .press('ArrowDown')
+  await expect
+    .poll(async () =>
+      (await (await page.request.get('/api/categories', { headers })).json())
+        .filter((category: { type: string }) => category.type === 'Expense')
+        .map((category: { id: number }) => category.id)
+    )
+    .toEqual([
+      second.id,
+      first.id,
+      ...expenses.slice(2).map((category: { id: number }) => category.id)
+    ])
+  await page.reload()
+  await expect(cards.first()).toHaveAttribute('data-category-id', String(second.id))
+  const handle = page.getByRole('button', {
+    name: `Reorder ${second.name}; arrow keys move it`,
+    exact: true
+  })
+  const from = await handle.boundingBox()
+  const to = await cards.nth(1).boundingBox()
+  expect(from).not.toBeNull()
+  expect(to).not.toBeNull()
+  if (info.project.name === 'android') {
+    const touch = await context.newCDPSession(page)
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: from!.x + from!.width / 2, y: from!.y + from!.height / 2, id: 1 }]
+    })
+    await page.waitForTimeout(300)
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: to!.x + to!.width / 2, y: to!.y + to!.height / 2, id: 1 }]
+    })
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: page.viewportSize()!.width - 8, y: 82, id: 1 }]
+    })
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await touch.detach()
+  } else {
+    await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2)
+    await page.mouse.down()
+    await page.waitForTimeout(300)
+    await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 8 })
+    await page.mouse.move(page.viewportSize()!.width - 8, 82)
+    await page.mouse.up()
+  }
+  await expect(cards.first()).toHaveAttribute('data-category-id', String(first.id))
+  await expect
+    .poll(
+      async () =>
+        (await (await page.request.get('/api/categories', { headers })).json()).filter(
+          (category: { type: string }) => category.type === 'Expense'
+        )[0].id
+    )
+    .toBe(first.id)
+  await expect(
+    page.getByRole('button', { name: `Reorder ${first.name}; arrow keys move it`, exact: true })
+  ).toBeEnabled()
+  await context.setOffline(true)
+  await page
+    .getByRole('button', { name: `Reorder ${first.name}; arrow keys move it`, exact: true })
+    .press('ArrowDown')
+  await expect(cards.first()).toHaveAttribute('data-category-id', String(second.id))
+  await page.getByRole('button', { name: 'New Category', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await context.setOffline(false)
+  await expect
+    .poll(
+      async () =>
+        (await (await page.request.get('/api/categories', { headers })).json()).filter(
+          (category: { type: string }) => category.type === 'Expense'
+        )[0].id
+    )
+    .toBe(second.id)
+  await page.goto('/transactions')
+  const select = page
+    .locator('.transaction-filters .v-select')
+    .filter({ has: page.getByLabel('Category', { exact: true }) })
+  await select.click()
+  await expect(page.getByRole('option').first()).toContainText(second.name)
+  await page.keyboard.press('Escape')
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 10, mutationId: randomUUID(), editedAt: new Date().toISOString() }
+      })
+    ).status()
+  ).toBe(200)
+  expect(
+    (
+      await page.request.post('/api/transactions', {
+        headers,
+        data: {
+          clientId: randomUUID(),
+          accountId: `main-${user.id}`,
+          categoryId: first.id,
+          type: 'Expense',
+          amount: 1,
+          date: '2026-01-01',
+          comment: ''
+        }
+      })
+    ).status()
+  ).toBe(201)
+  const refreshedCategories = page.waitForResponse(
+    response =>
+      response.url().includes('/api/categories') &&
+      response.request().method() === 'GET' &&
+      response.ok()
+  )
+  await page.goto('/categories')
+  await refreshedCategories
+  await page.getByRole('button', { name: `Delete ${first.name}`, exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.locator('.v-select').filter({ hasText: 'Move transactions to' }).click()
+  const option = page.getByRole('option').filter({ hasText: second.name })
+  expect(
+    await option.locator('.category-dot').evaluate(
+      (element, color) =>
+        (element as HTMLElement).style.backgroundColor ===
+        (() => {
+          const probe = document.createElement('span')
+          probe.style.backgroundColor = String(color)
+          return probe.style.backgroundColor
+        })(),
+      second.color
+    )
+  ).toBe(true)
+  await option.click()
+  expect(
+    await dialog.locator('.v-select .category-dot').evaluate(
+      (element, color) =>
+        (element as HTMLElement).style.backgroundColor ===
+        (() => {
+          const probe = document.createElement('span')
+          probe.style.backgroundColor = String(color)
+          return probe.style.backgroundColor
+        })(),
+      second.color
+    )
+  ).toBe(true)
+  await page.screenshot({ path: info.outputPath('category-reassignment.png'), fullPage: true })
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  const budgetCash = randomUUID()
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: budgetCash, name: 'AAA Cash', openingBalance: 0 }
+      })
+    ).status()
+  ).toBe(201)
+  for (const [categoryId, accountId] of [
+    [first.id, budgetCash],
+    [first.id, `main-${user.id}`],
+    [second.id, `main-${user.id}`]
+  ]) {
+    expect(
+      (
+        await page.request.post('/api/budgets', {
+          headers,
+          data: { clientId: randomUUID(), categoryId, accountId, amount: 100, period: 'MONTH' }
+        })
+      ).status()
+    ).toBe(201)
+  }
+  await page.goto('/budgets?period=MONTH')
+  await expect
+    .poll(() =>
+      page
+        .getByRole('button', { name: /^Edit budget for / })
+        .evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))
+    )
+    .toEqual([
+      `Edit budget for ${second.name}`,
+      `Edit budget for ${first.name}`,
+      `Edit budget for ${first.name}`
+    ])
+  await expect(
+    page
+      .locator('.app-entity-header')
+      .filter({ has: page.getByText(first.name, { exact: true }) })
+      .locator('.app-entity-header__heading .text-caption')
+  ).toHaveText([/Main/, /AAA Cash/])
+  await page.goto('/')
+  await page
+    .getByRole('group', { name: 'Dashboard period', exact: true })
+    .getByRole('button', { name: 'Month', exact: true })
+    .click()
+  const summary = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Budget Summary', { exact: true }) })
+  await expect(summary.locator('.budget-summary-label')).toHaveText([
+    new RegExp(second.name + '.*Main', 's'),
+    new RegExp(first.name + '.*Main', 's'),
+    new RegExp(first.name + '.*AAA Cash', 's')
+  ])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('yearly budgets can be created and dashboard cycles follow Day Week Month Year', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Yearly owner',
+      email: `yearly-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const category = categories.find((item: { type: string }) => item.type === 'Expense')
+  for (const [period, amount] of [
+    ['WEEK', 100],
+    ['MONTH', 200]
+  ])
+    expect(
+      (
+        await page.request.post('/api/budgets', {
+          headers,
+          data: {
+            clientId: randomUUID(),
+            accountId: `main-${user.id}`,
+            categoryId: category.id,
+            amount,
+            period
+          }
+        })
+      ).status()
+    ).toBe(201)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/budgets')
+  const period = page.getByRole('group', { name: 'Budget period', exact: true })
+  await expect(period.getByRole('button')).toHaveText(['This week', 'This month', 'This year'])
+  await expect(period.getByRole('button', { name: 'This week', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await period.getByRole('button', { name: 'This year', exact: true }).click()
+  await page.getByRole('button', { name: 'New Budget', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New Budget', exact: true })
+  await expect(dialog.locator('.v-select').filter({ hasText: 'Repeats' })).toContainText(
+    'Every year'
+  )
+  await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
+  await page.getByRole('option', { name: category.name, exact: true }).click()
+  await dialog.getByLabel('Limit', { exact: true }).fill('300')
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  await expect(page.getByText('Main · Yearly limit', { exact: false })).toBeVisible()
+  await page.goto('/')
+  const summary = page
+    .locator('.v-card')
+    .filter({ has: page.getByText('Budget Summary', { exact: true }) })
+  for (const [label, cycle, amount] of [
+    ['Day', 'Weekly', '$100.00'],
+    ['Week', 'Weekly', '$100.00'],
+    ['Month', 'Monthly', '$200.00'],
+    ['Year', 'Yearly', '$300.00']
+  ]) {
+    await page
+      .getByRole('group', { name: 'Dashboard period', exact: true })
+      .getByRole('button', { name: label, exact: true })
+      .click()
+    await expect(summary).toContainText(cycle)
+    await expect(summary).toContainText(amount)
+  }
+  await page.screenshot({ path: info.outputPath('yearly-budget-summary.png'), fullPage: true })
+})
+
+test('goal create and removal errors stay inside their modal and clear between actions', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'Goal owner',
+      email: `goal-errors-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const id = `goal-errors-${user.id}`
+  expect(
+    (
+      await page.request.post('/api/goals', {
+        headers,
+        data: { id, name: 'Vacation', targetAmount: 100 }
+      })
+    ).status()
+  ).toBe(201)
+  expect(
+    (
+      await page.request.put(`/api/accounts/main-${user.id}`, {
+        headers,
+        data: { openingBalance: 50, editedAt: new Date().toISOString(), mutationId: randomUUID() }
+      })
+    ).status()
+  ).toBe(200)
+  expect(
+    (
+      await page.request.post('/api/transfers', {
+        headers,
+        data: {
+          id: randomUUID(),
+          sourceId: `main-${user.id}`,
+          destinationId: id,
+          amount: 20,
+          date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' }),
+          comment: ''
+        }
+      })
+    ).status()
+  ).toBe(201)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  page.on('dialog', dialog => dialog.accept())
+  await page.goto('/goals')
+  await page.getByRole('button', { name: 'New Goal', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: 'New goal', exact: true })
+  await dialog.getByLabel('Name', { exact: true }).fill('Vacation')
+  await dialog.getByLabel('Target amount', { exact: true }).fill('200')
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('An account with that name already exists.')
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'An account with that name already exists.' })
+  ).toHaveCount(1)
+  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'An account with that name already exists.' })
+  ).toHaveCount(0)
+  await page.getByRole('button', { name: 'Remove Vacation', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: 'Remove goal?', exact: true })
+  await dialog.getByRole('button', { name: 'Remove', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(1)
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'New Goal', exact: true }).click()
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveCount(0)
+})
+
+test('readable account tag and category URLs resolve internal IDs and accept legacy links', async ({
+  page
+}, info) => {
+  const registration = await page.request.post('/auth/register', {
+    data: {
+      name: 'URL owner',
+      email: `readable-url-${info.project.name}@example.test`,
+      password: 'secret123'
+    }
+  })
+  expect(registration.status()).toBe(201)
+  const { token, user } = await registration.json()
+  const headers = { Authorization: `Bearer ${token}` }
+  const cash = randomUUID(),
+    tag = randomUUID()
+  expect(
+    (
+      await page.request.post('/api/accounts', {
+        headers,
+        data: { id: cash, name: 'Daily Cash', openingBalance: 100 }
+      })
+    ).status()
+  ).toBe(201)
+  expect(
+    (
+      await page.request.post('/api/tags', { headers, data: { id: tag, name: 'Home Daily' } })
+    ).status()
+  ).toBe(201)
+  const categories = await (await page.request.get('/api/categories', { headers })).json()
+  const food = categories.find((category: { name: string }) => category.name === 'Food')
+  expect(
+    (
+      await page.request.post('/api/transactions', {
+        headers,
+        data: {
+          clientId: randomUUID(),
+          accountId: cash,
+          categoryId: food.id,
+          tagIds: [tag],
+          type: 'Expense',
+          amount: 2,
+          comment: 'Readable URL lunch',
+          date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' })
+        }
+      })
+    ).status()
+  ).toBe(201)
+  await page.addInitScript(
+    ({ token, user }) => {
+      localStorage.setItem('porkex_token', token)
+      localStorage.setItem('porkex_user', JSON.stringify(user))
+    },
+    { token, user }
+  )
+  await page.goto('/transactions?period=year&account=daily-cash&tag=home-daily&category=food')
+  await expect(page.getByText('Readable URL lunch', { exact: true })).toBeVisible()
+  for (const path of ['/analytics', '/budgets', '/recurring']) {
+    await page.goto(path + '?account=daily-cash')
+    await expect(page.locator('.account-filter')).toContainText('Daily Cash')
+    expect(new URL(page.url()).searchParams.get('account')).toBe('daily-cash')
+  }
+  await page.goto(`/transactions?period=year&accountId=${cash}&tagId=${tag}&category=${food.id}`)
+  await expect(page.getByText('Readable URL lunch', { exact: true })).toBeVisible()
+  await expect.poll(() => new URL(page.url()).searchParams.get('account')).toBe('daily-cash')
+  const query = new URL(page.url()).searchParams
+  expect(query.get('tag')).toBe('home-daily')
+  expect(query.get('category')).toBe('food')
+  expect(query.has('accountId') || query.has('tagId')).toBe(false)
+  await page.reload()
+  await expect(page.getByText('Readable URL lunch', { exact: true })).toBeVisible()
 })

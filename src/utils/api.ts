@@ -391,7 +391,7 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
       ...(alreadyAttempted
         ? {
             outcome: 'unknown' as const,
-            lastError: 'The response was lost. Retry the original change to confirm its outcome.'
+            lastError: 'The server could not confirm this change. It remains saved on this device.'
           }
         : {}),
       body: typeof body === 'string' ? body : null
@@ -432,6 +432,7 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
         if (!queueable || !isNetworkFailure(error)) throw error
         return await savePending(true)
       }
+      if ([408, 502, 503, 504].includes(response.status)) return await savePending(true)
       const handled = handleResponse(response, session)
       if (response.ok) confirmedWrite(path)
       return handled

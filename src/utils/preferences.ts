@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { DecimalSeparator, PeriodFilter, WeekDay } from '@/types'
+import { setLanguage } from '@/i18n'
 
 // Display preferences: the period the Dashboard and Transactions filters open
 // with, where a week starts and how amounts are formatted. Like the currency
@@ -86,10 +87,12 @@ export function applyPreferences(prefs: {
   defaultPeriod?: string | null
   firstDayOfWeek?: string | null
   decimalSeparator?: string | null
+  language?: string | null
 }): void {
   if (prefs.defaultPeriod) setDefaultPeriod(prefs.defaultPeriod)
   if (prefs.firstDayOfWeek) setFirstDayOfWeek(prefs.firstDayOfWeek)
   if (prefs.decimalSeparator) setDecimalSeparator(prefs.decimalSeparator)
+  if (prefs.language) setLanguage(prefs.language)
 }
 
 function touch(): void {

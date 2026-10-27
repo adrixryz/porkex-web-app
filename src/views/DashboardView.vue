@@ -13,14 +13,14 @@
               :items="balanceOptions"
               item-title="name"
               item-value="id"
-              aria-label="Balance account"
+              :aria-label="translate('Balance account')"
               hide-details
               density="compact"
               class="balance-select"
             />
             <AppIconButton
               :icon="hideBalances ? mdiEyeOffOutline : mdiEyeOutline"
-              :label="hideBalances ? 'Show balances' : 'Hide balances'"
+              :label="hideBalances ? translate('Show balances') : translate('Hide balances')"
               :size="32"
               @click="toggleBalances"
             />
@@ -35,12 +35,12 @@
         <template #period>
           <AppSegmentedControl
             v-model="dashboardPeriod"
-            label="Dashboard period"
+            :label="translate('Dashboard period')"
             :items="[
-              { label: 'Day', value: 'day' },
-              { label: 'Week', value: 'week' },
-              { label: 'Month', value: 'month' },
-              { label: 'Year', value: 'year' }
+              { label: translate('Day'), value: 'day' },
+              { label: translate('Week'), value: 'week' },
+              { label: translate('Month'), value: 'month' },
+              { label: translate('Year'), value: 'year' }
             ]"
             block
             :height="44"
@@ -57,7 +57,7 @@
         <template #stats>
           <v-col cols="4">
             <AppStatCard
-              label="Income"
+              :label="translate('Income')"
               :value-sizing-length="kpiValueLength"
               responsive
               compact
@@ -69,7 +69,7 @@
           </v-col>
           <v-col cols="4">
             <AppStatCard
-              label="Expenses"
+              :label="translate('Expenses')"
               :value-sizing-length="kpiValueLength"
               responsive
               compact
@@ -81,7 +81,7 @@
           </v-col>
           <v-col cols="4">
             <AppStatCard
-              label="Transactions"
+              :label="translate('Transactions')"
               :value-sizing-length="kpiValueLength"
               responsive
               compact
@@ -94,14 +94,14 @@
         </template>
       </DashboardOverview>
       <v-alert v-if="dbError || budgetsError" type="warning" class="mb-4">
-        {{ dbError || budgetsError }}
+        {{ translate(dbError || budgetsError) }}
       </v-alert>
 
       <!-- MAIN TWO COLUMNS -->
       <v-row>
         <v-col cols="12" md="8" order="2" order-md="1">
           <AppCard
-            title="Recent Transactions"
+            :title="translate('Recent Transactions')"
             title-class="font-weight-bold"
             keep-actions-inline
             class="overflow-hidden fill-height"
@@ -120,7 +120,7 @@
                       : { account: catalogSlug(selectedAccountId, accounts) }
                 }"
               >
-                View All
+                {{ translate('View All') }}
               </AppButton>
             </template>
             <AppCardBody padding="pa-0">
@@ -128,8 +128,10 @@
                 <AppEmptyState
                   v-if="db.recentTransactions.length === 0"
                   :icon="mdiReceiptTextClockOutline"
-                  title="No transactions yet"
-                  description="Add your first movement to start tracking your balance."
+                  :title="translate('No transactions yet')"
+                  :description="
+                    translate('Add your first movement to start tracking your balance.')
+                  "
                   padding="10"
                 />
                 <template v-for="(tx, i) in visibleRecent" :key="tx.id">
@@ -153,7 +155,7 @@
         <!-- PIE CHART -->
         <v-col cols="12" md="4" order="1" order-md="2">
           <AppCard
-            title="Transactions Breakdown"
+            :title="translate('Transactions Breakdown')"
             title-class="font-weight-bold"
             keep-actions-inline
             class="fill-height"
@@ -165,17 +167,17 @@
                 size="small"
                 color="primary"
                 to="/analytics"
-                >View More</AppButton
+                >{{ translate('View More') }}</AppButton
               ></template
             >
             <AppCardBody padding="px-6 py-4" class="d-flex flex-column align-center justify-center">
               <AppSegmentedControl
                 v-model="breakdownType"
-                label="Transaction breakdown type"
+                :label="translate('Transaction breakdown type')"
                 :height="44"
                 :items="[
-                  { label: 'Expense', value: 'Expense' },
-                  { label: 'Income', value: 'Income' }
+                  { label: translate('Expense'), value: 'Expense' },
+                  { label: translate('Income'), value: 'Income' }
                 ]"
                 class="mb-2"
               />
@@ -188,8 +190,11 @@
               >
                 <v-icon :icon="mdiChartPie" size="48" class="mb-2 opacity-50"></v-icon>
                 <p>
-                  Add {{ breakdownType === 'Expense' ? 'expenses' : 'income' }} to see<br />your
-                  statistics
+                  {{
+                    breakdownType === 'Expense'
+                      ? translate('Add expenses to see your statistics.')
+                      : translate('Add income to see your statistics.')
+                  }}
                 </p>
               </div>
               <div
@@ -226,7 +231,7 @@
       <v-row>
         <v-col cols="12">
           <AppCard
-            title="Budget Summary"
+            :title="translate('Budget Summary')"
             title-class="font-weight-bold"
             keep-actions-inline
             class="overflow-hidden"
@@ -247,15 +252,15 @@
                   }
                 }"
               >
-                Manage Budgets
+                {{ translate('Manage Budgets') }}
               </AppButton>
             </template>
             <AppCardBody>
               <AppEmptyState
                 v-if="!summaryBudgets.length"
                 :icon="mdiPiggyBankOutline"
-                title="No budgets yet"
-                description="Add a new budget to start tracking your spending limits."
+                :title="translate('No budgets yet')"
+                :description="translate('Add a new budget to start tracking your spending limits.')"
                 padding="8"
               />
               <div v-else class="d-flex flex-column ga-5">
@@ -281,16 +286,14 @@
                       >
                         ·
                         <template v-if="b.overBudget"
-                          >Over by
+                          >{{ translate('Over by') }}
                           {{
                             hideBalances ? '****' : cs + formatMoney(Math.abs(b.remaining))
                           }}</template
                         >
                         <template v-else
-                          >{{
-                            hideBalances ? '****' : cs + formatMoney(b.remaining)
-                          }}
-                          left</template
+                          >{{ hideBalances ? '****' : cs + formatMoney(b.remaining) }}
+                          {{ translate('left') }}</template
                         >
                       </span>
                     </div>
@@ -305,7 +308,12 @@
                     bg-color="surface-bright"
                     height="6"
                     rounded
-                    :aria-label="`${b.category.name}: ${b.usagePercent}% of the limit used`"
+                    :aria-label="
+                      translate('{0}: {1}% of the limit used', {
+                        0: b.category.name,
+                        1: b.usagePercent
+                      })
+                    "
                   ></v-progress-linear>
                 </div>
               </div>
@@ -322,6 +330,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { catalogSlug } from '@/utils/catalogSlugs'
 import { dashboardBudgetPeriod, budgetPeriodName } from '@/utils/budgetPeriods'
 import { useCategorySortedRecords } from '@/composables/useCategoryOrder'
@@ -581,8 +590,14 @@ const chartOptions = {
 const pieAriaLabel = computed(() => {
   const items = breakdownItems.value
   const label = breakdownType.value === 'Income' ? 'Income' : 'Expense'
-  if (!items.length) return `${label} breakdown: no transactions recorded yet`
-  return `${label} breakdown: ${items.map(i => `${i.label} ${hideBalances.value ? '****' : cs.value + formatMoney(i.value)}`).join(', ')}`
+  if (!items.length)
+    return translate('{0} breakdown: no transactions recorded yet', { 0: translate(label) })
+  return translate('{0} breakdown: {1}', {
+    0: translate(label),
+    1: items
+      .map(i => `${i.label} ${hideBalances.value ? '****' : cs.value + formatMoney(i.value)}`)
+      .join(', ')
+  })
 })
 
 const loadDashboard = async () => {

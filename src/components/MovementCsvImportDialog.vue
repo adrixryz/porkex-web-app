@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     v-model="open"
-    title="Import Transactions"
+    :title="translate('Import Transactions')"
     :max-width="preview ? 1100 : 620"
     actions-class="pa-6 pt-0 ga-3"
     :persistent="busy"
@@ -9,16 +9,16 @@
     :dirty="!!csv"
   >
     <div class="mb-5">
-      <h2 class="text-subtitle-1 font-weight-bold mt-0 mb-1">Choose your CSV</h2>
+      <h2 class="text-subtitle-1 font-weight-bold mt-0 mb-1">{{ translate('Choose your CSV') }}</h2>
 
       <p class="text-body-2 text-on-surface-variant ma-0">
-        Review your transactions and possible duplicates before importing.
+        {{ translate('Review your transactions and possible duplicates before importing.') }}
       </p>
     </div>
 
     <AppFilePicker
-      label="Select a CSV file"
-      description="Import your complete transaction history"
+      :label="translate('Select a CSV file')"
+      :description="translate('Import your complete transaction history')"
       accept=".csv,text/csv"
       :file-name="fileName"
       :file-size="fileSize"
@@ -31,42 +31,49 @@
       <div class="d-flex align-center ga-2 mb-3">
         <v-icon :icon="mdiTable" size="18" color="on-surface-variant" />
 
-        <span class="text-subtitle-2">File format</span>
+        <span class="text-subtitle-2">{{ translate('File format') }}</span>
 
-        <span class="text-caption text-on-surface-variant ml-auto"
-          >UTF-8 · Semicolon separated</span
-        >
+        <span class="text-caption text-on-surface-variant ml-auto">{{
+          translate('UTF-8 · Semicolon separated')
+        }}</span>
       </div>
 
       <code class="csv-format__header">Date;Type;Account;Category;Tags;Comment;Amount</code>
 
       <div class="d-flex flex-wrap ga-2 mt-3 text-caption text-on-surface-variant">
-        <span>Date: <span class="text-on-surface">YYYY-MM-DD</span></span>
+        <span>{{ translate('Date:') }} <span class="text-on-surface">YYYY-MM-DD</span></span>
 
         <span aria-hidden="true">·</span>
 
-        <span>Amount: <span class="text-on-surface">4.75</span></span>
+        <span>{{ translate('Amount:') }} <span class="text-on-surface">4.75</span></span>
 
         <span aria-hidden="true">·</span>
 
-        <span>Tags: <span class="text-on-surface">Daily,Essential</span></span>
+        <span>{{ translate('Tags:') }} <span class="text-on-surface">Daily,Essential</span></span>
       </div>
     </div>
 
     <v-alert v-if="isOffline" type="warning" density="compact" class="mt-4 mb-4">
-      Connect to the internet to preview and import your file.
+      {{ translate('Connect to the internet to preview and import your file.') }}
     </v-alert>
 
-    <v-alert v-if="error" type="error" density="compact" class="mt-4 mb-4">{{ error }}</v-alert>
+    <v-alert v-if="error" type="error" density="compact" class="mt-4 mb-4">{{
+      translate(error)
+    }}</v-alert>
     <v-alert v-if="recoveringImport" type="warning" density="compact" class="mt-4 mb-4">
-      A previous import needs confirmation. Select the same CSV file to safely retry its original
-      selection.
+      {{
+        translate(
+          'A previous import needs confirmation. Select the same CSV file to safely retry its original selection.'
+        )
+      }}
     </v-alert>
 
     <v-progress-linear v-if="busy" indeterminate color="primary" class="mt-4 mb-4" />
 
     <div v-if="csv" class="d-flex align-center flex-wrap ga-3 mt-5 mb-4">
-      <h2 v-if="preview" class="text-subtitle-1 font-weight-bold">Transaction Preview</h2>
+      <h2 v-if="preview" class="text-subtitle-1 font-weight-bold">
+        {{ translate('Transaction Preview') }}
+      </h2>
 
       <AppButton
         v-if="!attemptLocked"
@@ -77,25 +84,32 @@
         :disabled="busy || isOffline"
         class="ml-auto"
         @click="refreshPreview"
-        >Refresh preview</AppButton
+        >{{ translate('Refresh preview') }}</AppButton
       >
     </div>
 
     <template v-if="preview">
       <div class="d-flex flex-wrap ga-2 my-4">
-        <v-chip>{{ selectedRows.length }} of {{ preview.rows.length }} selected</v-chip>
-
-        <v-chip v-if="duplicateCount" color="warning"
-          >{{ duplicateCount }} possible duplicates</v-chip
+        <v-chip
+          >{{ selectedRows.length }} {{ translate('of') }} {{ preview.rows.length }}
+          {{ translate('selected') }}</v-chip
         >
 
-        <v-chip v-if="errorCount" color="error">{{ errorCount }} rows with errors</v-chip>
+        <v-chip v-if="duplicateCount" color="warning"
+          >{{ duplicateCount }} {{ translate('possible duplicates') }}</v-chip
+        >
+
+        <v-chip v-if="errorCount" color="error"
+          >{{ errorCount }} {{ translate('rows with errors') }}</v-chip
+        >
       </div>
 
       <p class="text-body-2 mb-4">
-        Possible duplicates are unselected by default. Check them only if they are separate real
-        transactions. Correct every error in your CSV before importing. Rows on the same date keep
-        their file order.
+        {{
+          translate(
+            'Possible duplicates are unselected by default. Check them only if they are separate real transactions. Correct every error in your CSV before importing. Rows on the same date keep their file order.'
+          )
+        }}
       </p>
 
       <v-data-table
@@ -109,6 +123,7 @@
         class="border rounded-lg mb-4"
       >
         <template #item.tags="{ item }">{{ item.tags.join(', ') || '—' }}</template>
+        <template #item.type="{ item }">{{ translate(item.type) }}</template>
 
         <template #item.comment="{ item }"
           ><span class="csv-comment">{{ item.comment || '—' }}</span></template
@@ -133,38 +148,41 @@
         </template>
 
         <template #item.status="{ item }">
-          <span v-if="item.errors.length" class="text-error">{{ item.errors.join(' ') }}</span>
+          <span v-if="item.errors.length" class="text-error">{{
+            item.errors.map((message: string) => translate(message)).join(' ')
+          }}</span>
 
           <span v-else-if="item.duplicate.existing || item.duplicate.file" class="text-warning">
             {{
               item.importable === false
-                ? 'Already saved · Archived account'
+                ? translate('Already saved · Archived account')
                 : item.duplicate.existing
-                  ? 'Matches saved transaction'
-                  : 'Repeated in file'
+                  ? translate('Matches saved transaction')
+                  : translate('Repeated in file')
             }}
           </span>
 
-          <span v-else class="text-success">Ready</span>
+          <span v-else class="text-success">{{ translate('Ready') }}</span>
         </template>
       </v-data-table>
 
       <div class="text-body-2 mb-4">
         <p v-if="newAccounts.length" class="mb-2">
-          <strong>New accounts (opening balance 0):</strong> {{ newAccounts.join(', ') }}
+          <strong>{{ translate('New accounts (opening balance 0):') }}</strong>
+          {{ newAccounts.join(', ') }}
         </p>
 
         <p v-if="newCategories.length" class="mb-2">
-          <strong>New categories (gray):</strong> {{ newCategories.join(', ') }}
+          <strong>{{ translate('New categories (gray):') }}</strong> {{ newCategories.join(', ') }}
         </p>
 
         <p v-if="newTags.length" class="mb-2">
-          <strong>New tags:</strong> {{ newTags.join(', ') }}
+          <strong>{{ translate('New tags:') }}</strong> {{ newTags.join(', ') }}
         </p>
       </div>
 
       <p class="text-subtitle-2 mb-2">
-        Balances before and after importing the selected transactions
+        {{ translate('Balances before and after importing the selected transactions') }}
       </p>
 
       <div class="d-flex flex-wrap ga-2 mb-4">
@@ -196,8 +214,11 @@
         density="compact"
         class="mb-4"
       >
-        Historical imports can leave accounts with negative balances. Review these totals before
-        confirming.
+        {{
+          translate(
+            'Historical imports can leave accounts with negative balances. Review these totals before confirming.'
+          )
+        }}
       </v-alert>
     </template>
 
@@ -212,8 +233,10 @@
         @click="confirmImport"
         >{{
           attemptLocked
-            ? 'Retry confirmation'
-            : `Import${selectedRows.length ? ` ${selectedRows.length}` : ''} transactions`
+            ? translate('Retry confirmation')
+            : translate('Import{0} transactions', {
+                0: selectedRows.length ? ` ${selectedRows.length}` : ''
+              })
         }}</AppButton
       >
     </template>
@@ -221,6 +244,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed, ref, watch } from 'vue'
 import {
   pendingImport,
@@ -301,25 +325,27 @@ async function recoverImport() {
   }
 }
 
-const headers = [
-  { title: 'Row', key: 'line' },
+const headers = computed(() =>
+  [
+    { title: 'Row', key: 'line' },
 
-  { title: 'Date', key: 'date' },
+    { title: 'Date', key: 'date' },
 
-  { title: 'Type', key: 'type' },
+    { title: 'Type', key: 'type' },
 
-  { title: 'Account', key: 'account' },
+    { title: 'Account', key: 'account' },
 
-  { title: 'Category', key: 'category' },
+    { title: 'Category', key: 'category' },
 
-  { title: 'Tags', key: 'tags', sortable: false },
+    { title: 'Tags', key: 'tags', sortable: false },
 
-  { title: 'Comment', key: 'comment', sortable: false },
+    { title: 'Comment', key: 'comment', sortable: false },
 
-  { title: 'Amount', key: 'amount' },
+    { title: 'Amount', key: 'amount' },
 
-  { title: 'Status', key: 'status', sortable: false }
-]
+    { title: 'Status', key: 'status', sortable: false }
+  ].map(item => ({ ...item, title: translate(item.title) }))
+)
 
 const selectedRows = computed(() => {
   const selected = new Set(selectedLines.value)
@@ -574,9 +600,11 @@ async function confirmImport() {
     }
 
     error.value =
-      (cause as Error).message +
+      translate((cause as Error).message) +
       (attemptLocked.value
-        ? ' The outcome could not be confirmed. Retry this same selection to safely confirm it.'
+        ? translate(
+            ' The outcome could not be confirmed. Retry this same selection to safely confirm it.'
+          )
         : '')
   } finally {
     busy.value = false

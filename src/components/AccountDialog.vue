@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     :model-value="modelValue"
-    :title="account ? 'Edit account' : 'New account'"
+    :title="account ? translate('Edit account') : translate('New account')"
     :close-disabled="busy"
     :dirty="JSON.stringify(form) !== clean"
     @update:model-value="emit('update:modelValue', $event)"
@@ -10,22 +10,25 @@
       <AppFormFields>
         <AppTextField
           v-model="form.name"
-          label="Name"
+          :label="translate('Name')"
           maxlength="60"
           :rules="[
-            (value: unknown) => validCatalogName(value, 60) || catalogNameHint,
+            (value: unknown) => validCatalogName(value, 60) || translate(catalogNameHint),
             () => !duplicateName || 'An account with that name already exists.'
           ]"
           :readonly="account?.isMain"
         />
         <AppMoneyField
           v-model="form.openingBalance"
-          :label="account ? 'Current balance' : 'Opening balance'"
+          :label="account ? translate('Current balance') : translate('Opening balance')"
           :min="0"
           :unchanged-value="account ? originalBalance : undefined"
         />
-        <AppSwitch v-model="form.excludeFromTotalBalance" label="Do not include in total balance" />
-        <v-alert v-if="error" type="error">{{ error }}</v-alert>
+        <AppSwitch
+          v-model="form.excludeFromTotalBalance"
+          :label="translate('Do not include in total balance')"
+        />
+        <v-alert v-if="error" type="error">{{ translate(error) }}</v-alert>
         <AppButton
           type="submit"
           color="primary"
@@ -33,13 +36,14 @@
           class="w-100 font-weight-bold"
           :loading="busy"
           :disabled="!validCatalogName(form.name, 60) || duplicateName || !validOpeningBalance"
-          >{{ account ? 'Update' : 'Create' }}</AppButton
+          >{{ account ? translate('Update') : translate('Create') }}</AppButton
         >
       </AppFormFields>
     </v-form>
   </AppDialog>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { computed, ref, watch } from 'vue'

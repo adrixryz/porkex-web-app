@@ -2,8 +2,8 @@
   <AppCard
     class="fill-height category-comparison"
     role="region"
-    aria-label="Category Comparison"
-    title="Category Comparison"
+    :aria-label="translate('Category Comparison')"
+    :title="translate('Category Comparison')"
     title-class="font-weight-bold"
   >
     <template #header-actions>
@@ -20,7 +20,7 @@
           <AppSelect
             :model-value="mode"
             :items="periodOptions"
-            label="Period"
+            :label="translate('Period')"
             density="compact"
             hide-details
             class="comparison-selector"
@@ -29,10 +29,10 @@
           <AppSegmentedControl
             :model-value="type"
             :items="[
-              { label: 'Expense', value: 'Expense' },
-              { label: 'Income', value: 'Income' }
+              { label: translate('Expense'), value: 'Expense' },
+              { label: translate('Income'), value: 'Income' }
             ]"
-            label="Comparison type"
+            :label="translate('Comparison type')"
             compact
             block
             @update:model-value="selectType"
@@ -42,10 +42,12 @@
     </template>
     <v-progress-linear v-if="loading" indeterminate height="2" />
     <AppCardBody padding="pa-0">
-      <v-alert v-if="error" type="error" density="compact" class="ma-4">{{ error }}</v-alert>
+      <v-alert v-if="error" type="error" density="compact" class="ma-4">{{
+        translate(error)
+      }}</v-alert>
       <AppEmptyState
         v-else-if="!loading && !rows.length"
-        :description="`No ${type.toLowerCase()} data to compare yet`"
+        :description="translate('No {0} data to compare yet', { 0: translate(type.toLowerCase()) })"
         padding="8"
       />
       <div v-if="rows.length" class="comparison-content">
@@ -53,10 +55,10 @@
           <v-table theme="dark" class="bg-surface comparison-table">
             <thead>
               <tr>
-                <th class="text-left font-weight-bold">Category</th>
+                <th class="text-left font-weight-bold">{{ translate('Category') }}</th>
                 <th class="text-right font-weight-bold">{{ previousLabel }}</th>
                 <th class="text-right font-weight-bold">{{ currentLabel }}</th>
-                <th class="text-right font-weight-bold">Change</th>
+                <th class="text-right font-weight-bold">{{ translate('Change') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -81,7 +83,7 @@
             </tbody>
             <tfoot>
               <tr>
-                <td class="font-weight-bold">Total</td>
+                <td class="font-weight-bold">{{ translate('Total') }}</td>
                 <td class="text-right text-on-surface-variant">
                   {{ cs }}{{ formatMoney(totals.previous / 100) }}
                 </td>
@@ -109,6 +111,7 @@
   </AppCard>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 const props = defineProps<{ accountId?: string | null }>()
 import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
@@ -183,22 +186,24 @@ const currentLabel = computed(() =>
   offset.value < 0
     ? labelFor(anchor.value)
     : mode.value === 'day'
-      ? 'Today'
-      : `This ${periodName.value}`
+      ? translate('Today')
+      : translate(`This ${periodName.value}`)
 )
 const previousLabel = computed(() =>
   offset.value < 0
     ? labelFor(anchorFor(offset.value - 1))
     : mode.value === 'day'
-      ? 'Yesterday'
-      : `Last ${periodName.value}`
+      ? translate('Yesterday')
+      : translate(`Last ${periodName.value}`)
 )
-const periodOptions = [
-  { title: 'By Day', value: 'day' },
-  { title: 'By Week', value: 'week' },
-  { title: 'By Month', value: 'month' },
-  { title: 'By Year', value: 'year' }
-]
+const periodOptions = computed(() =>
+  [
+    { title: 'By Day', value: 'day' },
+    { title: 'By Week', value: 'week' },
+    { title: 'By Month', value: 'month' },
+    { title: 'By Year', value: 'year' }
+  ].map(item => ({ ...item, title: translate(item.title) }))
+)
 const key = () =>
   `/analytics/category-comparison?mode=${mode.value}&type=${type.value}&weekStart=${getFirstDayOfWeek()}&anchor=${toDateInput(anchor.value)}${props.accountId ? `&accountId=${encodeURIComponent(props.accountId)}` : ''}`
 const { data, loading, error, run } = useAsyncData<Comparison>(

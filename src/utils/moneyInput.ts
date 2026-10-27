@@ -1,3 +1,5 @@
+import { t } from '@/i18n'
+
 export const MAX_MONEY = 10_000_000
 
 export function parseMoneyInput(value: unknown): number | null {
@@ -13,7 +15,7 @@ export function moneyInputError(
   options: { min?: number; max?: number; optional?: boolean; unchangedValue?: number } = {}
 ): string {
   if (value === '' || value === null || value === undefined)
-    return options.optional ? '' : 'Enter an amount.'
+    return options.optional ? '' : t('Enter an amount.')
   const amount = parseMoneyInput(value)
   if (amount !== null && options.unchangedValue !== undefined && amount === options.unchangedValue)
     return ''
@@ -21,5 +23,8 @@ export function moneyInputError(
   const max = options.max ?? MAX_MONEY
   return amount !== null && !String(value).trim().startsWith('-') && amount >= min && amount <= max
     ? ''
-    : `Use up to two decimals, from ${min.toLocaleString('en-US')} to ${max.toLocaleString('en-US')}.`
+    : t('Use up to two decimals, from {0} to {1}.', {
+        0: min.toLocaleString('en-US'),
+        1: max.toLocaleString('en-US')
+      })
 }

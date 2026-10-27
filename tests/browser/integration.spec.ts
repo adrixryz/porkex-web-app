@@ -1181,9 +1181,30 @@ test('real analytics totals, net results and averages reach the income and expen
   const data = await analyticsResponse.json()
   expect(data.range).toEqual({ months: 3, days: 7 })
   expect(data.monthlyData).toEqual([
-    { month: 'Jan 24', income: 100.3, expense: 40.3, net: 60, avgExpense: 40.3 },
-    { month: 'Feb 24', income: 0, expense: 90.99, net: -90.99, avgExpense: 65.65 },
-    { month: 'Mar 24', income: 200.05, expense: 0, net: 200.05, avgExpense: 43.76 }
+    {
+      month: 'Jan 24',
+      monthStart: '2024-01-01',
+      income: 100.3,
+      expense: 40.3,
+      net: 60,
+      avgExpense: 40.3
+    },
+    {
+      month: 'Feb 24',
+      monthStart: '2024-02-01',
+      income: 0,
+      expense: 90.99,
+      net: -90.99,
+      avgExpense: 65.65
+    },
+    {
+      month: 'Mar 24',
+      monthStart: '2024-03-01',
+      income: 200.05,
+      expense: 0,
+      net: 200.05,
+      avgExpense: 43.76
+    }
   ])
   expect(data.insights.currentMonthIncome).toBe(200.05)
   expect(data.insights.currentMonthExpense).toBe(0)
@@ -1198,9 +1219,16 @@ test('real analytics totals, net results and averages reach the income and expen
   const expanded = await (await nextResponse).json()
   expect(expanded.monthlyData).toHaveLength(6)
   expect(expanded.monthlyData.slice(0, 3)).toEqual([
-    { month: 'Oct 23', income: 0, expense: 0, net: 0, avgExpense: 0 },
-    { month: 'Nov 23', income: 0, expense: 0, net: 0, avgExpense: 0 },
-    { month: 'Dec 23', income: 0, expense: 999, net: -999, avgExpense: 333 }
+    { month: 'Oct 23', monthStart: '2023-10-01', income: 0, expense: 0, net: 0, avgExpense: 0 },
+    { month: 'Nov 23', monthStart: '2023-11-01', income: 0, expense: 0, net: 0, avgExpense: 0 },
+    {
+      month: 'Dec 23',
+      monthStart: '2023-12-01',
+      income: 0,
+      expense: 999,
+      net: -999,
+      avgExpense: 333
+    }
   ])
   await expect(page).toHaveURL(/months=6/)
   await expect(

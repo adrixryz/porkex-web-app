@@ -1,4 +1,5 @@
 import type { BudgetPeriod, PeriodFilter } from '@/types'
+import { t } from '@/i18n'
 
 export const budgetPeriods: {
   value: BudgetPeriod
@@ -11,9 +12,9 @@ export const budgetPeriods: {
   { value: 'YEAR', label: 'This year', repeatLabel: 'Every year', adjective: 'Yearly' }
 ]
 export const budgetPeriodName = (period: BudgetPeriod) =>
-  budgetPeriods.find(item => item.value === period)!.adjective
+  t(budgetPeriods.find(item => item.value === period)!.adjective)
 export const budgetRangeName = (period: BudgetPeriod) =>
-  budgetPeriods.find(item => item.value === period)!.label.toLowerCase()
+  t(budgetPeriods.find(item => item.value === period)!.label).toLowerCase()
 export const dashboardBudgetPeriod = (period: PeriodFilter): BudgetPeriod =>
   period === 'year' ? 'YEAR' : period === 'month' ? 'MONTH' : 'WEEK'
 export const initialBudgetPeriod = (value: unknown): BudgetPeriod =>

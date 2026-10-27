@@ -7,7 +7,10 @@
     <template v-else>
       <!-- HEADER -->
 
-      <AppPageHeader title="Budgets" subtitle="Set budgets per account and category.">
+      <AppPageHeader
+        :title="translate('Budgets')"
+        :subtitle="translate('Set budgets per account and category.')"
+      >
         <template #actions>
           <AppButton
             color="primary"
@@ -15,13 +18,13 @@
             :disabled="selectedAccountArchived"
             @click="openDialog()"
           >
-            New Budget
+            {{ translate('New Budget') }}
           </AppButton>
         </template>
       </AppPageHeader>
 
       <v-alert v-if="loadError || accountsError" type="error" class="mb-4">{{
-        loadError || accountsError
+        translate(loadError || accountsError)
       }}</v-alert>
 
       <v-alert
@@ -29,8 +32,11 @@
         type="warning"
         class="mb-4"
       >
-        Some older budgets use income categories. Remove them and create budgets for expense
-        categories.
+        {{
+          translate(
+            'Some older budgets use income categories. Remove them and create budgets for expense categories.'
+          )
+        }}
       </v-alert>
 
       <!-- PERIOD TOGGLE -->
@@ -48,8 +54,8 @@
 
           <AppSegmentedControl
             v-model="period"
-            label="Budget period"
-            :items="budgetPeriods"
+            :label="translate('Budget period')"
+            :items="localizedBudgetPeriods"
             class="ml-sm-auto"
           />
         </v-col>
@@ -60,11 +66,13 @@
       <v-row v-if="totals" class="mb-4 budget-stats">
         <v-col cols="4">
           <AppStatCard
-            label="Total Budgeted"
+            :label="translate('Total Budgeted')"
             responsive-text
             :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(totals.amount)}`"
-            :caption="`${totals.count} ${totals.count === 1 ? 'budget' : 'budgets'}`"
+            :caption="
+              translate('{0} budget{1}', { 0: totals.count, 1: totals.count === 1 ? '' : 's' })
+            "
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
@@ -72,12 +80,12 @@
 
         <v-col cols="4">
           <AppStatCard
-            label="Spent"
+            :label="translate('Spent')"
             responsive-text
             :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(totals.spent)}`"
             value-class="text-error"
-            :caption="`${overallPercent}% used across budgets`"
+            :caption="translate('{0}% used across budgets', { 0: overallPercent })"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
@@ -85,7 +93,7 @@
 
         <v-col cols="4">
           <AppStatCard
-            label="Remaining"
+            :label="translate('Remaining')"
             responsive-text
             :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(remainingTotal)}`"
@@ -93,7 +101,7 @@
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           >
-            <template #caption>Across all budgets</template>
+            <template #caption>{{ translate('Across all budgets') }}</template>
           </AppStatCard>
         </v-col>
       </v-row>
@@ -104,8 +112,8 @@
         <v-col cols="12">
           <AppEmptyState
             :icon="mdiPiggyBankOutline"
-            :title="`No budgets for ${budgetRangeName(period)}`"
-            description="Set a budget for a category to track your spending."
+            :title="translate('No budgets for {0}', { 0: budgetRangeName(period) })"
+            :description="translate('Set a budget for a category to track your spending.')"
             padding="12"
           />
         </v-col>
@@ -127,13 +135,13 @@
                 ><template #actions
                   ><AppIconButton
                     :icon="mdiPencilOutline"
-                    :label="`Edit budget for ${b.category.name}`"
+                    :label="translate('Edit budget for {0}', { 0: b.category.name })"
                     color="primary"
                     @click="openDialog(b)" />
 
                   <AppIconButton
                     :icon="mdiDeleteOutline"
-                    :label="`Delete budget for ${b.category.name}`"
+                    :label="translate('Delete budget for {0}', { 0: b.category.name })"
                     color="error"
                     @click="confirmDelete(b)" /></template
               ></AppEntityHeader>
@@ -144,7 +152,7 @@
                 </span>
 
                 <span class="text-body-2 text-on-surface-variant"
-                  >of {{ cs }}{{ formatMoney(b.amount) }}</span
+                  >{{ translate('of') }} {{ cs }}{{ formatMoney(b.amount) }}</span
                 >
               </div>
 
@@ -154,7 +162,12 @@
                 bg-color="surface-bright"
                 height="8"
                 rounded
-                :aria-label="`${b.category.name}: ${b.usagePercent}% of the budget used`"
+                :aria-label="
+                  translate('{0}: {1}% of the budget used', {
+                    0: b.category.name,
+                    1: b.usagePercent
+                  })
+                "
               ></v-progress-linear>
 
               <div class="d-flex align-center justify-space-between mt-2">
@@ -165,10 +178,13 @@
                   "
                 >
                   <template v-if="b.overBudget"
-                    >Over by {{ cs }}{{ formatMoney(Math.abs(b.remaining)) }}</template
+                    >{{ translate('Over by') }} {{ cs
+                    }}{{ formatMoney(Math.abs(b.remaining)) }}</template
                   >
 
-                  <template v-else>{{ cs }}{{ formatMoney(b.remaining) }} left</template>
+                  <template v-else
+                    >{{ cs }}{{ formatMoney(b.remaining) }} {{ translate('left') }}</template
+                  >
                 </span>
 
                 <span class="text-caption text-on-surface-variant">{{ b.usagePercent }}%</span>
@@ -183,7 +199,7 @@
 
     <AppDialog
       v-model="dialog"
-      :title="editingBudget ? 'Edit Budget' : 'New Budget'"
+      :title="editingBudget ? translate('Edit Budget') : translate('New Budget')"
       :dirty="JSON.stringify(form) !== cleanForm"
       max-width="440"
       persistent
@@ -196,15 +212,15 @@
             :items="activeAccounts"
             item-title="name"
             item-value="id"
-            label="Account"
+            :label="translate('Account')"
           />
 
           <AppSelect
             v-model="form.period"
-            :items="budgetPeriods"
+            :items="localizedBudgetPeriods"
             item-title="repeatLabel"
             item-value="value"
-            label="Repeats"
+            :label="translate('Repeats')"
           ></AppSelect>
 
           <CategorySelect
@@ -213,7 +229,11 @@
             :disabled="isEditing"
           />
 
-          <AppMoneyField v-model="form.amount" label="Budget amount" step-label="budget amount" />
+          <AppMoneyField
+            v-model="form.amount"
+            :label="translate('Budget amount')"
+            :step-label="translate('budget amount')"
+          />
 
           <v-alert
             v-if="error"
@@ -223,7 +243,7 @@
             closable
             @click:close="error = ''"
           >
-            {{ error }}
+            {{ translate(error) }}
           </v-alert>
 
           <AppButton
@@ -234,7 +254,7 @@
             :loading="submitting"
             :disabled="!isValid"
           >
-            {{ editingBudget ? 'Update' : 'Create' }}
+            {{ editingBudget ? translate('Update') : translate('Create') }}
           </AppButton>
         </AppFormFields>
       </v-form>
@@ -244,8 +264,8 @@
 
     <AppConfirmDialog
       v-model="deleteDialog"
-      title="Remove budget?"
-      confirm-label="Delete"
+      :title="translate('Remove budget?')"
+      :confirm-label="translate('Delete')"
       :loading="deleting"
       @confirm="doDelete"
     >
@@ -255,13 +275,14 @@
         </v-avatar>
       </template>
 
-      The budget for {{ deletingBudget?.category.name }} will be deleted. Your transactions are not
-      affected.
+      {{ translate('The budget for') }} {{ deletingBudget?.category.name }}
+      {{ translate('will be deleted. Your transactions are not affected.') }}
     </AppConfirmDialog>
   </AppPage>
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { useAccountQuery } from '@/composables/useAccountQuery'
 import {
   budgetPeriods,
@@ -337,6 +358,15 @@ import { getFirstDayOfWeek } from '@/utils/preferences'
 import type { Budget, BudgetPeriod, BudgetsResponse, Category } from '@/types'
 
 import { mdiDeleteOutline, mdiPencilOutline, mdiPiggyBankOutline, mdiPlus } from '@mdi/js'
+
+const localizedBudgetPeriods = computed(() =>
+  budgetPeriods.map(item => ({
+    ...item,
+    label: translate(item.label),
+    repeatLabel: translate(item.repeatLabel),
+    adjective: translate(item.adjective)
+  }))
+)
 
 const cs = useCurrencySymbol()
 

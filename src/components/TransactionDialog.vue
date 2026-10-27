@@ -13,23 +13,23 @@
         <AppTextField
           v-if="favoriteMode"
           v-model="form.name"
-          label="Favorite name"
+          :label="translate('Favorite name')"
           autofocus
           maxlength="60"
-          :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
+          :rules="[(value: unknown) => validCatalogName(value, 60) || translate(catalogNameHint)]"
         />
         <div class="amount-date-row">
           <div>
             <AppMoneyField
               v-model="form.amount"
-              :step-label="isIncome ? 'income amount' : 'expense amount'"
+              :step-label="isIncome ? translate('income amount') : translate('expense amount')"
               :autofocus="!favoriteMode"
             />
           </div>
           <div>
             <AppTextField
               v-model="form.date"
-              label="Date"
+              :label="translate('Date')"
               type="date"
               :max="occurrence ? undefined : todayInput()"
               :readonly="!!occurrence"
@@ -44,15 +44,17 @@
           :items="activeAccounts"
           item-title="name"
           item-value="id"
-          label="Account"
+          :label="translate('Account')"
         />
         <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
 
         <AppTextField
           v-model="form.description"
-          label="Comment (optional)"
+          :label="translate('Comment (optional)')"
           maxlength="200"
-          :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Grocery shopping'"
+          :placeholder="
+            isIncome ? translate('e.g. Monthly salary') : translate('e.g. Grocery shopping')
+          "
           hide-details="auto"
         ></AppTextField>
         <TagPicker v-model="form.tagIds" />
@@ -63,7 +65,11 @@
           variant="tonal"
           density="compact"
         >
-          Categories could not be loaded. Connect once and they will stay available offline.
+          {{
+            translate(
+              'Categories could not be loaded. Connect once and they will stay available offline.'
+            )
+          }}
         </v-alert>
 
         <v-alert
@@ -74,7 +80,7 @@
           closable
           @click:close="error = ''"
         >
-          {{ error }}
+          {{ translate(error) }}
         </v-alert>
 
         <AppButton
@@ -85,7 +91,9 @@
           :loading="submitting"
           :disabled="!isValid"
         >
-          {{ isEditing ? 'Update' : favoriteMode ? 'Create' : 'Save' }}
+          {{
+            isEditing ? translate('Update') : favoriteMode ? translate('Create') : translate('Save')
+          }}
         </AppButton>
 
         <!-- Record metadata: only meaningful for an existing movement -->
@@ -93,7 +101,7 @@
           v-if="isEditing && transaction?.createdAt"
           class="d-flex align-center justify-space-between ga-3 pt-3 border-t border-outline-variant"
         >
-          <span class="text-caption text-on-surface-variant">Created At</span>
+          <span class="text-caption text-on-surface-variant">{{ translate('Created At') }}</span>
           <span class="text-caption text-on-surface">{{
             formatDateTime(transaction.createdAt)
           }}</span>
@@ -104,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { validCatalogName, catalogNameHint } from '@/utils/catalogNames'
@@ -189,17 +198,19 @@ const isEditing = computed(() => !!props.transaction || (props.favoriteMode && !
 const isIncome = computed(() => props.type === 'Income')
 
 const title = computed(() =>
-  props.favoriteMode
-    ? props.favorite
-      ? 'Edit favorite'
-      : 'New favorite'
-    : props.occurrence
-      ? 'Edit next occurrence'
-      : isEditing.value
-        ? 'Edit Transaction'
-        : props.type === 'Income'
-          ? 'New Income'
-          : 'New Expense'
+  translate(
+    props.favoriteMode
+      ? props.favorite
+        ? 'Edit favorite'
+        : 'New favorite'
+      : props.occurrence
+        ? 'Edit next occurrence'
+        : isEditing.value
+          ? 'Edit Transaction'
+          : props.type === 'Income'
+            ? 'New Income'
+            : 'New Expense'
+  )
 )
 
 // The parent may pass its own categories (e.g. for the filter); if not, they are loaded here.

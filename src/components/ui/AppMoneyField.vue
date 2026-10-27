@@ -1,7 +1,7 @@
 <template>
   <AppTextField
     v-model="model"
-    :label="label"
+    :label="translate(label)"
     type="number"
     inputmode="decimal"
     :prefix="cs"
@@ -17,7 +17,7 @@
   >
     <template #append-inner>
       <AmountStepper
-        :label="stepLabel || label.toLowerCase()"
+        :label="translate((stepLabel || label).toLowerCase())"
         :disabled="disabled || readonly"
         @step="step"
       />
@@ -26,6 +26,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed } from 'vue'
 import AppTextField from './AppTextField.vue'
 import AmountStepper from '@/components/AmountStepper.vue'
@@ -61,7 +62,10 @@ const props = withDefaults(
 const cs = useCurrencySymbol()
 const messages = computed(() => {
   const external = props.errorMessages
-  if (Array.isArray(external) ? external.length : !!external) return external
+  if (Array.isArray(external) ? external.length : !!external)
+    return Array.isArray(external)
+      ? external.map(message => translate(message))
+      : translate(external)
   return model.value === '' ? [] : moneyInputError(model.value, props)
 })
 function step(delta: number) {

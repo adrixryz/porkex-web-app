@@ -7,24 +7,30 @@
   >
     {{
       undoing
-        ? 'Restoring movements…'
+        ? translate('Restoring movements…')
         : deleteError ||
-          `${waitingDeletes.length} movement${waitingDeletes.length === 1 ? '' : 's'} removed; deletion pending.`
+          translate('{0} movement{1} removed; deletion pending.', {
+            0: waitingDeletes.length,
+            1: waitingDeletes.length === 1 ? '' : 's'
+          })
     }}
     <template #actions
       ><AppButton
         v-if="waitingDeletes.length || undoing"
         variant="text"
-        aria-label="Undo"
+        :aria-label="translate('Undo')"
         :loading="undoing"
         :disabled="undoing"
         @click="undo"
-        >Undo</AppButton
-      ><AppButton v-else variant="text" @click="retry">Retry</AppButton></template
+        >{{ translate('Undo') }}</AppButton
+      ><AppButton v-else variant="text" @click="retry">{{
+        translate('Retry')
+      }}</AppButton></template
     >
   </v-snackbar>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import { onMounted, onUnmounted, ref } from 'vue'
 import {

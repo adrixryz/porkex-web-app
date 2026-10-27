@@ -5,6 +5,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed } from 'vue'
 import { Bar } from 'vue-chartjs'
 import {
@@ -165,7 +166,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
 }))
 const chartDescription = computed(
   () =>
-    `${props.previousLabel}: ${cs.value}${formatMoney(totals.value[0])}. ${props.currentLabel}: ${cs.value}${formatMoney(totals.value[1])}. Stacked by category, largest at the bottom.`
+    `${props.previousLabel}: ${cs.value}${formatMoney(totals.value[0])}. ${props.currentLabel}: ${cs.value}${formatMoney(totals.value[1])}. ${translate('Stacked by category, largest at the bottom.')}`
 )
 </script>
 

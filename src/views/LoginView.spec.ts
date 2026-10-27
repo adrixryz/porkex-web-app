@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   authApi: vi.fn(),
   setToken: vi.fn(),
-  setUser: vi.fn()
+  setUser: vi.fn(),
+  applyPreferences: vi.fn(),
+  protectProfileChanges: vi.fn((user: Record<string, unknown>) => user)
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock('@/utils/api', () => ({
@@ -17,7 +19,8 @@ vi.mock('@/utils/api', () => ({
   setUser: mocks.setUser
 }))
 vi.mock('@/utils/currency', () => ({ setCurrencyByCode: vi.fn() }))
-vi.mock('@/utils/preferences', () => ({ applyPreferences: vi.fn() }))
+vi.mock('@/utils/preferences', () => ({ applyPreferences: mocks.applyPreferences }))
+vi.mock('@/utils/profile', () => ({ protectProfileChanges: mocks.protectProfileChanges }))
 
 const stubs = {
   'v-defaults-provider': { props: ['defaults'], template: '<slot />' },
@@ -158,6 +161,21 @@ describe('login and update protection', () => {
     await flushPromises()
     expect(mocks.setToken).toHaveBeenCalledWith('token')
     expect(mocks.setUser).toHaveBeenCalledWith(user)
+    expect(mocks.push).toHaveBeenCalledWith('/')
+  })
+
+  it('applies a pending language choice when signing back into its account', async () => {
+    const user = { id: 1, name: 'Me', email: 'me@example.com', language: 'en' }
+    const effective = { ...user, language: 'es' }
+    mocks.protectProfileChanges.mockReturnValueOnce(effective)
+    mocks.authApi.mockResolvedValue(new Response(JSON.stringify({ token: 'token', user })))
+    render()
+    await fillLogin()
+    await wrapper!.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.protectProfileChanges).toHaveBeenCalledWith(user)
+    expect(mocks.setUser).toHaveBeenLastCalledWith(effective)
+    expect(mocks.applyPreferences).toHaveBeenCalledWith(effective)
     expect(mocks.push).toHaveBeenCalledWith('/')
   })
 

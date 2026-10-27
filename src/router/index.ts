@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { watch } from 'vue'
+import { t, useLanguage } from '@/i18n'
 import { isAuthenticated } from '@/utils/api'
 import { canLeaveForms } from '@/composables/useUnsavedChanges'
 
@@ -97,9 +99,11 @@ router.beforeEach((to, from) => {
   return canLeaveForms()
 })
 
-router.afterEach(to => {
+function updateTitle(to = router.currentRoute.value) {
   const title = (to.meta as { title?: string }).title
-  document.title = title ? `${title} · Porkex` : 'Porkex'
-})
+  document.title = title ? `${t(title)} · Porkex` : 'Porkex'
+}
+router.afterEach(to => updateTitle(to))
+watch(useLanguage(), () => updateTitle())
 
 export default router

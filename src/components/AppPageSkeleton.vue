@@ -1,9 +1,14 @@
 <template>
-  <div class="app-page-skeleton" role="status" aria-label="Loading page" aria-busy="true">
+  <div
+    class="app-page-skeleton"
+    role="status"
+    :aria-label="translate('Loading page')"
+    aria-busy="true"
+  >
     <AppPageHeader
       v-if="header && page !== 'dashboard'"
-      :title="page[0].toUpperCase() + page.slice(1)"
-      :subtitle="page === 'settings' ? undefined : 'Loading summary'"
+      :title="translate(page[0].toUpperCase() + page.slice(1))"
+      :subtitle="page === 'settings' ? undefined : translate('Loading summary')"
       loading
     >
       <template v-if="page !== 'settings'" #actions>
@@ -16,7 +21,7 @@
       <AppCard
         v-for="section in ['Profile', 'Preferences', 'Backup', 'Security', 'Danger Zone']"
         :key="section"
-        :title="section"
+        :title="translate(section)"
         class="mb-4"
       >
         <AppCardBody class="app-page-skeleton__fields">
@@ -27,7 +32,11 @@
             </div>
           </div>
           <template v-if="section === 'Backup'">
-            <AppCard v-for="group in ['All Transactions', 'All Data']" :key="group" :title="group">
+            <AppCard
+              v-for="group in ['All Transactions', 'All Data']"
+              :key="group"
+              :title="translate(group)"
+            >
               <AppCardBody class="app-page-skeleton__fields">
                 <AppSkeleton width="85%" />
                 <div class="d-flex flex-wrap ga-3">
@@ -207,6 +216,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import DashboardOverview from '@/components/DashboardOverview.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppCard from '@/components/ui/AppCard.vue'

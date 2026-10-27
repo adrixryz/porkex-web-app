@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     :model-value="modelValue"
-    :title="transfer ? 'Edit transfer' : 'New transfer'"
+    :title="transfer ? translate('Edit transfer') : translate('New transfer')"
     :close-disabled="busy"
     :dirty="JSON.stringify(form) !== clean"
     @update:model-value="emit('update:modelValue', $event)"
@@ -10,14 +10,14 @@
       <AppFormFields>
         <AppSelect
           v-model="form.sourceId"
-          label="From account"
+          :label="translate('From account')"
           :items="sourceOptions"
           :item-title="accountTitle"
           item-value="id"
         />
         <AppSelect
           v-model="form.destinationId"
-          label="To account"
+          :label="translate('To account')"
           :items="destinationOptions"
           :item-title="accountTitle"
           item-value="id"
@@ -26,19 +26,28 @@
           v-model="form.amount"
           :max="goalLimit ?? 10_000_000"
           :error-messages="
-            exceedsGoal ? 'This amount exceeds the remaining savings goal target.' : []
+            exceedsGoal ? translate('This amount exceeds the remaining savings goal target.') : []
           "
         />
-        <AppTextField v-model="form.date" label="Date" type="date" :max="todayInput()" />
-        <AppTextField v-model="form.comment" label="Comment (optional)" maxlength="200" />
+        <AppTextField
+          v-model="form.date"
+          :label="translate('Date')"
+          type="date"
+          :max="todayInput()"
+        />
+        <AppTextField
+          v-model="form.comment"
+          :label="translate('Comment (optional)')"
+          maxlength="200"
+        />
         <v-alert
           v-if="
             accountsError && !activeAccounts.length && (!sourceAccounts || !destinationAccounts)
           "
           type="warning"
-          >{{ accountsError }}</v-alert
+          >{{ translate(accountsError) }}</v-alert
         >
-        <v-alert v-if="error" type="error">{{ error }}</v-alert>
+        <v-alert v-if="error" type="error">{{ translate(error) }}</v-alert>
         <AppButton
           type="submit"
           color="primary"
@@ -53,21 +62,22 @@
             !sourceOptions.some(account => account.id === form.sourceId) ||
             !destinationOptions.some(account => account.id === form.destinationId)
           "
-          >{{ transfer ? 'Update' : 'Create' }}</AppButton
+          >{{ transfer ? translate('Update') : translate('Create') }}</AppButton
         >
       </AppFormFields>
     </v-form>
   </AppDialog>
   <AppConfirmDialog
     v-model="confirming"
-    title="Update transfer?"
-    confirm-label="Update"
+    :title="translate('Update transfer?')"
+    :confirm-label="translate('Update')"
     :loading="busy"
     @confirm="save"
-    >This recalculates both account balances.</AppConfirmDialog
+    >{{ translate('This recalculates both account balances.') }}</AppConfirmDialog
   >
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { computed, ref, watch } from 'vue'
@@ -146,7 +156,7 @@ const destinationOptions = computed(() =>
   )
 )
 const accountTitle = (account: Account) =>
-  account.isGoal ? `${account.name} (Goal)` : account.name
+  account.isGoal ? `${account.name} (${translate('Goal')})` : account.name
 watch(
   () => props.modelValue,
   open => {

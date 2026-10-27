@@ -2,21 +2,25 @@
   <component
     :is="embedded ? 'div' : AppCard"
     v-bind="$attrs"
-    :title="embedded ? undefined : 'Favorites'"
-    :subtitle="embedded ? undefined : 'Open a template, review it and confirm before saving.'"
+    :title="embedded ? undefined : translate('Favorites')"
+    :subtitle="
+      embedded ? undefined : translate('Open a template, review it and confirm before saving.')
+    "
   >
     <AppCardBody :padding="embedded ? 'pa-0' : 'pa-6'">
       <p v-if="embedded" class="text-body-2 text-on-surface-variant mt-0 mb-4">
-        Open a template, review it and confirm before saving.
+        {{ translate('Open a template, review it and confirm before saving.') }}
       </p>
       <v-alert v-if="error || loadError" type="error" class="mb-3">{{
-        error || loadError
+        translate(error || loadError)
       }}</v-alert>
       <AppEmptyState
         v-if="!favorites.length"
         :icon="mdiStarOutline"
-        title="No favorites yet"
-        description="Save a transaction as a favorite to register it quickly next time."
+        :title="translate('No favorites yet')"
+        :description="
+          translate('Save a transaction as a favorite to register it quickly next time.')
+        "
         padding="8"
       />
       <AppCard v-for="favorite in favorites" :key="favorite.id" class="favorite-card">
@@ -40,7 +44,7 @@
                 />
                 {{
                   categories.find(category => category.id === favorite.categoryId)?.name ||
-                  favorite.type
+                  translate(favorite.type)
                 }}
                 · {{ accounts.find(account => account.id === favorite.accountId)?.name || 'Main' }}
               </span>
@@ -55,13 +59,13 @@
           <div v-if="manage" class="d-flex flex-shrink-0">
             <AppIconButton
               :icon="mdiPencilOutline"
-              :label="`Edit ${favorite.name}`"
+              :label="translate('Edit {0}', { 0: favorite.name })"
               color="primary"
               @click="edit(favorite)"
             />
             <AppIconButton
               :icon="mdiDeleteOutline"
-              :label="`Delete ${favorite.name}`"
+              :label="translate('Delete {0}', { 0: favorite.name })"
               color="error"
               @click="deleting = favorite"
             />
@@ -80,15 +84,16 @@
   />
   <AppConfirmDialog
     :model-value="!!deleting"
-    title="Delete favorite?"
-    confirm-label="Delete"
+    :title="translate('Delete favorite?')"
+    :confirm-label="translate('Delete')"
     :loading="busy"
     @update:model-value="deleting = null"
     @confirm="remove"
-    >Existing transactions will remain unchanged.</AppConfirmDialog
+    >{{ translate('Existing transactions will remain unchanged.') }}</AppConfirmDialog
   >
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 defineOptions({ inheritAttrs: false })
 import { onMounted, ref } from 'vue'
 import { mdiStarOutline, mdiPencilOutline, mdiDeleteOutline } from '@mdi/js'

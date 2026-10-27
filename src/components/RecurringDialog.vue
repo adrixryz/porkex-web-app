@@ -1,43 +1,44 @@
 <template>
   <AppDialog
     :model-value="modelValue"
-    :title="isEditing ? 'Edit Recurring Rule' : 'New Recurring Rule'"
+    :title="isEditing ? translate('Edit Recurring Rule') : translate('New Recurring Rule')"
     max-width="520"
     persistent
     :close-disabled="submitting"
     :dirty="JSON.stringify(form) !== cleanForm"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <v-alert v-if="rule?.nextException" type="info" density="compact" class="mb-3"
-      >Changing the schedule can cancel the next-only edit. Other rule edits preserve
-      it.</v-alert
-    >
+    <v-alert v-if="rule?.nextException" type="info" density="compact" class="mb-3">{{
+      translate(
+        'Changing the schedule can cancel the next-only edit. Other rule edits preserve it.'
+      )
+    }}</v-alert>
     <v-form @submit.prevent="submit">
       <AppFormFields>
         <AppSegmentedControl
           v-if="!isEditing"
           v-model="form.type"
-          label="Rule type"
+          :label="translate('Rule type')"
           block
           :items="[
-            { label: 'Expense', value: 'Expense' },
-            { label: 'Income', value: 'Income' }
+            { label: translate('Expense'), value: 'Expense' },
+            { label: translate('Income'), value: 'Income' }
           ]"
         />
 
         <AppMoneyField
           v-model="form.amount"
-          :step-label="isIncome ? 'income amount' : 'expense amount'"
+          :step-label="isIncome ? translate('income amount') : translate('expense amount')"
           autofocus
         />
 
         <AppTextField
           v-model="form.description"
-          label="Comment"
+          :label="translate('Comment')"
           maxlength="200"
-          :rules="[(value: string) => !!value?.trim() || 'Comment is required.']"
+          :rules="[(value: string) => !!value?.trim() || translate('Comment is required.')]"
           hide-details="auto"
-          :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Rent'"
+          :placeholder="isIncome ? translate('e.g. Monthly salary') : translate('e.g. Rent')"
         ></AppTextField>
 
         <AppSelect
@@ -45,7 +46,7 @@
           :items="activeAccounts"
           item-title="name"
           item-value="id"
-          label="Account"
+          :label="translate('Account')"
         />
         <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
         <TagPicker v-model="form.tagIds" />
@@ -57,7 +58,7 @@
               :items="frequencyOptions"
               item-title="title"
               item-value="value"
-              label="Repeats"
+              :label="translate('Repeats')"
             ></AppSelect>
           </v-col>
           <v-col cols="5">
@@ -69,10 +70,10 @@
               :max="MAX_INTERVAL"
               step="1"
               hide-spin-buttons
-              :label="`Every (${unitLabel(form.frequency)})`"
+              :label="translate('Every ({0})', { 0: unitLabel(form.frequency) })"
             >
               <template #append-inner>
-                <AmountStepper label="interval" @step="stepInterval"></AmountStepper>
+                <AmountStepper :label="translate('interval')" @step="stepInterval"></AmountStepper>
               </template>
             </AppTextField>
           </v-col>
@@ -80,12 +81,16 @@
 
         <v-row dense>
           <v-col cols="6">
-            <AppTextField v-model="form.startDate" label="Starts" type="date"></AppTextField>
+            <AppTextField
+              v-model="form.startDate"
+              :label="translate('Starts')"
+              type="date"
+            ></AppTextField>
           </v-col>
           <v-col cols="6">
             <AppTextField
               v-model="form.endDate"
-              label="Ends (optional)"
+              :label="translate('Ends (optional)')"
               type="date"
               :min="form.startDate || undefined"
               clearable
@@ -94,7 +99,11 @@
         </v-row>
 
         <div v-if="startsInPast" class="text-caption text-on-surface-variant">
-          Past dates are not backfilled: the rule starts at the next occurrence from today.
+          {{
+            translate(
+              'Past dates are not backfilled: the rule starts at the next occurrence from today.'
+            )
+          }}
         </div>
 
         <v-alert
@@ -103,7 +112,11 @@
           variant="tonal"
           density="compact"
         >
-          Categories could not be loaded. Connect once and they will stay available offline.
+          {{
+            translate(
+              'Categories could not be loaded. Connect once and they will stay available offline.'
+            )
+          }}
         </v-alert>
 
         <v-alert
@@ -114,7 +127,7 @@
           closable
           @click:close="error = ''"
         >
-          {{ error }}
+          {{ translate(error) }}
         </v-alert>
 
         <!-- Neutral blue like the other dialogs: the rule itself already
@@ -127,7 +140,7 @@
           :loading="submitting"
           :disabled="!isValid"
         >
-          {{ isEditing ? 'Update' : 'Create' }}
+          {{ isEditing ? translate('Update') : translate('Create') }}
         </AppButton>
       </AppFormFields>
     </v-form>
@@ -135,6 +148,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
@@ -211,12 +225,14 @@ const isEditing = computed(() => !!props.rule)
 const isIncome = computed(() => form.value.type === 'Income')
 const categoryOptions = computed(() => categories.value.filter(c => c.type === form.value.type))
 
-const frequencyOptions = [
-  { title: 'Daily', value: 'DAY' },
-  { title: 'Weekly', value: 'WEEK' },
-  { title: 'Monthly', value: 'MONTH' },
-  { title: 'Yearly', value: 'YEAR' }
-]
+const frequencyOptions = computed(() =>
+  [
+    { title: 'Daily', value: 'DAY' },
+    { title: 'Weekly', value: 'WEEK' },
+    { title: 'Monthly', value: 'MONTH' },
+    { title: 'Yearly', value: 'YEAR' }
+  ].map(item => ({ ...item, title: translate(item.title) }))
+)
 
 // The interval is typed, not picked: whole numbers from 1 up to the API's own
 // maximum (MAX_RECURRING_INTERVAL on the backend).

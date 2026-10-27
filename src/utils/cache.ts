@@ -9,6 +9,7 @@
 // Only GET responses are cached. Writes are handled by the outbox instead.
 
 import { transactionTypeReviver } from './transactionTypes'
+import { t } from '@/i18n'
 
 const KEY = 'porkex_cache'
 
@@ -124,9 +125,9 @@ export function clearCache() {
 export function formatAge(savedAt: number, now = Date.now()): string {
   // Floor, not round: rounding would turn "30 seconds ago" into "1 min ago".
   const minutes = Math.max(0, Math.floor((now - savedAt) / 60000))
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes} min ago`
+  if (minutes < 1) return t('just now')
+  if (minutes < 60) return t('{0} min ago', { 0: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} h ago`
-  return `${Math.floor(hours / 24)} d ago`
+  if (hours < 24) return t('{0} h ago', { 0: hours })
+  return t('{0} d ago', { 0: Math.floor(hours / 24) })
 }

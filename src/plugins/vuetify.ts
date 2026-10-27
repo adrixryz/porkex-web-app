@@ -1,5 +1,8 @@
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
+import { en, es } from 'vuetify/locale'
+import { watch } from 'vue'
+import { getLanguage, useLanguage } from '@/i18n'
 import { aliases, mdi } from './mdiSvg'
 
 // Vercel-inspired dark theme: pure black canvas, #0a0a0a surfaces,
@@ -17,7 +20,8 @@ import { aliases, mdi } from './mdiSvg'
 // internals; mdiSvg.spec.ts mounts a real VIcon and checks the rendered <path>.
 type VuetifyOptions = NonNullable<Parameters<typeof createVuetify>[0]>
 
-export default createVuetify({
+const vuetify = createVuetify({
+  locale: { locale: getLanguage(), messages: { en, es } },
   icons: {
     defaultSet: 'mdi',
     aliases,
@@ -81,3 +85,8 @@ export default createVuetify({
     }
   }
 })
+
+watch(useLanguage(), value => {
+  vuetify.locale.current.value = value
+})
+export default vuetify

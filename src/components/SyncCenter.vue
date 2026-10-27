@@ -1,42 +1,50 @@
 <template>
-  <AppDialog v-model="syncCenterOpen" title="Pending Changes" max-width="720">
+  <AppDialog v-model="syncCenterOpen" :title="translate('Pending Changes')" max-width="720">
     <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
-      Changes are sent in order. Confirmed changes leave this list.
+      {{ translate('Changes are sent in order. Confirmed changes leave this list.') }}
     </p>
-    <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
+    <v-alert v-if="error" type="error" class="mb-4">{{ translate(error) }}</v-alert>
     <p
       v-if="items.length || scheduledDeletes.length"
       class="text-caption text-on-surface-variant mb-4"
     >
       {{
         storagePersistence === 'persistent'
-          ? 'Persistent device storage is enabled.'
-          : 'Device storage is managed by your browser. Keep pending changes here until synchronization completes.'
+          ? translate('Persistent device storage is enabled.')
+          : translate(
+              'Device storage is managed by your browser. Keep pending changes here until synchronization completes.'
+            )
       }}
     </p>
-    <p v-if="!items.length && !scheduledDeletes.length" class="mb-0">No pending changes.</p>
+    <p v-if="!items.length && !scheduledDeletes.length" class="mb-0">
+      {{ translate('No pending changes.') }}
+    </p>
     <AppCard v-for="item in items" :key="item.id" class="mb-3">
       <AppCardBody>
         <strong class="text-break">{{ describe(item) }}</strong>
         <div class="text-caption">
-          {{ new Date(item.createdAt).toLocaleString('en-US') }} ·
+          {{ new Date(item.createdAt).toLocaleString(dateLocale()) }} ·
           {{
-            sendingId === item.id ? 'Sending' : item.status === 'blocked' ? 'Blocked' : 'Pending'
+            sendingId === item.id
+              ? translate('Sending')
+              : item.status === 'blocked'
+                ? translate('Blocked')
+                : translate('Pending')
           }}
-          · {{ item.attempts }} attempts
+          · {{ item.attempts }} {{ translate('attempts') }}
         </div>
-        <p v-if="item.lastError" class="text-warning mt-2">{{ item.lastError }}</p>
+        <p v-if="item.lastError" class="text-warning mt-2">{{ translate(item.lastError) }}</p>
         <div class="d-flex flex-wrap ga-2 mt-3">
-          <AppButton size="small" :disabled="busy || !!sendingId" @click="retry(item)"
-            >Retry</AppButton
-          >
+          <AppButton size="small" :disabled="busy || !!sendingId" @click="retry(item)">{{
+            translate('Retry')
+          }}</AppButton>
           <AppButton
             v-if="canEdit(item)"
             size="small"
             variant="text"
             :disabled="busy || !!sendingId"
             @click="edit(item)"
-            >Edit</AppButton
+            >{{ translate('Edit') }}</AppButton
           >
           <AppButton
             v-if="
@@ -50,54 +58,58 @@
             variant="text"
             :disabled="busy || !!sendingId"
             @click="reconcile(item)"
-            >Retry and edit</AppButton
+            >{{ translate('Retry and edit') }}</AppButton
           >
           <AppButton
             size="small"
             variant="text"
             :disabled="busy || !!sendingId"
             @click="discard = item"
-            >Discard</AppButton
+            >{{ translate('Discard') }}</AppButton
           >
         </div>
       </AppCardBody>
     </AppCard>
     <AppCard v-for="item in scheduledDeletes" :key="item.id" class="mb-3">
       <AppCardBody>
-        Delete {{ scheduledDeleteLabel(item) }}
+        {{ translate('Delete') }} {{ scheduledDeleteLabel(item) }}
         <p class="text-caption">
-          Waiting for deletion · {{ new Date(item.deadline).toLocaleTimeString('en-US') }}
+          {{ translate('Waiting for deletion ·') }}
+          {{ new Date(item.deadline).toLocaleTimeString(dateLocale()) }}
         </p>
         <AppButton
           v-if="item.deadline > Date.now()"
           size="small"
           @click="act(() => undoDelete(item.id))"
-          >Undo</AppButton
+          >{{ translate('Undo') }}</AppButton
         >
       </AppCardBody>
     </AppCard>
   </AppDialog>
   <AppConfirmDialog
     :model-value="!!discard"
-    title="Discard pending change?"
-    confirm-label="Discard"
+    :title="translate('Discard pending change?')"
+    :confirm-label="translate('Discard')"
     :loading="busy"
     @update:model-value="discard = null"
     @confirm="remove"
   >
-    <v-alert v-if="error" type="error" class="mb-3">{{ error }}</v-alert>
-    This removes the local operation. If its response was lost, it may already exist on the server.
-    Dependent operations must be discarded first.
+    <v-alert v-if="error" type="error" class="mb-3">{{ translate(error) }}</v-alert>
+    {{
+      translate(
+        'This removes the local operation. If its response was lost, it may already exist on the server. Dependent operations must be discarded first.'
+      )
+    }}
   </AppConfirmDialog>
   <AppDialog
     :model-value="!!editing"
-    title="Edit pending change"
+    :title="translate('Edit pending change')"
     :close-disabled="busy"
     :dirty="JSON.stringify(draft) !== cleanDraft"
     @update:model-value="editing = null"
   >
     <AppFormFields>
-      <v-alert v-if="error" type="error">{{ error }}</v-alert>
+      <v-alert v-if="error" type="error">{{ translate(error) }}</v-alert>
       <template v-for="field in fields" :key="field">
         <AppMoneyField
           v-if="amountFields.includes(field)"
@@ -128,7 +140,7 @@
         :items="accounts"
         item-title="name"
         item-value="id"
-        label="Account"
+        :label="translate('Account')"
       />
       <AppSelect
         v-if="'sourceId' in draft"
@@ -136,7 +148,7 @@
         :items="transferAccounts"
         item-title="name"
         item-value="id"
-        label="From account"
+        :label="translate('From account')"
       />
       <AppSelect
         v-if="'destinationId' in draft"
@@ -144,93 +156,97 @@
         :items="transferAccounts"
         item-title="name"
         item-value="id"
-        label="To account"
+        :label="translate('To account')"
       />
       <AppSelect
         v-if="'frequency' in draft"
         v-model="draft.frequency"
         :items="[
-          { title: 'Day', value: 'DAY' },
-          { title: 'Week', value: 'WEEK' },
-          { title: 'Month', value: 'MONTH' },
-          { title: 'Year', value: 'YEAR' }
+          { title: translate('Day'), value: 'DAY' },
+          { title: translate('Week'), value: 'WEEK' },
+          { title: translate('Month'), value: 'MONTH' },
+          { title: translate('Year'), value: 'YEAR' }
         ]"
-        label="Frequency"
+        :label="translate('Frequency')"
       />
       <AppSelect
         v-if="'period' in draft"
         v-model="draft.period"
         :items="[
-          { title: 'Week', value: 'WEEK' },
-          { title: 'Month', value: 'MONTH' }
+          { title: translate('Week'), value: 'WEEK' },
+          { title: translate('Month'), value: 'MONTH' }
         ]"
-        label="Period"
+        :label="translate('Period')"
       />
       <AppSelect
         v-if="'type' in draft"
         v-model="draft.type"
-        :items="transactionTypeOptions"
-        label="Type"
+        :items="transactionTypeOptions.map(item => ({ ...item, title: translate(item.title) }))"
+        :label="translate('Type')"
       />
       <AppSelect
         v-if="'active' in draft"
         v-model="draft.active"
         :items="[
-          { title: 'Active', value: true },
-          { title: 'Paused', value: false }
+          { title: translate('Active'), value: true },
+          { title: translate('Paused'), value: false }
         ]"
-        label="Status"
+        :label="translate('Status')"
       />
       <AppSelect
         v-if="'currency' in draft"
         v-model="draft.currency"
         :items="['USD', 'EUR', 'GBP', 'BRL', 'MXN', 'PEN']"
-        label="Currency"
+        :label="translate('Currency')"
       />
       <AppSelect
         v-if="'defaultPeriod' in draft"
         v-model="draft.defaultPeriod"
         :items="[
-          { title: 'Day', value: 'day' },
-          { title: 'Week', value: 'week' },
-          { title: 'Month', value: 'month' },
-          { title: 'Year', value: 'year' }
+          { title: translate('Day'), value: 'day' },
+          { title: translate('Week'), value: 'week' },
+          { title: translate('Month'), value: 'month' },
+          { title: translate('Year'), value: 'year' }
         ]"
-        label="Default period"
+        :label="translate('Default period')"
       />
       <AppSelect
         v-if="'firstDayOfWeek' in draft"
         v-model="draft.firstDayOfWeek"
         :items="[
-          { title: 'Monday', value: 'MONDAY' },
-          { title: 'Tuesday', value: 'TUESDAY' },
-          { title: 'Wednesday', value: 'WEDNESDAY' },
-          { title: 'Thursday', value: 'THURSDAY' },
-          { title: 'Friday', value: 'FRIDAY' },
-          { title: 'Saturday', value: 'SATURDAY' },
-          { title: 'Sunday', value: 'SUNDAY' }
+          { title: translate('Monday'), value: 'MONDAY' },
+          { title: translate('Tuesday'), value: 'TUESDAY' },
+          { title: translate('Wednesday'), value: 'WEDNESDAY' },
+          { title: translate('Thursday'), value: 'THURSDAY' },
+          { title: translate('Friday'), value: 'FRIDAY' },
+          { title: translate('Saturday'), value: 'SATURDAY' },
+          { title: translate('Sunday'), value: 'SUNDAY' }
         ]"
-        label="First day of week"
+        :label="translate('First day of week')"
       />
       <AppSelect
         v-if="'decimalSeparator' in draft"
         v-model="draft.decimalSeparator"
         :items="['.', ',']"
-        label="Decimal separator"
+        :label="translate('Decimal separator')"
       />
       <div v-for="(id, index) in orderedTagIds" :key="id" class="d-flex align-center ga-2">
         <span class="flex-grow-1">{{
-          availableTags.find(tag => tag.id === id)?.name || 'Unavailable tag'
+          availableTags.find(tag => tag.id === id)?.name || translate('Unavailable tag')
         }}</span>
-        <AppButton size="small" variant="text" :disabled="index === 0" @click="moveTag(index, -1)"
-          >Move up</AppButton
+        <AppButton
+          size="small"
+          variant="text"
+          :disabled="index === 0"
+          @click="moveTag(index, -1)"
+          >{{ translate('Move up') }}</AppButton
         >
         <AppButton
           size="small"
           variant="text"
           :disabled="index === orderedTagIds.length - 1"
           @click="moveTag(index, 1)"
-          >Move down</AppButton
+          >{{ translate('Move down') }}</AppButton
         >
       </div>
       <TagPicker
@@ -244,7 +260,7 @@
         class="w-100 font-weight-bold"
         :loading="busy"
         @click="save"
-        >Update</AppButton
+        >{{ translate('Update') }}</AppButton
       >
     </AppFormFields>
   </AppDialog>
@@ -257,6 +273,8 @@
   <RecurringDialog v-model="confirmedRuleOpen" :rule="confirmedRule" />
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
+import { dateLocale } from '@/utils/date'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import { storagePersistence } from '@/utils/storagePersistence'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
@@ -407,7 +425,7 @@ function describe(item: QueuedMutation) {
     /* Preserve invalid stored payloads for explicit recovery. */
   }
   if (!body || typeof body !== 'object') body = {}
-  return `${names[item.method] || item.method} ${resources[item.path.split('/')[1]!] || 'change'}${body.name || body.comment || body.description ? ': ' + (body.name || body.comment || body.description) : ''}`
+  return `${translate(names[item.method] || item.method)} ${translate(resources[item.path.split('/')[1]!] || 'change')}${body.name || body.comment || body.description ? ': ' + (body.name || body.comment || body.description) : ''}`
 }
 function canEdit(item: QueuedMutation) {
   return (

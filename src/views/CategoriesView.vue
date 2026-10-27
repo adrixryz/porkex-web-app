@@ -3,10 +3,13 @@
     <!-- LOADING SKELETON -->
     <AppPageSkeleton v-if="loading && !hasLoaded" page="categories" />
     <template v-else>
-      <AppPageHeader title="Categories" subtitle="Organize your income and expenses.">
+      <AppPageHeader
+        :title="translate('Categories')"
+        :subtitle="translate('Organize your income and expenses.')"
+      >
         <template #actions>
           <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
-            New Category
+            {{ translate('New Category') }}
           </AppButton>
         </template>
       </AppPageHeader>
@@ -15,11 +18,11 @@
         <v-col cols="12" class="d-flex flex-wrap align-center ga-4">
           <AppSegmentedControl
             v-model="filterType"
-            label="Filter by type"
+            :label="translate('Filter by type')"
             :disabled="reordering || dragging !== null"
             :items="[
-              { label: 'Expense', value: 'Expense' },
-              { label: 'Income', value: 'Income' }
+              { label: translate('Expense'), value: 'Expense' },
+              { label: translate('Income'), value: 'Income' }
             ]"
           />
         </v-col>
@@ -54,12 +57,12 @@
                         :color="cat.type === 'Income' ? 'success' : 'error'"
                         variant="tonal"
                       >
-                        {{ cat.type === 'Income' ? 'Income' : 'Expense' }}
+                        {{ cat.type === 'Income' ? translate('Income') : translate('Expense') }}
                       </v-chip>
                     </div></template
                   ><template #actions
                     ><AppDragHandle
-                      :label="`Reorder ${cat.name}; arrow keys move it`"
+                      :label="translate('Reorder {0}; arrow keys move it', { 0: cat.name })"
                       :disabled="reordering"
                       @pointerdown="startDrag($event, cat.id)"
                       @keydown.up.prevent="move(filteredCategories.indexOf(cat), -1)"
@@ -69,12 +72,12 @@
                       @keydown.esc="cancelDrag" />
                     <AppIconButton
                       :icon="mdiPencilOutline"
-                      :label="`Edit ${cat.name}`"
+                      :label="translate('Edit {0}', { 0: cat.name })"
                       color="primary"
                       @click="editCat(cat)" />
                     <AppIconButton
                       :icon="mdiDeleteOutline"
-                      :label="`Delete ${cat.name}`"
+                      :label="translate('Delete {0}', { 0: cat.name })"
                       color="error"
                       @click="confirmDelete(cat)" /></template
                 ></AppEntityHeader>
@@ -84,13 +87,17 @@
           <v-col v-if="filteredCategories.length === 0" cols="12">
             <AppEmptyState
               :icon="mdiShapePlusOutline"
-              :title="`No ${filterLabel} categories yet`"
-              :description="`Create one to start organizing your ${filterLabel === 'income' ? 'earnings' : 'spending'}.`"
+              :title="translate('No {0} categories yet', { 0: translate(filterLabel) })"
+              :description="
+                translate('Create one to start organizing your {0}.', {
+                  0: translate(filterLabel === 'income' ? 'earnings' : 'spending')
+                })
+              "
               padding="12"
             >
               <template #actions>
                 <AppButton color="primary" :prepend-icon="mdiPlus" @click="openDialog()">
-                  New {{ filterLabel }} category
+                  {{ translate('New') }} {{ filterLabel }} {{ translate('category') }}
                 </AppButton>
               </template>
             </AppEmptyState>
@@ -102,7 +109,7 @@
     <!-- CREATE/EDIT DIALOG -->
     <AppDialog
       v-model="dialog"
-      :title="isEditing ? 'Edit Category' : 'New Category'"
+      :title="isEditing ? translate('Edit Category') : translate('New Category')"
       :close-disabled="submitting"
       :dirty="JSON.stringify(catForm) !== cleanForm"
       max-width="440"
@@ -112,18 +119,22 @@
         <AppFormFields>
           <AppTextField
             v-model="catForm.name"
-            :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
-            label="Name"
+            :rules="[(value: unknown) => validCatalogName(value, 60) || translate(catalogNameHint)]"
+            :label="translate('Name')"
             maxlength="60"
           ></AppTextField>
           <AppSelect
             v-model="catForm.type"
-            :items="transactionTypeOptions"
-            label="Type"
+            :items="transactionTypeOptions.map(item => ({ ...item, title: translate(item.title) }))"
+            :label="translate('Type')"
           ></AppSelect>
           <div>
-            <div class="text-body-2 text-on-surface-variant mb-2">Color</div>
-            <div class="d-flex flex-wrap ga-2" role="radiogroup" aria-label="Category color">
+            <div class="text-body-2 text-on-surface-variant mb-2">{{ translate('Color') }}</div>
+            <div
+              class="d-flex flex-wrap ga-2"
+              role="radiogroup"
+              :aria-label="translate('Category color')"
+            >
               <v-avatar
                 v-for="c in colorOptions"
                 :key="c"
@@ -133,7 +144,7 @@
                 role="radio"
                 tabindex="0"
                 :aria-checked="catForm.color === c"
-                :aria-label="`Color ${c}`"
+                :aria-label="translate('Color {0}', { 0: c })"
                 :style="
                   catForm.color === c ? 'outline: 3px solid #0070f3; outline-offset: 2px;' : ''
                 "
@@ -158,7 +169,7 @@
             :loading="submitting"
             :disabled="!catForm.name.trim() || !catForm.type"
           >
-            {{ isEditing ? 'Update' : 'Create' }}
+            {{ isEditing ? translate('Update') : translate('Create') }}
           </AppButton>
         </AppFormFields>
       </v-form>
@@ -168,7 +179,7 @@
     <AppConfirmDialog
       v-model="deleteDialog"
       :title="deleteTitle"
-      :confirm-label="needsReassignment ? 'Move & Delete' : 'Delete'"
+      :confirm-label="needsReassignment ? translate('Move & Delete') : translate('Delete')"
       :loading="deleting"
       :error="deleteError"
       :confirm-disabled="!canDelete"
@@ -185,36 +196,48 @@
       </template>
       <AppFormFields :gap="16">
         <p v-if="needsReassignment">
-          It has {{ deletingCat?.allTimeCount ?? 0 }} movement{{
-            deletingCat?.allTimeCount === 1 ? '' : 's'
+          {{
+            translate(
+              deletingCat?.allTimeCount === 1
+                ? 'It has {0} movement in total. Choose which category takes it, or cancel to keep the category.'
+                : 'It has {0} movements in total. Choose which category takes them, or cancel to keep the category.',
+              { 0: deletingCat?.allTimeCount ?? 0 }
+            )
           }}
-          in total. Choose which category takes them, or cancel to keep the category.
         </p>
-        <p v-else>This action cannot be undone.</p>
+        <p v-else>{{ translate('This action cannot be undone.') }}</p>
         <p>
           {{
             needsReassignment
-              ? 'Linked favorites will use the replacement category.'
-              : 'Favorites using this category will also be removed.'
+              ? translate('Linked favorites will use the replacement category.')
+              : translate('Favorites using this category will also be removed.')
           }}
         </p>
         <p v-if="(deletingCat?.budgetCount ?? 0) > 0" class="text-warning">
-          Its {{ deletingCat?.budgetCount }} budget{{
-            (deletingCat?.budgetCount ?? 0) === 1 ? '' : 's'
+          {{
+            translate(
+              deletingCat?.budgetCount === 1
+                ? 'Its {0} budget will be deleted with it.'
+                : 'Its {0} budgets will be deleted with it.',
+              { 0: deletingCat?.budgetCount }
+            )
           }}
-          will be deleted with it.
         </p>
         <p v-if="(deletingCat?.recurringCount ?? 0) > 0" class="text-warning">
-          Its {{ deletingCat?.recurringCount }} recurring rule{{
-            (deletingCat?.recurringCount ?? 0) === 1 ? '' : 's'
+          {{
+            translate(
+              deletingCat?.recurringCount === 1
+                ? 'Its {0} recurring rule will be deleted with it.'
+                : 'Its {0} recurring rules will be deleted with it.',
+              { 0: deletingCat?.recurringCount }
+            )
           }}
-          will be deleted with it.
         </p>
         <CategorySelect
           v-if="needsReassignment"
           v-model="reassignTo"
           :items="reassignOptions"
-          label="Move transactions to"
+          :label="translate('Move transactions to')"
           density="comfortable"
           rounded="xl"
           hide-details
@@ -227,6 +250,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import CategorySelect from '@/components/CategorySelect.vue'
 import AppDragHandle from '@/components/ui/AppDragHandle.vue'
 import { useCategoryOrder } from '@/composables/useCategoryOrder'
@@ -282,7 +306,7 @@ useUnsavedChanges(
 const deleteDialog = ref(false)
 const deleteError = ref('')
 const deletingCat = ref<Category | null>(null)
-const deleteTitle = computed(() => `Delete "${deletingCat.value?.name ?? ''}"?`)
+const deleteTitle = computed(() => translate('Delete "{0}"?', { 0: deletingCat.value?.name ?? '' }))
 const reassignTo = ref<number | null>(null)
 const deleting = ref(false)
 const { showSnack } = useSnackbar()

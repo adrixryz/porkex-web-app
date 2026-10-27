@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     :model-value="modelValue"
-    title="Edit tags"
+    :title="translate('Edit tags')"
     max-width="480"
     :persistent="busy || dragging !== null"
     :close-disabled="busy || dragging !== null"
@@ -9,8 +9,11 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
-      Names, order and deletions apply to all your transactions. Hold the handle to drag; use arrow
-      keys when focused.
+      {{
+        translate(
+          'Names, order and deletions apply to all your transactions. Hold the handle to drag; use arrow keys when focused.'
+        )
+      }}
     </p>
     <v-alert v-if="message" class="mb-3" :type="messageType" density="compact">{{
       message
@@ -31,7 +34,7 @@
         :class="{ dragging: dragging === tag.id }"
       >
         <AppDragHandle
-          :label="`Reorder ${tag.name}; arrow keys move it`"
+          :label="translate('Reorder {0}; arrow keys move it', { 0: tag.name })"
           class="drag-handle"
           :disabled="busy"
           @pointerdown="startDrag($event, tag.id)"
@@ -41,7 +44,7 @@
         />
         <AppTextField
           v-model="names[tag.id]"
-          :aria-label="`Tag name ${tag.name}`"
+          :aria-label="translate('Tag name {0}', { 0: tag.name })"
           density="compact"
           hide-details
           :disabled="busy"
@@ -50,13 +53,13 @@
         <AppIconButton
           :icon="mdiCheck"
           color="primary"
-          :label="`Save name ${tag.name}`"
+          :label="translate('Save name {0}', { 0: tag.name })"
           :disabled="busy || names[tag.id] === tag.name"
           @click="rename(tag)"
         />
         <AppIconButton
           :icon="mdiDeleteOutline"
-          :label="`Delete tag ${tag.name}`"
+          :label="translate('Delete tag {0}', { 0: tag.name })"
           color="error"
           :disabled="busy"
           @click="deleting = tag"
@@ -67,7 +70,7 @@
       <AppFormFields>
         <AppTextField
           v-model="newName"
-          label="New tag name"
+          :label="translate('New tag name')"
           density="compact"
           enterkeyhint="done"
           :disabled="busy"
@@ -78,25 +81,26 @@
           size="large"
           class="w-100 font-weight-bold"
           :disabled="busy || !newName.trim()"
-          >Add tag</AppButton
+          >{{ translate('Add tag') }}</AppButton
         >
       </AppFormFields>
     </v-form>
   </AppDialog>
   <AppConfirmDialog
     :model-value="!!deleting"
-    title="Delete tag?"
-    confirm-label="Delete"
+    :title="translate('Delete tag?')"
+    :confirm-label="translate('Delete')"
     :loading="busy"
     :persistent="busy"
     @update:model-value="deleting = null"
     @confirm="remove"
   >
-    Delete “{{ deleting?.name }}” from all transactions? Your transactions and comments will be
-    kept.
+    {{ translate('Delete “') }}{{ deleting?.name
+    }}{{ translate('” from all transactions? Your transactions and comments will be kept.') }}
   </AppConfirmDialog>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppDragHandle from '@/components/ui/AppDragHandle.vue'
 import { useReorderableList } from '@/composables/useReorderableList'
 import AppFormFields from '@/components/ui/AppFormFields.vue'

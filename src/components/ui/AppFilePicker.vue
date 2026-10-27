@@ -19,15 +19,18 @@
       :prepend-icon="mdiFolderOpenOutline"
       :disabled="disabled"
       :aria-label="
-        fileName ? `Choose another file, current file ${fileName}` : `Browse for ${label}`
+        fileName
+          ? translate('Choose another file, current file {0}', { 0: fileName })
+          : translate('Browse for {0}', { 0: label })
       "
       @click="input?.click()"
-      >{{ fileName ? 'Change file' : 'Browse files' }}</AppButton
+      >{{ fileName ? translate('Change file') : translate('Browse files') }}</AppButton
     >
   </div>
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed, ref } from 'vue'
 import { mdiFileDelimitedOutline, mdiFolderOpenOutline, mdiTrayArrowUp } from '@mdi/js'
 import AppButton from './AppButton.vue'

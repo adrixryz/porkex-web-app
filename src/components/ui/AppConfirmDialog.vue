@@ -16,10 +16,10 @@
     <div v-if="message || $slots.default" class="text-body-2 text-on-surface-variant mb-6">
       <slot>{{ message }}</slot>
     </div>
-    <v-alert v-if="error" type="error" class="mb-6 text-start">{{ error }}</v-alert>
+    <v-alert v-if="error" type="error" class="mb-6 text-start">{{ translate(error) }}</v-alert>
     <div class="d-flex flex-wrap justify-center ga-3">
       <AppButton variant="outlined" :disabled="loading || cancelDisabled" @click="cancel">
-        {{ cancelLabel }}
+        {{ translate(cancelLabel) }}
       </AppButton>
       <AppButton
         :color="color"
@@ -27,13 +27,14 @@
         :disabled="loading || confirmDisabled"
         @click="confirm"
       >
-        {{ confirmLabel }}
+        {{ translate(confirmLabel) }}
       </AppButton>
     </div>
   </AppDialog>
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { mdiAlertCircleOutline } from '@mdi/js'
 import AppButton from './AppButton.vue'
 import AppDialog from './AppDialog.vue'

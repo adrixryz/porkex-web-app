@@ -5,7 +5,7 @@
       <AppIconButton
         v-bind="props"
         :icon="mdiPlus"
-        label="Quick actions"
+        :label="translate('Quick actions')"
         color="primary"
         variant="flat"
         rounded="circle"
@@ -13,27 +13,31 @@
         class="quick-actions-button"
       />
     </template>
-    <v-list density="compact" class="quick-actions-menu app-action-menu" aria-label="Quick actions">
+    <v-list
+      density="compact"
+      class="quick-actions-menu app-action-menu"
+      :aria-label="translate('Quick actions')"
+    >
       <v-list-item
-        title="Expense"
+        :title="translate('Expense')"
         :prepend-icon="mdiMinus"
         class="text-error"
         @click="openMovement('Expense')"
       />
       <v-list-item
-        title="Income"
+        :title="translate('Income')"
         :prepend-icon="mdiPlus"
         class="text-success"
         @click="openMovement('Income')"
       />
       <v-list-item
-        title="Favorites"
+        :title="translate('Favorites')"
         :prepend-icon="mdiStarOutline"
         class="text-warning"
         @click="favoritesOpen = true"
       />
       <v-list-item
-        title="Transfer"
+        :title="translate('Transfer')"
         :prepend-icon="mdiSwapHorizontal"
         class="text-primary"
         @click="transferOpen = true"
@@ -46,13 +50,14 @@
     :default-account-id="defaultAccountId"
     @saved="movementSaved"
   />
-  <AppDialog v-model="favoritesOpen" title="Favorites" max-width="520">
+  <AppDialog v-model="favoritesOpen" :title="translate('Favorites')" max-width="520">
     <FavoritesPanel manage embedded />
   </AppDialog>
   <TransferDialog v-model="transferOpen" :source-id="defaultAccountId" @saved="emit('saved')" />
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { ref } from 'vue'
 import { mdiMinus, mdiPlus, mdiStarOutline, mdiSwapHorizontal } from '@mdi/js'
 import AppIconButton from './ui/AppIconButton.vue'

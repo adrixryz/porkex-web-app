@@ -4,6 +4,7 @@ import { activeProfileChanges, setToken, setUser, getUser, USER_CHANGE_EVENT } f
 import { enqueue } from './outbox'
 import { getCurrencyCode } from './currency'
 import { getFirstDayOfWeek } from './preferences'
+import { getLanguage, setLanguage } from '@/i18n'
 import { deferred, installTestLocks } from './locks.test-helper'
 
 const profile = {
@@ -18,6 +19,7 @@ const profile = {
 }
 beforeEach(() => {
   localStorage.clear()
+  setLanguage('en')
   installTestLocks()
   activeProfileChanges.clear()
   setToken('token')
@@ -26,6 +28,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   activeProfileChanges.clear()
+  setLanguage('en')
 })
 it('groups profile loads and does not announce unchanged results again', async () => {
   const response = deferred<Response>()
@@ -71,6 +74,35 @@ it('protects only pending profile fields, including saves in flight', async () =
   expect(result.currency).toBe('PEN')
   expect(result.name).toBe('Editing locally')
   expect(result.firstDayOfWeek).toBe('SUNDAY')
+})
+it('keeps a pending language choice through profile refresh and applies another account preference', async () => {
+  await enqueue({
+    id: 'language-pref',
+    userId: 1,
+    method: 'PUT',
+    path: '/profile',
+    body: '{"language":"es"}'
+  })
+  const items = JSON.parse(localStorage.getItem('porkex_outbox')!)
+  items[0].status = 'blocked'
+  localStorage.setItem('porkex_outbox', JSON.stringify(items))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify({ ...profile, language: 'en' })))
+  )
+  expect((await refreshAccountProfile()).language).toBe('es')
+  expect(getLanguage()).toBe('es')
+  expect(getUser()?.language).toBe('es')
+
+  setToken('other')
+  setUser({ id: 2, name: 'Other', email: 'other@example.com' })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify({ ...profile, id: 2, language: 'en' })))
+  )
+  await refreshAccountProfile()
+  expect(getLanguage()).toBe('en')
+  expect(getUser()?.language).toBe('en')
 })
 it('never applies the response of an earlier session', async () => {
   const response = deferred<Response>()

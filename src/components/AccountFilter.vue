@@ -4,7 +4,7 @@
     :items="options"
     item-title="name"
     item-value="id"
-    label="Account"
+    :label="translate('Account')"
     density="comfortable"
     clearable
     hide-details
@@ -13,6 +13,7 @@
   />
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed } from 'vue'
 import type { Account } from '@/types'
 import AppSelect from './ui/AppSelect.vue'
@@ -22,7 +23,7 @@ const model = defineModel<string | null>({ default: null })
 const options = computed(() =>
   props.accounts.map(account => ({
     ...account,
-    name: account.archived ? `${account.name} (Archived)` : account.name
+    name: account.archived ? translate('{0} (Archived)', { 0: account.name }) : account.name
   }))
 )
 </script>

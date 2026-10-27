@@ -112,6 +112,8 @@ export interface Transaction {
   recurringId: number | null
 }
 
+export type Language = 'en' | 'es'
+
 export interface User {
   id: number
   name: string
@@ -120,6 +122,7 @@ export interface User {
   defaultPeriod?: PeriodFilter
   firstDayOfWeek?: WeekDay
   decimalSeparator?: DecimalSeparator
+  language?: Language
 }
 
 export interface Profile {
@@ -130,6 +133,7 @@ export interface Profile {
   defaultPeriod: PeriodFilter
   firstDayOfWeek: WeekDay
   decimalSeparator: DecimalSeparator
+  language?: Language
   createdAt: string
 }
 
@@ -172,6 +176,7 @@ export interface CategoryComparison {
 
 export interface MonthPoint {
   month: string
+  monthStart?: string
   income: number
   expense: number
   net: number
@@ -180,6 +185,7 @@ export interface MonthPoint {
 
 export interface TrendPoint {
   date: string
+  dateKey?: string
   balance: number
 }
 

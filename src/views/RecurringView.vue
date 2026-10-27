@@ -7,7 +7,10 @@
     <template v-else>
       <!-- HEADER -->
 
-      <AppPageHeader title="Recurring" subtitle="Manage your recurring transactions.">
+      <AppPageHeader
+        :title="translate('Recurring')"
+        :subtitle="translate('Manage your recurring transactions.')"
+      >
         <template #actions>
           <AppButton
             color="primary"
@@ -15,20 +18,22 @@
             :disabled="selectedAccountArchived"
             @click="openDialog()"
           >
-            New Rule
+            {{ translate('New Rule') }}
           </AppButton>
         </template>
       </AppPageHeader>
 
-      <v-alert v-if="accountsError" type="error" class="mb-4">{{ accountsError }}</v-alert>
+      <v-alert v-if="accountsError" type="error" class="mb-4">{{
+        translate(accountsError)
+      }}</v-alert>
       <div class="d-flex flex-column flex-sm-row flex-wrap align-start align-sm-center ga-4 mb-6">
         <AccountFilter v-model="accountFilter" :accounts="accounts" />
         <AppSegmentedControl
           v-model="filterType"
-          label="Recurring type"
+          :label="translate('Recurring type')"
           :items="[
-            { label: 'Expense', value: 'Expense' },
-            { label: 'Income', value: 'Income' }
+            { label: translate('Expense'), value: 'Expense' },
+            { label: translate('Income'), value: 'Income' }
           ]"
           class="ml-sm-auto"
         />
@@ -42,13 +47,18 @@
             :icon="mdiRepeat"
             :title="
               rules.length
-                ? `No ${filterType.toLowerCase()} recurring rules${accountFilter ? ' for this account' : ''}`
-                : 'No recurring rules yet'
+                ? translate('No {0} recurring rules{1}', {
+                    0: translate(filterType.toLowerCase()),
+                    1: accountFilter ? translate(' for this account') : ''
+                  })
+                : translate('No recurring rules yet')
             "
             :description="
               rules.length
-                ? 'Choose another account or transaction type.'
-                : 'Recreate the rent, the salary or any movement that comes back on its own.'
+                ? translate('Choose another account or transaction type.')
+                : translate(
+                    'Recreate the rent, the salary or any movement that comes back on its own.'
+                  )
             "
             padding="12"
           />
@@ -72,19 +82,23 @@
                   ><AppIconButton
                     v-if="!isEnded(r)"
                     :icon="r.active ? mdiPause : mdiPlayOutline"
-                    :label="r.active ? `Pause ${r.description}` : `Resume ${r.description}`"
+                    :label="
+                      r.active
+                        ? translate('Pause {0}', { 0: r.description })
+                        : translate('Resume {0}', { 0: r.description })
+                    "
                     :color="r.active ? 'warning' : 'success'"
                     @click="confirmToggle(r)" />
 
                   <AppIconButton
                     :icon="mdiPencilOutline"
-                    :label="`Edit ${r.description}`"
+                    :label="translate('Edit {0}', { 0: r.description })"
                     color="primary"
                     @click="openDialog(r)" />
 
                   <AppIconButton
                     :icon="mdiDeleteOutline"
-                    :label="`Delete ${r.description}`"
+                    :label="translate('Delete {0}', { 0: r.description })"
                     color="error"
                     @click="confirmDelete(r)" /></template
               ></AppEntityHeader>
@@ -104,38 +118,38 @@
                     variant="tonal"
                     class="font-weight-medium"
                   >
-                    {{ statusLabel(r) }}
+                    {{ translate(statusLabel(r)) }}
                   </v-chip>
                 </div>
 
                 <span v-if="!isEnded(r)" class="text-body-2 text-on-surface-variant">
-                  Next: {{ formatDateOnly(r.nextDate) }}
+                  {{ translate('Next:') }} {{ formatDateOnly(r.nextDate) }}
                 </span>
 
                 <span v-else class="text-body-2 text-on-surface-variant">
-                  Ended {{ formatDateOnly(r.endDate!) }}
+                  {{ translate('Ended') }} {{ formatDateOnly(r.endDate!) }}
                 </span>
               </div>
 
               <v-alert v-if="r.nextException" density="compact" variant="tonal" type="info"
-                >Next only: {{ cs }}{{ formatMoney(r.nextException.amount)
+                >{{ translate('Next only:') }} {{ cs }}{{ formatMoney(r.nextException.amount)
                 }}<span v-if="r.nextException.comment">
                   · {{ r.nextException.comment }}</span
                 ></v-alert
               >
 
               <div v-if="r.active && !isEnded(r)" class="d-flex flex-wrap ga-2">
-                <AppActionButton :icon="mdiSkipNextOutline" @click="skipRule = r"
-                  >Skip next</AppActionButton
-                >
+                <AppActionButton :icon="mdiSkipNextOutline" @click="skipRule = r">{{
+                  translate('Skip next')
+                }}</AppActionButton>
 
-                <AppActionButton :icon="mdiPencilOutline" @click="editNext(r)"
-                  >Edit next</AppActionButton
-                >
+                <AppActionButton :icon="mdiPencilOutline" @click="editNext(r)">{{
+                  translate('Edit next')
+                }}</AppActionButton>
               </div>
 
               <p v-if="r.endDate" class="text-caption text-on-surface-variant ma-0">
-                Until {{ formatDateOnly(r.endDate) }}
+                {{ translate('Until') }} {{ formatDateOnly(r.endDate) }}
               </p>
             </AppCardBody>
           </AppCard>
@@ -163,8 +177,8 @@
 
     <AppConfirmDialog
       :model-value="!!skipRule"
-      title="Skip next occurrence?"
-      confirm-label="Skip"
+      :title="translate('Skip next occurrence?')"
+      :confirm-label="translate('Skip')"
       color="primary"
       :icon="mdiRepeat"
       max-width="400"
@@ -172,14 +186,14 @@
       @update:model-value="skipRule = null"
       @confirm="skipNext"
     >
-      Skip {{ skipRule ? formatDateOnly(skipRule.nextDate) : '' }}? The rule will continue on its
-      following date.
+      {{ translate('Skip') }} {{ skipRule ? formatDateOnly(skipRule.nextDate) : ''
+      }}{{ translate('? The rule will continue on its following date.') }}
     </AppConfirmDialog>
 
     <AppConfirmDialog
       v-model="toggleDialog"
-      :title="togglingRule?.active ? 'Pause rule?' : 'Resume rule?'"
-      :confirm-label="togglingRule?.active ? 'Pause' : 'Resume'"
+      :title="togglingRule?.active ? translate('Pause rule?') : translate('Resume rule?')"
+      :confirm-label="togglingRule?.active ? translate('Pause') : translate('Resume')"
       :color="togglingRule?.active ? 'warning' : 'success'"
       :icon="togglingRule?.active ? mdiPause : mdiPlayOutline"
       :loading="toggling"
@@ -187,13 +201,21 @@
       @confirm="toggleActive"
     >
       <template v-if="togglingRule?.active">
-        Pause "{{ togglingRule.description }}"? It will stop creating movements until you resume it.
-        Existing movements stay in your history.
+        {{ translate('Pause "') }}{{ togglingRule.description
+        }}{{
+          translate(
+            '"? It will stop creating movements until you resume it. Existing movements stay in your history.'
+          )
+        }}
       </template>
 
       <template v-else>
-        Resume "{{ togglingRule?.description }}"? It will continue on its next scheduled date.
-        Movements missed while paused will not be created.
+        {{ translate('Resume "') }}{{ togglingRule?.description
+        }}{{
+          translate(
+            '"? It will continue on its next scheduled date. Movements missed while paused will not be created.'
+          )
+        }}
       </template>
     </AppConfirmDialog>
 
@@ -201,8 +223,8 @@
 
     <AppConfirmDialog
       v-model="deleteDialog"
-      title="Delete rule?"
-      confirm-label="Delete"
+      :title="translate('Delete rule?')"
+      :confirm-label="translate('Delete')"
       :loading="deleting"
       max-width="420"
       @confirm="doDelete"
@@ -213,13 +235,18 @@
         </v-avatar>
       </template>
 
-      "{{ deletingRule?.description }}" will stop creating movements. The ones it already created
-      stay in your history.
+      "{{ deletingRule?.description
+      }}{{
+        translate(
+          '" will stop creating movements. The ones it already created stay in your history.'
+        )
+      }}
     </AppConfirmDialog>
   </AppPage>
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { useAccountQuery } from '@/composables/useAccountQuery'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
 
@@ -297,7 +324,7 @@ const ruleAccountId = (rule: RecurringRule) =>
   rule.accountId ?? accounts.value.find(account => account.isMain)?.id
 const accountName = (rule: RecurringRule) =>
   accounts.value.find(account => account.id === ruleAccountId(rule))?.name ??
-  (rule.accountId ? 'Unavailable account' : 'Main')
+  (rule.accountId ? translate('Unavailable account') : 'Main')
 const visibleRules = computed(() =>
   rules.value.filter(
     rule =>

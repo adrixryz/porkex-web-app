@@ -20,7 +20,7 @@
           class="tag-overflow text-caption text-white"
           :class="{ 'single-tag': !overflow.length }"
           v-bind="activator"
-          :aria-label="`Show ${ordered.length} tags`"
+          :aria-label="translate('Show {0} tags', { 0: ordered.length })"
         >
           <span class="overflow-count">+{{ overflow.length }}</span>
           <span class="total-count">+{{ ordered.length }}</span>
@@ -37,6 +37,7 @@
   </span>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed } from 'vue'
 import type { Tag } from '@/types'
 import { tags as catalog } from '@/composables/useTags'

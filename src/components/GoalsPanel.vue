@@ -1,12 +1,12 @@
 <template>
   <div v-bind="$attrs">
-    <v-alert v-if="loadError" type="error" class="mb-4">{{ loadError }}</v-alert>
+    <v-alert v-if="loadError" type="error" class="mb-4">{{ translate(loadError) }}</v-alert>
     <AppPageSkeleton v-if="loading && !hasLoaded" page="goals" :header="false" />
     <AppEmptyState
       v-else-if="!goals.length"
       :icon="mdiBullseyeArrow"
-      title="No savings goals yet"
-      description="Create a goal to start setting money aside."
+      :title="translate('No savings goals yet')"
+      :description="translate('Create a goal to start setting money aside.')"
       padding="12"
     />
     <v-row v-else>
@@ -21,19 +21,19 @@
               ><template #actions
                 ><AppIconButton
                   :icon="mdiPencilOutline"
-                  :label="`Edit ${goal.name}`"
+                  :label="translate('Edit {0}', { 0: goal.name })"
                   color="primary"
                   @click="edit(goal)" />
                 <AppIconButton
                   :icon="mdiDeleteOutline"
-                  :label="`Remove ${goal.name}`"
+                  :label="translate('Remove {0}', { 0: goal.name })"
                   color="error"
                   @click="confirmRemove(goal)" /></template
             ></AppEntityHeader>
             <div class="d-flex flex-wrap align-baseline justify-space-between ga-2 mb-2">
               <span class="text-h6 font-weight-bold">{{ cs }}{{ formatMoney(goal.balance) }}</span>
               <span class="text-body-2 text-on-surface-variant"
-                >of {{ cs }}{{ formatMoney(goal.targetAmount || 0) }}</span
+                >{{ translate('of') }} {{ cs }}{{ formatMoney(goal.targetAmount || 0) }}</span
               >
             </div>
             <PendingBalance :account="goal" class="mb-2" />
@@ -43,14 +43,14 @@
               bg-color="surface-bright"
               height="8"
               rounded
-              :aria-label="`${goal.name} progress`"
+              :aria-label="translate('{0} progress', { 0: goal.name })"
             />
             <div
               class="d-flex align-center justify-space-between ga-2 mt-2 text-caption text-on-surface-variant"
             >
               <span
-                >{{ cs
-                }}{{ formatMoney(Math.max(0, (goal.targetAmount || 0) - goal.balance)) }} left</span
+                >{{ cs }}{{ formatMoney(Math.max(0, (goal.targetAmount || 0) - goal.balance)) }}
+                {{ translate('left') }}</span
               >
               <span>{{ Math.floor((goal.balance / (goal.targetAmount || 1)) * 100) }}%</span>
             </div>
@@ -62,13 +62,13 @@
                   (goal.projectedBalance ?? goal.balance) >= (goal.targetAmount || 0)
                 "
                 @click="fund(goal, false)"
-                >Add funds</AppActionButton
+                >{{ translate('Add funds') }}</AppActionButton
               >
               <AppActionButton
                 :icon="mdiMinus"
                 :disabled="goal.balance <= 0"
                 @click="fund(goal, true)"
-                >Withdraw</AppActionButton
+                >{{ translate('Withdraw') }}</AppActionButton
               >
             </div>
           </AppCardBody>
@@ -78,7 +78,7 @@
   </div>
   <AppDialog
     v-model="dialog"
-    :title="editing ? 'Edit goal' : 'New goal'"
+    :title="editing ? translate('Edit goal') : translate('New goal')"
     :close-disabled="busy"
     :dirty="JSON.stringify(form) !== clean"
   >
@@ -86,20 +86,20 @@
       <AppFormFields>
         <AppTextField
           v-model="form.name"
-          label="Name"
+          :label="translate('Name')"
           maxlength="60"
-          :rules="[(value: unknown) => validCatalogName(value, 60) || catalogNameHint]"
+          :rules="[(value: unknown) => validCatalogName(value, 60) || translate(catalogNameHint)]"
         />
         <AppMoneyField
           v-model="form.targetAmount"
-          label="Target amount"
+          :label="translate('Target amount')"
           :error-messages="
             editing && Number(form.targetAmount) < editing.balance
-              ? 'The target cannot be lower than the amount already saved.'
+              ? translate('The target cannot be lower than the amount already saved.')
               : []
           "
         />
-        <v-alert v-if="error" type="error">{{ error }}</v-alert>
+        <v-alert v-if="error" type="error">{{ translate(error) }}</v-alert>
         <AppButton
           type="submit"
           color="primary"
@@ -112,7 +112,7 @@
             !!(editing && Number(form.targetAmount) < editing.balance)
           "
         >
-          {{ editing ? 'Update' : 'Create' }}
+          {{ editing ? translate('Update') : translate('Create') }}
         </AppButton>
       </AppFormFields>
     </v-form>
@@ -127,16 +127,19 @@
   />
   <AppConfirmDialog
     :model-value="!!deleting"
-    title="Remove goal?"
-    confirm-label="Remove"
+    :title="translate('Remove goal?')"
+    :confirm-label="translate('Remove')"
     :loading="busy"
     :error="error"
     @update:model-value="closeRemove"
     @confirm="remove"
-    >Withdraw all funds first. Transfer history will remain available.</AppConfirmDialog
+    >{{
+      translate('Withdraw all funds first. Transfer history will remain available.')
+    }}</AppConfirmDialog
   >
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'

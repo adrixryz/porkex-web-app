@@ -1,7 +1,8 @@
 <template>
   <div class="mt-3">
     <div class="text-caption mb-2">
-      Tags <span class="text-on-surface-variant">({{ modelValue.length }}/5)</span>
+      {{ translate('Tags') }}
+      <span class="text-on-surface-variant">({{ modelValue.length }}/5)</span>
     </div>
     <div class="d-flex flex-wrap align-center ga-2">
       <v-chip
@@ -22,7 +23,7 @@
         closable
         color="warning"
         @click:close="remove([id])"
-        >Unavailable tag</v-chip
+        >{{ translate('Unavailable tag') }}</v-chip
       >
       <AppButton
         type="button"
@@ -32,14 +33,15 @@
         :prepend-icon="mdiPencilOutline"
         @click="editing = true"
       >
-        Edit tags
+        {{ translate('Edit tags') }}
       </AppButton>
     </div>
-    <div v-if="error && !tags.length" class="text-caption text-warning">{{ error }}</div>
+    <div v-if="error && !tags.length" class="text-caption text-warning">{{ translate(error) }}</div>
     <TagManagerDialog v-model="editing" @removed="remove" />
   </div>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed, ref } from 'vue'
 import { mdiPencilOutline } from '@mdi/js'
 import { useTags } from '@/composables/useTags'

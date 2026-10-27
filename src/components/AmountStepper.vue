@@ -4,7 +4,7 @@
       type="button"
       :disabled="disabled"
       class="amount-stepper-btn"
-      :aria-label="`Increase ${label}`"
+      :aria-label="translate('Increase {0}', { 0: translate(label) })"
       @click="$emit('step', 1)"
     >
       <v-icon :icon="mdiChevronUp" size="14"></v-icon>
@@ -13,7 +13,7 @@
       type="button"
       :disabled="disabled"
       class="amount-stepper-btn"
-      :aria-label="`Decrease ${label}`"
+      :aria-label="translate('Decrease {0}', { 0: translate(label) })"
       @click="$emit('step', -1)"
     >
       <v-icon :icon="mdiChevronDown" size="14"></v-icon>
@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { mdiChevronDown, mdiChevronUp } from '@mdi/js'
 // Up/down stepper for numeric amount fields.
 // Replaces the native number spinner, which is drawn as an OS widget and

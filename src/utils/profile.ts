@@ -2,6 +2,7 @@ import type { Profile, User } from '@/types'
 import { activeProfileChanges, fetchJson, getSessionIdentity, getUser, setUser } from './api'
 import { ownedPending } from './outbox'
 import { getCurrencyCode, setCurrencyByCode } from './currency'
+import { getLanguage, setLanguage } from '@/i18n'
 import {
   getDecimalSeparator,
   getDefaultPeriod,
@@ -18,10 +19,11 @@ const fields = [
   'currency',
   'defaultPeriod',
   'firstDayOfWeek',
-  'decimalSeparator'
+  'decimalSeparator',
+  'language'
 ] as const
 
-export function protectProfileChanges(profile: Profile): Profile {
+export function protectProfileChanges<T extends User>(profile: T): T {
   const userId = getUser()?.id
   if (!userId || profile.id !== userId) return profile
   const result = { ...profile }
@@ -55,6 +57,7 @@ export function refreshAccountProfile(): Promise<Profile> {
       setFirstDayOfWeek(effective.firstDayOfWeek)
     if (effective.decimalSeparator && effective.decimalSeparator !== getDecimalSeparator())
       setDecimalSeparator(effective.decimalSeparator)
+    if (effective.language && effective.language !== getLanguage()) setLanguage(effective.language)
     const current = getUser()!
     const next: User = { ...current }
     for (const field of fields)

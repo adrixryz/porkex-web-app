@@ -6,9 +6,9 @@
         <AppPageSkeleton v-if="loading && !hasLoaded" page="settings" />
 
         <template v-else>
-          <AppPageHeader title="Settings" />
+          <AppPageHeader :title="translate('Settings')" />
           <!-- PROFILE CARD -->
-          <AppCard title="Profile" class="mb-4">
+          <AppCard :title="translate('Profile')" class="mb-4">
             <AppCardBody>
               <div class="d-flex align-center mb-6">
                 <v-avatar color="primary" variant="tonal" size="64" class="mr-5">
@@ -17,7 +17,7 @@
                 <div class="flex-grow-1">
                   <div class="text-h6 font-weight-medium">{{ profile.name }}</div>
                   <div class="text-caption text-on-surface-variant mt-1">
-                    Member since
+                    {{ translate('Member since') }}
                     {{ formatDate(profile.createdAt, { month: 'long', year: 'numeric' }) }}
                   </div>
                 </div>
@@ -25,21 +25,23 @@
 
               <v-divider class="mb-6"></v-divider>
 
-              <div class="text-subtitle-1 font-weight-medium mb-4">Edit Profile</div>
+              <div class="text-subtitle-1 font-weight-medium mb-4">
+                {{ translate('Edit Profile') }}
+              </div>
               <v-form @submit.prevent="updateProfile">
                 <AppFormFields>
                   <AppTextField
                     v-model="editName"
-                    label="Display Name"
+                    :label="translate('Display Name')"
                     maxlength="80"
                     :prepend-inner-icon="mdiAccountOutline"
                   ></AppTextField>
                   <AppTextField
                     :model-value="profile.email"
-                    label="Email"
+                    :label="translate('Email')"
                     :prepend-inner-icon="mdiEmailOutline"
                     disabled
-                    hint="Email cannot be changed"
+                    :hint="translate('Email cannot be changed')"
                     persistent-hint
                     :hide-details="false"
                   ></AppTextField>
@@ -50,7 +52,7 @@
                     :disabled="!editName.trim() || editName.trim() === profile.name"
                     class="align-self-start"
                   >
-                    Save Changes
+                    {{ translate('Save Changes') }}
                   </AppButton>
                 </AppFormFields>
               </v-form>
@@ -58,14 +60,16 @@
           </AppCard>
 
           <!-- PREFERENCES -->
-          <AppCard class="mb-4 preferences-card" title="Preferences">
+          <AppCard class="mb-4 preferences-card" :title="translate('Preferences')">
             <AppCardBody>
               <AppFormFields>
                 <AppSelect
                   v-model="selectedCurrency"
                   :items="CURRENCIES"
-                  :item-title="(c: CurrencyOption) => `${c.symbol} — ${c.name} (${c.code})`"
-                  label="Currency"
+                  :item-title="
+                    (c: CurrencyOption) => `${c.symbol} — ${translate(c.name)} (${c.code})`
+                  "
+                  :label="translate('Currency')"
                   :prepend-inner-icon="mdiCurrencyUsd"
                   return-object
                   :loading="savingCurrency"
@@ -74,7 +78,7 @@
                 <AppSelect
                   v-model="defaultPeriod"
                   :items="periodOptions"
-                  label="Default period"
+                  :label="translate('Default period')"
                   :prepend-inner-icon="mdiCalendarRange"
                   :loading="savingPreferences"
                   @update:model-value="onDefaultPeriodChange"
@@ -82,7 +86,7 @@
                 <AppSelect
                   v-model="weekStart"
                   :items="weekDayOptions"
-                  label="First day of the week"
+                  :label="translate('First day of the week')"
                   :prepend-inner-icon="mdiCalendarWeekBegin"
                   :loading="savingPreferences"
                   @update:model-value="onWeekStartChange"
@@ -90,36 +94,44 @@
                 <AppSelect
                   v-model="decimalSeparator"
                   :items="separatorOptions"
-                  label="Decimal separator"
+                  :label="translate('Decimal separator')"
                   :prepend-inner-icon="mdiDecimal"
                   :loading="savingPreferences"
                   @update:model-value="onDecimalSeparatorChange"
                 ></AppSelect>
+                <AppSelect
+                  v-model="selectedLanguage"
+                  :items="languageOptions"
+                  :label="translate('Language')"
+                  :prepend-inner-icon="mdiTranslate"
+                  :loading="savingPreferences"
+                  @update:model-value="onLanguageChange"
+                />
               </AppFormFields>
             </AppCardBody>
           </AppCard>
 
           <!-- BACKUP -->
-          <AppCard title="Backup" class="mb-4">
+          <AppCard :title="translate('Backup')" class="mb-4">
             <AppCardBody class="d-flex flex-column ga-4">
-              <AppCard title="All Transactions">
+              <AppCard :title="translate('All Transactions')">
                 <AppCardBody>
                   <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
-                    Import or export your complete transaction history as CSV.
+                    {{ translate('Import or export your complete transaction history as CSV.') }}
                   </p>
                   <div class="d-flex flex-wrap ga-3">
                     <AppActionButton
                       :icon="mdiUpload"
                       :disabled="isOffline || exportingCsv"
                       @click="csvImportOpen = true"
-                      >Import CSV</AppActionButton
+                      >{{ translate('Import CSV') }}</AppActionButton
                     >
                     <AppActionButton
                       :icon="mdiDownload"
                       :loading="exportingCsv"
                       :disabled="isOffline || exportingCsv"
                       @click="csvExportOpen = true"
-                      >Export CSV</AppActionButton
+                      >{{ translate('Export CSV') }}</AppActionButton
                     >
                   </div>
                 </AppCardBody>
@@ -129,13 +141,13 @@
           </AppCard>
 
           <!-- SECURITY -->
-          <AppCard class="mb-4" title="Security">
+          <AppCard class="mb-4" :title="translate('Security')">
             <AppCardBody>
               <v-form @submit.prevent="updatePassword">
                 <AppFormFields :gap="16">
                   <AppTextField
                     v-model="currentPassword"
-                    label="Current Password"
+                    :label="translate('Current Password')"
                     :type="showPassword ? 'text' : 'password'"
                     autocomplete="current-password"
                     :prepend-inner-icon="mdiLockOutline"
@@ -145,7 +157,7 @@
                   ></AppTextField>
                   <AppTextField
                     v-model="newPassword"
-                    label="New Password"
+                    :label="translate('New Password')"
                     :type="showNewPassword ? 'text' : 'password'"
                     autocomplete="new-password"
                     :prepend-inner-icon="mdiLockOutline"
@@ -155,14 +167,14 @@
                   ></AppTextField>
                   <AppTextField
                     v-model="confirmPassword"
-                    label="Confirm New Password"
+                    :label="translate('Confirm New Password')"
                     :type="showConfirmPassword ? 'text' : 'password'"
                     autocomplete="new-password"
                     :prepend-inner-icon="mdiLockOutline"
                     :append-inner-icon="showConfirmPassword ? mdiEyeOff : mdiEye"
                     @click:append-inner="showConfirmPassword = !showConfirmPassword"
                     :error="confirmMismatch"
-                    :error-messages="confirmMismatch ? 'Passwords do not match' : ''"
+                    :error-messages="confirmMismatch ? translate('Passwords do not match') : ''"
                     hide-details="auto"
                   ></AppTextField>
                   <AppButton
@@ -172,7 +184,7 @@
                     :disabled="!canSavePassword"
                     class="align-self-start"
                   >
-                    Update Password
+                    {{ translate('Update Password') }}
                   </AppButton>
                 </AppFormFields>
               </v-form>
@@ -184,7 +196,7 @@
             class=""
             border
             style="border-color: rgb(var(--v-theme-error))"
-            title="Danger Zone"
+            :title="translate('Danger Zone')"
             title-class="font-weight-medium text-error"
           >
             <AppCardBody>
@@ -195,7 +207,7 @@
                   :disabled="revokingSessions"
                   @click="revokeDialog = true"
                 >
-                  Log Out All Sessions
+                  {{ translate('Log Out All Sessions') }}
                 </AppButton>
               </div>
               <AppButton
@@ -204,7 +216,7 @@
                 :prepend-icon="mdiLogout"
                 @click="logoutDialog = true"
               >
-                Log Out
+                {{ translate('Log Out') }}
               </AppButton>
             </AppCardBody>
           </AppCard>
@@ -222,33 +234,45 @@
     <!-- LOG OUT CONFIRM -->
     <AppConfirmDialog
       v-model="revokeDialog"
-      title="Log out all other sessions?"
-      confirm-label="Confirm"
+      :title="translate('Log out all other sessions?')"
+      :confirm-label="translate('Confirm')"
       :loading="revokingSessions"
       @confirm="revokeSessions"
     >
-      All other devices will need to sign in again. This browser will stay signed in. Pending
-      changes on those devices will remain saved there until you sign in to the same account.
+      {{
+        translate(
+          'All other devices will need to sign in again. This browser will stay signed in. Pending changes on those devices will remain saved there until you sign in to the same account.'
+        )
+      }}
     </AppConfirmDialog>
     <AppConfirmDialog
       v-model="logoutDialog"
-      title="Log out?"
-      confirm-label="Log out"
+      :title="translate('Log out?')"
+      :confirm-label="translate('Log out')"
       :icon="mdiLogout"
       color="error"
       @confirm="logout"
     >
-      You'll need to sign in again to see your transactions.
+      {{ translate("You'll need to sign in again to see your transactions.") }}
       <span v-if="localPendingCount > 0">
-        Your {{ localPendingCount }} pending change(s) will stay on this device and sync when you
-        sign in to the same account.
-        <AppButton variant="text" @click="reviewPending">Review pending changes</AppButton></span
+        {{
+          translate(
+            localPendingCount === 1
+              ? 'Your {0} pending change will stay on this device and sync when you sign in to the same account.'
+              : 'Your {0} pending changes will stay on this device and sync when you sign in to the same account.',
+            { 0: localPendingCount }
+          )
+        }}
+        <AppButton variant="text" @click="reviewPending">{{
+          translate('Review pending changes')
+        }}</AppButton></span
       >
     </AppConfirmDialog>
   </AppPage>
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import MovementCsvImportDialog from '@/components/MovementCsvImportDialog.vue'
@@ -274,7 +298,15 @@ import { useRouter } from 'vue-router'
 import { api, securityApi, clearAuth, setUser, getUser } from '@/utils/api'
 import { protectProfileChanges, refreshAccountProfile } from '@/utils/profile'
 import { useAsyncData } from '@/composables/useAsyncData'
-import type { CurrencyOption, DecimalSeparator, PeriodFilter, Profile, WeekDay } from '@/types'
+import type {
+  CurrencyOption,
+  DecimalSeparator,
+  Language,
+  PeriodFilter,
+  Profile,
+  WeekDay
+} from '@/types'
+import { getLanguage, setLanguage, useLanguage } from '@/i18n'
 import { CURRENCIES, getCurrency, setCurrency, setCurrencyByCode } from '@/utils/currency'
 import {
   applyPreferences,
@@ -298,47 +330,58 @@ import {
   mdiEye,
   mdiEyeOff,
   mdiLockOutline,
-  mdiLogout
+  mdiLogout,
+  mdiTranslate
 } from '@mdi/js'
 
 const router = useRouter()
 const csvImportOpen = ref(false)
 const csvExportOpen = ref(false)
 const exportingCsv = ref(false)
-const backupSelection: CsvExportSelection = {
+const backupSelection = computed<CsvExportSelection>(() => ({
   url: '/transactions?type=ALL',
   scope: 'all',
   filters: [
-    { label: 'Period', value: 'Entire history, from start to finish' },
-    { label: 'Type', value: 'Income and Expense' }
+    { label: translate('Period'), value: translate('Entire history, from start to finish') },
+    { label: translate('Type'), value: translate('Income and Expense') }
   ]
-}
+}))
 
 const currentCurrency = getCurrency()
 const selectedCurrency = ref<CurrencyOption>(
   CURRENCIES.find(c => c.code === currentCurrency.code) || CURRENCIES[0]
 )
 
-const periodOptions = [
-  { title: 'Day', value: 'day' },
-  { title: 'Week', value: 'week' },
-  { title: 'Month', value: 'month' },
-  { title: 'Year', value: 'year' }
-]
+const periodOptions = computed(() =>
+  [
+    { title: 'Day', value: 'day' },
+    { title: 'Week', value: 'week' },
+    { title: 'Month', value: 'month' },
+    { title: 'Year', value: 'year' }
+  ].map(item => ({ ...item, title: translate(item.title) }))
+)
 
-const weekDayOptions = [
-  { title: 'Monday', value: 'MONDAY' },
-  { title: 'Tuesday', value: 'TUESDAY' },
-  { title: 'Wednesday', value: 'WEDNESDAY' },
-  { title: 'Thursday', value: 'THURSDAY' },
-  { title: 'Friday', value: 'FRIDAY' },
-  { title: 'Saturday', value: 'SATURDAY' },
-  { title: 'Sunday', value: 'SUNDAY' }
-]
+const weekDayOptions = computed(() =>
+  [
+    { title: 'Monday', value: 'MONDAY' },
+    { title: 'Tuesday', value: 'TUESDAY' },
+    { title: 'Wednesday', value: 'WEDNESDAY' },
+    { title: 'Thursday', value: 'THURSDAY' },
+    { title: 'Friday', value: 'FRIDAY' },
+    { title: 'Saturday', value: 'SATURDAY' },
+    { title: 'Sunday', value: 'SUNDAY' }
+  ].map(item => ({ ...item, title: translate(item.title) }))
+)
 
-const separatorOptions = [
-  { title: 'Dot (1,234.56)', value: '.', label: 'dot' },
-  { title: 'Comma (1.234,56)', value: ',', label: 'comma' }
+const separatorOptions = computed(() =>
+  [
+    { title: 'Dot (1,234.56)', value: '.', label: 'dot' },
+    { title: 'Comma (1.234,56)', value: ',', label: 'comma' }
+  ].map(item => ({ ...item, title: translate(item.title) }))
+)
+const languageOptions = [
+  { title: 'English', value: 'en' },
+  { title: 'Español', value: 'es' }
 ]
 
 // The selects mirror the stored preferences; the setters ignore invalid values,
@@ -346,6 +389,10 @@ const separatorOptions = [
 const defaultPeriod = ref<PeriodFilter>(getDefaultPeriod())
 const weekStart = ref<WeekDay>(getFirstDayOfWeek())
 const decimalSeparator = ref<DecimalSeparator>(getDecimalSeparator())
+const selectedLanguage = ref<Language>(getLanguage())
+watch(useLanguage(), value => {
+  selectedLanguage.value = value
+})
 const savingPreferences = ref(false)
 
 const editName = ref('')
@@ -383,6 +430,7 @@ const EMPTY_PROFILE: Profile = {
   defaultPeriod: 'week',
   firstDayOfWeek: 'MONDAY',
   decimalSeparator: '.',
+  language: 'en',
   createdAt: ''
 }
 
@@ -409,6 +457,7 @@ function applyProfile(data: Profile) {
   defaultPeriod.value = getDefaultPeriod()
   weekStart.value = getFirstDayOfWeek()
   decimalSeparator.value = getDecimalSeparator()
+  selectedLanguage.value = getLanguage()
 }
 
 const loadProfile = async () => {
@@ -436,6 +485,7 @@ watch(profile, (data, previous) => {
     defaultPeriod.value = getDefaultPeriod()
     weekStart.value = getFirstDayOfWeek()
     decimalSeparator.value = getDecimalSeparator()
+    selectedLanguage.value = getLanguage()
   }
   const current = getUser()
   if (current && current.name !== data.name) setUser({ ...current, name: data.name })
@@ -502,11 +552,17 @@ const onCurrencyChange = async (val: CurrencyOption | string | null) => {
       const data = (await res.json().catch(() => null)) as { queued?: boolean } | null
       if (data?.queued) {
         showSnack(
-          `Currency changed to ${currency.symbol} (${currency.code}); it will be saved when the connection is back.`,
+          translate(
+            'Currency changed to {0} ({1}); it will be saved when the connection is back.',
+            { 0: currency.symbol, 1: currency.code }
+          ),
           'info'
         )
       } else {
-        showSnack(`Currency changed to ${currency.symbol} (${currency.code})`, 'success')
+        showSnack(
+          translate('Currency changed to {0} ({1})', { 0: currency.symbol, 1: currency.code }),
+          'success'
+        )
       }
     }
   } catch (e) {
@@ -544,33 +600,51 @@ async function savePreference(
 const onDefaultPeriodChange = async (value: string | null) => {
   setDefaultPeriod(value)
   defaultPeriod.value = getDefaultPeriod()
-  const title = periodOptions.find(p => p.value === defaultPeriod.value)?.title ?? ''
+  const title = periodOptions.value.find(p => p.value === defaultPeriod.value)?.title ?? ''
   await savePreference(
     { defaultPeriod: defaultPeriod.value },
-    `Default period changed to ${title}`,
-    `Default period changed to ${title}; it will be saved when the connection is back.`
+    translate('Default period changed to {0}', { 0: title }),
+    translate('Default period changed to {0}; it will be saved when the connection is back.', {
+      0: title
+    })
   )
 }
 
 const onWeekStartChange = async (value: string | null) => {
   setFirstDayOfWeek(value)
   weekStart.value = getFirstDayOfWeek()
-  const title = weekDayOptions.find(d => d.value === weekStart.value)?.title ?? ''
+  const title = weekDayOptions.value.find(d => d.value === weekStart.value)?.title ?? ''
   await savePreference(
     { firstDayOfWeek: weekStart.value },
-    `First day of the week changed to ${title}`,
-    `First day of the week changed to ${title}; it will be saved when the connection is back.`
+    translate('First day of the week changed to {0}', { 0: title }),
+    translate(
+      'First day of the week changed to {0}; it will be saved when the connection is back.',
+      { 0: title }
+    )
   )
 }
 
 const onDecimalSeparatorChange = async (value: string | null) => {
   setDecimalSeparator(value)
   decimalSeparator.value = getDecimalSeparator()
-  const label = separatorOptions.find(o => o.value === decimalSeparator.value)?.label ?? ''
+  const label = separatorOptions.value.find(o => o.value === decimalSeparator.value)?.label ?? ''
   await savePreference(
     { decimalSeparator: decimalSeparator.value },
-    `Decimal separator changed to ${label}`,
-    `Decimal separator changed to ${label}; it will be saved when the connection is back.`
+    translate('Decimal separator changed to {0}', { 0: translate(label) }),
+    translate('Decimal separator changed to {0}; it will be saved when the connection is back.', {
+      0: translate(label)
+    })
+  )
+}
+
+const onLanguageChange = async (value: string | null) => {
+  if (value !== 'en' && value !== 'es') return
+  setLanguage(value)
+  selectedLanguage.value = getLanguage()
+  await savePreference(
+    { language: value },
+    translate('Language updated.'),
+    translate('Language saved on this device. Pending synchronization.')
   )
 }
 

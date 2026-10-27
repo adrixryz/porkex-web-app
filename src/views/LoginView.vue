@@ -11,13 +11,17 @@
           class="brand-logo mb-4"
         />
         <h1 class="text-h4 font-weight-bold text-on-surface">Porkex</h1>
-        <p class="text-body-2 text-on-surface-variant mt-1">Your personal finance tracker</p>
+        <p class="text-body-2 text-on-surface-variant mt-1">
+          {{ translate('Your personal finance tracker') }}
+        </p>
       </div>
 
       <!-- TABS -->
       <v-tabs v-model="tab" color="primary" align-tabs="center" class="mb-2 auth-tabs">
-        <v-tab value="login">Log In</v-tab>
-        <v-tab v-if="registrationState !== 'disabled'" value="register">Sign Up</v-tab>
+        <v-tab value="login">{{ translate('Log In') }}</v-tab>
+        <v-tab v-if="registrationState !== 'disabled'" value="register">{{
+          translate('Sign Up')
+        }}</v-tab>
       </v-tabs>
 
       <AppCardBody padding="pa-6 pt-4">
@@ -32,15 +36,17 @@
         >
           {{
             registrationState === 'pending'
-              ? 'Checking registration availability…'
-              : 'Registration availability could not be checked. Login is still available.'
+              ? translate('Checking registration availability…')
+              : translate(
+                  'Registration availability could not be checked. Login is still available.'
+                )
           }}
           <AppButton
             v-if="registrationState === 'error'"
             size="small"
             variant="text"
             @click="loadRegistration"
-            >Retry</AppButton
+            >{{ translate('Retry') }}</AppButton
           >
         </v-alert>
         <v-alert
@@ -52,7 +58,7 @@
           closable
           @click:close="error = ''"
         >
-          {{ error }}
+          {{ translate(error) }}
         </v-alert>
 
         <v-form @submit.prevent="submit">
@@ -61,7 +67,7 @@
             <AppTextField
               v-if="tab === 'register'"
               v-model="form.name"
-              label="Full Name"
+              :label="translate('Full Name')"
               autocomplete="name"
               maxlength="80"
               :prepend-inner-icon="mdiAccountOutline"
@@ -69,7 +75,7 @@
 
             <AppTextField
               v-model="form.email"
-              label="Email"
+              :label="translate('Email')"
               type="email"
               autocomplete="email"
               :prepend-inner-icon="mdiEmailOutline"
@@ -78,7 +84,9 @@
 
             <AppTextField
               v-model="form.password"
-              :label="tab === 'register' ? 'Password (min 6 chars)' : 'Password'"
+              :label="
+                tab === 'register' ? translate('Password (min 6 chars)') : translate('Password')
+              "
               :type="showPass ? 'text' : 'password'"
               :autocomplete="tab === 'register' ? 'new-password' : 'current-password'"
               :prepend-inner-icon="mdiLockOutline"
@@ -98,7 +106,7 @@
                 (tab === 'register' && (!form.name.trim() || registrationState !== 'enabled'))
               "
             >
-              {{ tab === 'login' ? 'Log In' : 'Create Account' }}
+              {{ tab === 'login' ? translate('Log In') : translate('Create Account') }}
             </AppButton>
           </AppFormFields>
         </v-form>
@@ -108,12 +116,14 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi, setToken, setUser } from '@/utils/api'
 import { setCurrencyByCode } from '@/utils/currency'
 import { applyPreferences } from '@/utils/preferences'
+import { protectProfileChanges } from '@/utils/profile'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -219,11 +229,13 @@ const submit = async () => {
     if (res.ok && data) {
       setToken(data.token)
       setUser(data.user)
+      const effectiveUser = protectProfileChanges(data.user)
+      setUser(effectiveUser)
       // The currency and the display preferences travel with the account: this
       // is what makes them follow the user to another browser, instead of
       // staying on this device only.
-      setCurrencyByCode(data.user?.currency)
-      applyPreferences(data.user ?? {})
+      setCurrencyByCode(effectiveUser?.currency)
+      applyPreferences(effectiveUser ?? {})
       form.value = { name: '', email: '', password: '' }
       loading.value = false
       router.push('/')

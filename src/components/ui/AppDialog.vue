@@ -17,7 +17,7 @@
         <AppIconButton
           v-if="closable"
           :icon="mdiClose"
-          label="Close dialog"
+          :label="translate('Close dialog')"
           :disabled="closeDisabled"
           @click="close"
         ></AppIconButton>
@@ -33,6 +33,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { mdiClose } from '@mdi/js'
 import { computed } from 'vue'
 import { confirmDiscard } from '@/composables/useUnsavedChanges'

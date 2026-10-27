@@ -8,7 +8,7 @@
       <p class="text-caption text-medium-emphasis">
         {{
           instant
-            ? new Date(date).toLocaleDateString('en-US', {
+            ? new Date(date).toLocaleDateString(dateLocale(), {
                 month: 'numeric',
                 day: 'numeric',
                 year: '2-digit'
@@ -25,7 +25,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { formatDateOnly } from '@/utils/date'
+import { dateLocale, formatDateOnly } from '@/utils/date'
 defineProps<{ date: string; comment?: string; icon: string; color: string; instant?: boolean }>()
 </script>
 <style scoped>

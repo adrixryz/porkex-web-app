@@ -1,6 +1,8 @@
 <template>
   <AppPage>
-    <AppPageHeader title="Accounts" subtitle="Manage your accounts and balances."
+    <AppPageHeader
+      :title="translate('Accounts')"
+      :subtitle="translate('Manage your accounts and balances.')"
       ><template #actions
         ><AppButton
           color="primary"
@@ -11,12 +13,12 @@
               accountDialog = true
             }
           "
-          >New account</AppButton
+          >{{ translate('New account') }}</AppButton
         ></template
       ></AppPageHeader
     >
     <v-alert v-if="accountsError || transfersError" type="error" class="mb-4">{{
-      accountsError || transfersError
+      translate(accountsError || transfersError)
     }}</v-alert>
     <AppPageSkeleton v-if="loading && !hasLoaded" page="accounts" :header="false" />
     <v-row v-else
@@ -29,11 +31,11 @@
               color="success"
               :subtitle="
                 account.pendingArchive === 'restore'
-                  ? 'Restoration pending'
+                  ? translate('Restoration pending')
                   : account.pendingArchive === 'archive'
-                    ? 'Archiving pending'
+                    ? translate('Archiving pending')
                     : account.archived
-                      ? 'Archived'
+                      ? translate('Archived')
                       : undefined
               "
             >
@@ -44,7 +46,7 @@
                 ><AppIconButton
                   v-if="!account.archived"
                   :icon="mdiPencilOutline"
-                  :label="`Edit ${account.name}`"
+                  :label="translate('Edit {0}', { 0: account.name })"
                   color="primary"
                   @click="
                     () => {
@@ -54,17 +56,17 @@
                   " /><AppIconButton
                   v-if="!account.isMain && !account.archived"
                   :icon="mdiArchiveOutline"
-                  :label="`Archive ${account.name}`"
+                  :label="translate('Archive {0}', { 0: account.name })"
                   color="warning"
                   @click="archiving = account" /><AppIconButton
                   v-if="account.archived"
                   :icon="mdiRestore"
-                  :label="`Restore ${account.name}`"
+                  :label="translate('Restore {0}', { 0: account.name })"
                   color="warning"
                   @click="restoring = account" /><AppIconButton
                   v-if="account.archived"
                   :icon="mdiDeleteOutline"
-                  :label="`Delete ${account.name}`"
+                  :label="translate('Delete {0}', { 0: account.name })"
                   color="error"
                   @click="deletingAccount = account"
               /></template>
@@ -78,7 +80,7 @@
             /> </AppCardBody></AppCard></v-col
     ></v-row>
     <AppCard
-      title="Account Movements"
+      :title="translate('Account Movements')"
       title-class="font-weight-bold"
       class="mt-6 overflow-hidden account-movements"
     >
@@ -88,7 +90,7 @@
           :items="historyAccounts"
           :item-title="historyAccountTitle"
           item-value="id"
-          label="Account"
+          :label="translate('Account')"
           clearable
           density="compact"
           hide-details
@@ -99,22 +101,24 @@
         <div
           v-if="historyLoading && !historyLoaded"
           role="status"
-          aria-label="Loading account movements"
+          :aria-label="translate('Loading account movements')"
         >
           <AppSkeleton type="rows" :rows="4" />
         </div>
         <AppEmptyState
           v-else-if="!visibleMovements.length"
           :icon="mdiSwapHorizontal"
-          title="No account movements yet"
-          description="Transfers, opening balances and balance adjustments will appear here."
+          :title="translate('No account movements yet')"
+          :description="
+            translate('Transfers, opening balances and balance adjustments will appear here.')
+          "
           padding="8"
         />
         <v-list
           v-if="visibleMovements.length"
           bg-color="transparent"
           class="py-0"
-          aria-label="Account movements"
+          :aria-label="translate('Account movements')"
         >
           <template v-for="(transfer, index) in visibleMovements" :key="transfer.id">
             <v-list-item class="px-6 py-2 transfer-history-row">
@@ -122,14 +126,24 @@
                 <template #actions>
                   <AppIconButton
                     :icon="mdiPencilOutline"
-                    :label="`Edit transfer from ${transfer.source.name} to ${transfer.destination.name}`"
+                    :label="
+                      translate('Edit transfer from {0} to {1}', {
+                        0: transfer.source.name,
+                        1: transfer.destination.name
+                      })
+                    "
                     :size="32"
                     color="primary"
                     @click="editTransfer(transfer)"
                   />
                   <AppIconButton
                     :icon="mdiDeleteOutline"
-                    :label="`Delete transfer from ${transfer.source.name} to ${transfer.destination.name}`"
+                    :label="
+                      translate('Delete transfer from {0} to {1}', {
+                        0: transfer.source.name,
+                        1: transfer.destination.name
+                      })
+                    "
                     :size="32"
                     color="error"
                     @click="deleting = transfer"
@@ -140,7 +154,9 @@
                 v-else
                 :date="transfer.date"
                 :comment="
-                  transfer.kind === 'opening-balance' ? 'Opening balance' : 'Balance adjustment'
+                  translate(
+                    transfer.kind === 'opening-balance' ? 'Opening balance' : 'Balance adjustment'
+                  )
                 "
                 :icon="mdiTuneVariant"
                 color="warning"
@@ -155,13 +171,15 @@
                     {{ cs }}{{ formatMoney(transfer.balance) }}
                   </div>
                   <div class="text-caption text-medium-emphasis">
-                    from {{ cs }}{{ formatMoney(transfer.previousBalance) }}
+                    {{ translate('from') }} {{ cs }}{{ formatMoney(transfer.previousBalance) }}
                   </div>
                 </template>
                 <template #actions>
                   <AppIconButton
                     :icon="mdiPencilOutline"
-                    :label="`Edit balance adjustment for ${transfer.accountName}`"
+                    :label="
+                      translate('Edit balance adjustment for {0}', { 0: transfer.accountName })
+                    "
                     :size="32"
                     :color="
                       historyAccounts.some(account => account.id === transfer.accountId)
@@ -173,7 +191,9 @@
                   />
                   <AppIconButton
                     :icon="mdiDeleteOutline"
-                    :label="`Delete balance adjustment for ${transfer.accountName}`"
+                    :label="
+                      translate('Delete balance adjustment for {0}', { 0: transfer.accountName })
+                    "
                     :size="32"
                     color="error"
                     @click="deletingAdjustment = transfer"
@@ -199,64 +219,79 @@
     />
     <AppConfirmDialog
       :model-value="!!deletingAdjustment"
-      title="Delete balance adjustment?"
+      :title="translate('Delete balance adjustment?')"
       :error="error"
-      confirm-label="Delete"
+      :confirm-label="translate('Delete')"
       :loading="busy"
       @update:model-value="deletingAdjustment = null"
       @confirm="removeAdjustment"
-      >The adjustment will be removed and its effect on the account balance will be
-      reversed.</AppConfirmDialog
+      >{{
+        translate(
+          'The adjustment will be removed and its effect on the account balance will be reversed.'
+        )
+      }}</AppConfirmDialog
     >
     <TransferDialog v-model="transferDialog" :transfer="editingTransfer" @saved="refresh" />
     <AppConfirmDialog
       :model-value="!!deleting"
-      title="Delete transfer?"
+      :title="translate('Delete transfer?')"
       :error="error"
-      confirm-label="Delete"
+      :confirm-label="translate('Delete')"
       :loading="busy"
       @update:model-value="deleting = null"
       @confirm="remove"
-      >Both account balances will be recalculated. The transfer will leave the
-      history.</AppConfirmDialog
+      >{{
+        translate(
+          'Both account balances will be recalculated. The transfer will leave the history.'
+        )
+      }}</AppConfirmDialog
     >
     <AppConfirmDialog
       :model-value="!!archiving"
-      title="Archive account?"
+      :title="translate('Archive account?')"
       :error="error"
-      confirm-label="Archive"
+      :confirm-label="translate('Archive')"
       color="warning"
       :loading="busy"
       @update:model-value="archiving = null"
       @confirm="archive"
-      >The account must have a zero balance and no active recurring rules. Its history will remain
-      available.</AppConfirmDialog
+      >{{
+        translate(
+          'The account must have a zero balance and no active recurring rules. Its history will remain available.'
+        )
+      }}</AppConfirmDialog
     >
     <AppConfirmDialog
       :model-value="!!restoring"
-      title="Restore account?"
+      :title="translate('Restore account?')"
       :error="error"
-      confirm-label="Restore"
+      :confirm-label="translate('Restore')"
       color="warning"
       :loading="busy"
       @update:model-value="restoring = null"
       @confirm="restore"
-      >The account will be available for new transactions and transfers again.</AppConfirmDialog
+      >{{
+        translate('The account will be available for new transactions and transfers again.')
+      }}</AppConfirmDialog
     >
     <AppConfirmDialog
       :model-value="!!deletingAccount"
-      title="Delete account?"
+      :title="translate('Delete account?')"
       :error="error"
-      confirm-label="Delete"
+      :confirm-label="translate('Delete')"
       :loading="busy"
       @update:model-value="deletingAccount = null"
       @confirm="removeAccount"
-      >Permanently delete this archived account? Accounts with transactions, transfers, budgets or
-      recurring rules cannot be deleted.</AppConfirmDialog
+      >{{
+        translate(
+          'Permanently delete this archived account? Accounts with transactions, transfers, budgets or recurring rules cannot be deleted.'
+        )
+      }}</AppConfirmDialog
     >
   </AppPage>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import AppEntityHeader from '@/components/ui/AppEntityHeader.vue'
@@ -322,7 +357,7 @@ function editAdjustment(adjustment: BalanceAdjustment) {
   adjustmentDialog.value = true
 }
 const historyAccountTitle = (account: Account) =>
-  `${account.name}${account.isGoal ? ' (Goal)' : ''}${account.archived ? ' (Archived)' : ''}`
+  `${account.name}${account.isGoal ? ` (${translate('Goal')})` : ''}${account.archived ? ` (${translate('Archived')})` : ''}`
 const { data: historyAccounts, run: loadHistoryAccounts } = useAsyncData<Account[]>(
   signal => fetchJson('/accounts?includeGoals=true', { signal }),
   [],

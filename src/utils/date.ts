@@ -1,5 +1,8 @@
 import { weekStartIndex } from './preferences'
 import { calendarState } from './calendar'
+import { getLanguage } from '@/i18n'
+
+export const dateLocale = () => (getLanguage() === 'es' ? 'es-PE' : 'en-US')
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n))
 
@@ -60,7 +63,7 @@ export function formatDate(
 ): string {
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-US', options)
+  return d.toLocaleDateString(dateLocale(), options)
 }
 
 // For calendar dates (a transaction's `date`): rendered in UTC so the stored
@@ -72,7 +75,7 @@ export function formatDateOnly(
 ): string {
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-US', { ...options, timeZone: 'UTC' })
+  return d.toLocaleDateString(dateLocale(), { ...options, timeZone: 'UTC' })
 }
 
 /** Consistent calendar labels for all shared period navigation controls. */
@@ -94,7 +97,7 @@ export function formatPeriodLabel(
 export function formatDateTime(value: string | Date): string {
   const d = typeof value === 'string' ? new Date(value) : value
   if (isNaN(d.getTime())) return ''
-  return d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+  return d.toLocaleString(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function startOfMonth(date = new Date()): Date {

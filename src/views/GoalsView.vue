@@ -1,9 +1,12 @@
 <template>
   <AppPage>
-    <AppPageHeader title="Goals" subtitle="Set money aside and track your progress.">
+    <AppPageHeader
+      :title="translate('Goals')"
+      :subtitle="translate('Set money aside and track your progress.')"
+    >
       <template #actions>
         <AppButton color="primary" :prepend-icon="mdiPlus" @click="goalsPanel?.newGoal()">
-          New Goal
+          {{ translate('New Goal') }}
         </AppButton>
       </template>
     </AppPageHeader>
@@ -11,6 +14,7 @@
   </AppPage>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { ref } from 'vue'
 import { mdiPlus } from '@mdi/js'
 import GoalsPanel from '@/components/GoalsPanel.vue'

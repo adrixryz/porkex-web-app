@@ -1,11 +1,12 @@
 <template>
   <v-chip size="x-small" variant="tonal" :color="color">
     <v-icon start size="12" :icon="icon" />
-    {{ value === null ? 'New' : `${value > 0 ? '+' : ''}${value}%` }}
+    {{ value === null ? translate('New') : `${value > 0 ? '+' : ''}${value}%` }}
   </v-chip>
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed } from 'vue'
 import { mdiTrendingUp, mdiTrendingDown, mdiMinus } from '@mdi/js'
 

@@ -9,14 +9,17 @@
     <!-- LOADING SKELETON -->
     <AppPageSkeleton v-if="loading && !initialLoadComplete" page="transactions" />
     <template v-else>
-      <AppPageHeader title="Transactions" subtitle="Review your income and expenses.">
+      <AppPageHeader
+        :title="translate('Transactions')"
+        :subtitle="translate('Review your income and expenses.')"
+      >
         <template #actions>
           <AppSegmentedControl
             :model-value="filterType"
-            label="Transaction type"
+            :label="translate('Transaction type')"
             :items="[
-              { label: 'Expense', value: 'Expense' },
-              { label: 'Income', value: 'Income' }
+              { label: translate('Expense'), value: 'Expense' },
+              { label: translate('Income'), value: 'Income' }
             ]"
             class="transactions-type-toggle"
             @update:model-value="changeTransactionType"
@@ -33,14 +36,14 @@
                 <div class="period-picker">
                   <AppSegmentedControl
                     v-model="periodMode"
-                    label="Select period"
+                    :label="translate('Select period')"
                     :height="44"
                     :items="[
-                      { label: 'Day', value: 'day' },
-                      { label: 'Week', value: 'week' },
-                      { label: 'Month', value: 'month' },
-                      { label: 'Year', value: 'year' },
-                      { label: 'Custom', value: 'custom' }
+                      { label: translate('Day'), value: 'day' },
+                      { label: translate('Week'), value: 'week' },
+                      { label: translate('Month'), value: 'month' },
+                      { label: translate('Year'), value: 'year' },
+                      { label: translate('Custom'), value: 'custom' }
                     ]"
                   />
                 </div>
@@ -60,7 +63,7 @@
                 >
                   <AppTextField
                     v-model="customFrom"
-                    label="From"
+                    :label="translate('From')"
                     type="date"
                     :max="todayInput()"
                     density="compact"
@@ -69,7 +72,7 @@
                   ></AppTextField>
                   <AppTextField
                     v-model="customTo"
-                    label="To"
+                    :label="translate('To')"
                     type="date"
                     :max="todayInput()"
                     density="compact"
@@ -77,7 +80,7 @@
                     class="flex-grow-1"
                   ></AppTextField>
                   <AppButton color="primary" @click="reload" class="flex-grow-1 flex-sm-grow-0">
-                    Apply
+                    {{ translate('Apply') }}
                   </AppButton>
                 </div>
               </div>
@@ -89,7 +92,7 @@
                   :items="accountOptions"
                   item-title="title"
                   item-value="value"
-                  label="Account"
+                  :label="translate('Account')"
                   clearable
                   density="compact"
                   hide-details
@@ -101,7 +104,7 @@
                   :items="categoryOptions"
                   item-title="title"
                   item-value="value"
-                  label="Category"
+                  :label="translate('Category')"
                   clearable
                   density="compact"
                   hide-details
@@ -113,7 +116,7 @@
                   :items="sortOptions"
                   item-title="title"
                   item-value="value"
-                  label="Sort by"
+                  :label="translate('Sort by')"
                   density="compact"
                   hide-details
                   class="sort-filter"
@@ -122,8 +125,8 @@
                 <div class="amount-range">
                   <AppMoneyField
                     v-model="minAmount"
-                    label="Min"
-                    step-label="minimum amount"
+                    :label="translate('Min')"
+                    :step-label="translate('minimum amount')"
                     :min="0"
                     optional
                     density="compact"
@@ -132,8 +135,8 @@
 
                   <AppMoneyField
                     v-model="maxAmount"
-                    label="Max"
-                    step-label="maximum amount"
+                    :label="translate('Max')"
+                    :step-label="translate('maximum amount')"
                     :min="0"
                     optional
                     :error-messages="amountRangeError"
@@ -145,7 +148,9 @@
 
               <!-- Active filter summary -->
               <div v-if="hasActiveFilters" class="d-flex align-center flex-wrap ga-2">
-                <span class="text-caption text-on-surface-variant">Active filters:</span>
+                <span class="text-caption text-on-surface-variant">{{
+                  translate('Active filters:')
+                }}</span>
                 <v-chip
                   v-if="filterTag"
                   size="small"
@@ -163,8 +168,11 @@
                   closable
                   @click:close="filterAccount = null"
                 >
-                  {{ accounts.find(account => account.id === filterAccount)?.name || 'Selected' }}
-                  Account
+                  {{
+                    accounts.find(account => account.id === filterAccount)?.name ||
+                    translate('Selected')
+                  }}
+                  {{ translate('Account') }}
                 </v-chip>
                 <v-chip
                   v-if="filterCategory !== null"
@@ -172,7 +180,9 @@
                   closable
                   @click:close="filterCategory = null"
                 >
-                  {{ categories?.find(c => c.id === filterCategory)?.name || 'Category' }}
+                  {{
+                    categories?.find(c => c.id === filterCategory)?.name || translate('Category')
+                  }}
                 </v-chip>
                 <v-chip
                   v-if="minBound !== null"
@@ -197,7 +207,7 @@
                   color="white"
                   @click="clearFilters"
                 >
-                  Clear all
+                  {{ translate('Clear all') }}
                 </AppButton>
               </div>
             </AppCardBody>
@@ -211,8 +221,8 @@
           <AppTextField
             v-model="searchQuery"
             :prepend-inner-icon="mdiMagnify"
-            label="Search transactions"
-            placeholder="Search transactions..."
+            :label="translate('Search transactions')"
+            :placeholder="translate('Search transactions...')"
             type="search"
             maxlength="100"
             density="comfortable"
@@ -227,7 +237,7 @@
         <v-col cols="12">
           <AppCard class="overflow-hidden" :aria-busy="loading">
             <AppCardBody padding="pa-0">
-              <div v-if="loading" role="status" aria-label="Loading transactions">
+              <div v-if="loading" role="status" :aria-label="translate('Loading transactions')">
                 <AppSkeleton type="rows" :rows="4" />
               </div>
               <!-- MOBILE LIST -->
@@ -249,7 +259,9 @@
                         ><div class="d-flex justify-end mt-1">
                           <AppIconButton
                             :icon="mdiPencilOutline"
-                            :label="`Edit ${tx.description || tx.category?.name}`"
+                            :label="
+                              translate('Edit {0}', { 0: tx.description || tx.category?.name })
+                            "
                             :size="32"
                             color="primary"
                             @click="editTx(tx)"
@@ -289,41 +301,51 @@
                         tabindex="0"
                         role="button"
                         :aria-sort="ariaSort('date')"
-                        :aria-label="`Sort by date`"
+                        :aria-label="translate('Sort by date')"
                         @click="toggleSort('date')"
                         @keydown.enter.prevent="toggleSort('date')"
                         @keydown.space.prevent="toggleSort('date')"
                       >
-                        Date
+                        {{ translate('Date') }}
                         <v-icon
                           v-if="sortBy === 'date'"
                           :icon="order === 'asc' ? mdiArrowUp : mdiArrowDown"
                           size="14"
                         ></v-icon>
                       </th>
-                      <th class="text-left font-weight-bold" scope="col">Account</th>
-                      <th class="text-left font-weight-bold" scope="col">Category</th>
-                      <th class="text-left font-weight-bold" scope="col">Tags</th>
-                      <th class="text-left font-weight-bold" scope="col">Comment</th>
+                      <th class="text-left font-weight-bold" scope="col">
+                        {{ translate('Account') }}
+                      </th>
+                      <th class="text-left font-weight-bold" scope="col">
+                        {{ translate('Category') }}
+                      </th>
+                      <th class="text-left font-weight-bold" scope="col">
+                        {{ translate('Tags') }}
+                      </th>
+                      <th class="text-left font-weight-bold" scope="col">
+                        {{ translate('Comment') }}
+                      </th>
                       <th
                         class="text-right font-weight-bold cursor-pointer select-none"
                         scope="col"
                         tabindex="0"
                         role="button"
                         :aria-sort="ariaSort('amount')"
-                        :aria-label="`Sort by amount`"
+                        :aria-label="translate('Sort by amount')"
                         @click="toggleSort('amount')"
                         @keydown.enter.prevent="toggleSort('amount')"
                         @keydown.space.prevent="toggleSort('amount')"
                       >
-                        Amount
+                        {{ translate('Amount') }}
                         <v-icon
                           v-if="sortBy === 'amount'"
                           :icon="order === 'asc' ? mdiArrowUp : mdiArrowDown"
                           size="14"
                         ></v-icon>
                       </th>
-                      <th class="text-center font-weight-bold" scope="col">Actions</th>
+                      <th class="text-center font-weight-bold" scope="col">
+                        {{ translate('Actions') }}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -359,7 +381,7 @@
                           :icon="mdiRepeat"
                           size="14"
                           class="mr-1 text-on-surface-variant"
-                          aria-label="Generated by a recurring rule"
+                          :aria-label="translate('Generated by a recurring rule')"
                         ></v-icon>
                         {{ tx.comment ?? tx.description ?? '' }}
                       </td>
@@ -373,7 +395,11 @@
                         <div class="d-inline-flex flex-nowrap align-center">
                           <AppIconButton
                             :icon="mdiPencilOutline"
-                            :label="`Edit ${tx.comment || tx.description || tx.category?.name}`"
+                            :label="
+                              translate('Edit {0}', {
+                                0: tx.comment || tx.description || tx.category?.name
+                              })
+                            "
                             :size="32"
                             color="primary"
                             @click="editTx(tx)"
@@ -393,11 +419,11 @@
               <AppEmptyState
                 v-else
                 :icon="mdiReceiptTextClockOutline"
-                title="No transactions found"
+                :title="translate('No transactions found')"
                 :description="
                   hasActiveFilters
-                    ? 'No results match your current filters.'
-                    : 'There is nothing recorded in this period.'
+                    ? translate('No results match your current filters.')
+                    : translate('There is nothing recorded in this period.')
                 "
                 padding="12"
               >
@@ -408,7 +434,7 @@
                     :prepend-icon="mdiFilterOffOutline"
                     @click="clearFilters"
                   >
-                    Clear filters
+                    {{ translate('Clear filters') }}
                   </AppButton>
                 </template>
               </AppEmptyState>
@@ -433,14 +459,14 @@
               :icon="mdiUpload"
               :disabled="isOffline || exporting"
               @click="csvImportOpen = true"
-              >Import CSV</AppActionButton
+              >{{ translate('Import CSV') }}</AppActionButton
             >
             <AppActionButton
               :icon="mdiDownload"
               :loading="exporting"
               :disabled="isOffline || exporting || !!amountFilterError"
               @click="prepareCsvExport"
-              >Export CSV</AppActionButton
+              >{{ translate('Export CSV') }}</AppActionButton
             >
           </div>
         </v-col>
@@ -462,8 +488,8 @@
     <!-- DELETE CONFIRM DIALOG -->
     <AppConfirmDialog
       v-model="deleteDialog"
-      title="Delete Transaction?"
-      confirm-label="Delete"
+      :title="translate('Delete Transaction?')"
+      :confirm-label="translate('Delete')"
       :loading="deleting"
       @confirm="doDelete"
     >
@@ -473,6 +499,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { catalogId, catalogSlug } from '@/utils/catalogSlugs'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
@@ -560,33 +587,39 @@ function prepareCsvExport() {
   csvExportSelection.value = {
     url,
     filters: [
-      { label: 'Period', value: `${query.get('from')} — ${query.get('to')}` },
-      { label: 'Type', value: query.get('type') || 'Income and Expense' },
+      { label: translate('Period'), value: `${query.get('from')} — ${query.get('to')}` },
+      { label: translate('Type'), value: translate(query.get('type') || 'Income and Expense') },
       {
-        label: 'Account',
+        label: translate('Account'),
         value: accountId
           ? accounts.value.find(account => account.id === accountId)?.name || accountId
-          : 'All accounts'
+          : translate('All accounts')
       },
       {
-        label: 'Category',
+        label: translate('Category'),
         value: categoryId
           ? categories.value?.find(category => category.id === Number(categoryId))?.name ||
             categoryId
-          : 'All categories'
+          : translate('All categories')
       },
-      { label: 'Tag', value: query.get('tagId') ? selectedTagName.value : 'All tags' },
-      { label: 'Search', value: query.get('search') || 'Any comment or category' },
       {
-        label: 'Amount',
+        label: translate('Tag'),
+        value: query.get('tagId') ? selectedTagName.value : translate('All tags')
+      },
+      {
+        label: translate('Search'),
+        value: query.get('search') || translate('Any comment or category')
+      },
+      {
+        label: translate('Amount'),
         value:
           min !== null && max !== null
             ? `${money(min)} – ${money(max)}`
             : min !== null
-              ? `At least ${money(min)}`
+              ? translate('At least {0}', { 0: money(min) })
               : max !== null
-                ? `Up to ${money(max)}`
-                : 'Any amount'
+                ? translate('Up to {0}', { 0: money(max) })
+                : translate('Any amount')
       }
     ]
   }
@@ -620,7 +653,7 @@ const filterAccount = ref<string | null>(null)
 const { accounts, run: fetchAccounts } = useAccounts()
 const accountOptions = computed(() =>
   accounts.value.map(account => ({
-    title: account.archived ? `${account.name} (Archived)` : account.name,
+    title: account.archived ? translate('{0} (Archived)', { 0: account.name }) : account.name,
     value: account.id
   }))
 )
@@ -730,12 +763,14 @@ const categoryOptions = computed(() =>
     }))
 )
 
-const sortOptions = [
-  { title: 'Newest date first', value: 'date:desc' },
-  { title: 'Oldest date first', value: 'date:asc' },
-  { title: 'Highest amount', value: 'amount:desc' },
-  { title: 'Lowest amount', value: 'amount:asc' }
-]
+const sortOptions = computed(() =>
+  [
+    { title: 'Newest date first', value: 'date:desc' },
+    { title: 'Oldest date first', value: 'date:asc' },
+    { title: 'Highest amount', value: 'amount:desc' },
+    { title: 'Lowest amount', value: 'amount:asc' }
+  ].map(item => ({ ...item, title: translate(item.title) }))
+)
 
 const sortOption = computed({
   get: () => `${sortBy.value}:${order.value}`,
@@ -811,7 +846,7 @@ const getDateRange = () => {
 }
 
 const periodLabel = computed(() => {
-  if (periodMode.value === 'custom') return 'Custom Range'
+  if (periodMode.value === 'custom') return translate('Custom Range')
   const { from, to } = getDateRange()
   return formatPeriodLabel(periodMode.value, toDateOnly(from), toDateOnly(to))
 })

@@ -1,31 +1,34 @@
 <template>
-  <AppCard title="All Data">
+  <AppCard :title="translate('All Data')">
     <AppCardBody>
       <p class="text-body-2 text-on-surface-variant mt-0 mb-4">
-        Back up accounts, goals, transactions, transfers, categories, tags, budgets, recurring
-        rules, favorites and preferences as JSON.
+        {{
+          translate(
+            'Back up accounts, goals, transactions, transfers, categories, tags, budgets, recurring rules, favorites and preferences as JSON.'
+          )
+        }}
       </p>
       <div class="d-flex flex-wrap ga-3">
         <AppActionButton
           :icon="mdiUpload"
           :disabled="isOffline || exporting || busy"
           @click="openImport"
-          >Import JSON</AppActionButton
+          >{{ translate('Import JSON') }}</AppActionButton
         >
         <AppActionButton
           :icon="mdiDownload"
           :loading="exporting"
           :disabled="isOffline || busy"
           @click="download"
-          >Export JSON</AppActionButton
+          >{{ translate('Export JSON') }}</AppActionButton
         >
       </div>
     </AppCardBody>
   </AppCard>
   <AppConfirmDialog
     v-model="exportOpen"
-    title="Export All Data"
-    confirm-label="Export JSON"
+    :title="translate('Export All Data')"
+    :confirm-label="translate('Export JSON')"
     color="primary"
     :icon="mdiDownload"
     :max-width="520"
@@ -33,7 +36,7 @@
     :confirm-disabled="isOffline || !preparedExport"
     @confirm="finishExport"
   >
-    <p class="mt-0 mb-4">Export all synchronized data as a JSON backup?</p>
+    <p class="mt-0 mb-4">{{ translate('Export all synchronized data as a JSON backup?') }}</p>
     <AppExportSummary
       v-if="preparedExport"
       :entries="exportEntries"
@@ -41,25 +44,27 @@
       class="mb-4"
     />
     <p class="ma-0 text-caption">
-      Includes financial data and preferences. Passwords and sessions are excluded.
+      {{
+        translate('Includes financial data and preferences. Passwords and sessions are excluded.')
+      }}
     </p>
     <v-progress-linear
       v-if="exporting"
       indeterminate
       color="primary"
       class="mt-4"
-      aria-label="Preparing full backup"
+      :aria-label="translate('Preparing full backup')"
     />
     <v-alert v-if="isOffline" type="warning" density="compact" class="mt-4 text-left">
-      Connect to the internet to export your data.
+      {{ translate('Connect to the internet to export your data.') }}
     </v-alert>
     <v-alert v-if="exportError" type="error" density="compact" class="mt-4 text-left">{{
-      exportError
+      translate(exportError)
     }}</v-alert>
   </AppConfirmDialog>
   <AppDialog
     v-model="open"
-    title="Import All Data"
+    :title="translate('Import All Data')"
     :max-width="preview ? 760 : 620"
     actions-class="pa-6 pt-0 ga-3"
     :persistent="busy"
@@ -67,14 +72,16 @@
     :dirty="!!file"
   >
     <div class="mb-5">
-      <h2 class="text-subtitle-1 font-weight-bold mt-0 mb-1">Choose your JSON</h2>
+      <h2 class="text-subtitle-1 font-weight-bold mt-0 mb-1">
+        {{ translate('Choose your JSON') }}
+      </h2>
       <p class="text-body-2 text-on-surface-variant ma-0">
-        Review your backup and current data before restoring.
+        {{ translate('Review your backup and current data before restoring.') }}
       </p>
     </div>
     <AppFilePicker
-      label="Select a JSON file"
-      description="Choose a Porkex full data backup."
+      :label="translate('Select a JSON file')"
+      :description="translate('Choose a Porkex full data backup.')"
       accept=".json,application/json"
       :disabled="busy || !!preview"
       :file-name="file?.name"
@@ -83,13 +90,19 @@
       @select="select"
     />
     <v-alert v-if="isOffline" type="warning" density="compact" class="mt-4 mb-4">
-      Connect to the internet to preview and restore your file.
+      {{ translate('Connect to the internet to preview and restore your file.') }}
     </v-alert>
-    <v-alert v-if="error" type="error" density="compact" class="mt-4 mb-4">{{ error }}</v-alert>
-    <v-alert v-if="notice" type="info" density="compact" class="mt-4 mb-4">{{ notice }}</v-alert>
+    <v-alert v-if="error" type="error" density="compact" class="mt-4 mb-4">{{
+      translate(error)
+    }}</v-alert>
+    <v-alert v-if="notice" type="info" density="compact" class="mt-4 mb-4">{{
+      translate(notice)
+    }}</v-alert>
     <v-progress-linear v-if="busy" indeterminate color="primary" class="mt-4 mb-4" />
     <div v-if="file" class="d-flex align-center flex-wrap ga-3 mt-5 mb-4">
-      <h2 v-if="preview" class="text-subtitle-1 font-weight-bold">Data Preview</h2>
+      <h2 v-if="preview" class="text-subtitle-1 font-weight-bold">
+        {{ translate('Data Preview') }}
+      </h2>
       <AppButton
         variant="outlined"
         size="small"
@@ -98,25 +111,26 @@
         :disabled="busy || isOffline"
         class="ml-auto"
         @click="refreshPreview"
-        >Refresh preview</AppButton
+        >{{ translate('Refresh preview') }}</AppButton
       >
     </div>
     <template v-if="preview">
-      <v-alert type="warning" density="compact" class="mb-4"
-        >Restoring replaces all financial data and preferences in this account. Your login and
-        password stay unchanged. Other sessions will be signed out.</v-alert
-      >
+      <v-alert type="warning" density="compact" class="mb-4">{{
+        translate(
+          'Restoring replaces all financial data and preferences in this account. Your login and password stay unchanged. Other sessions will be signed out.'
+        )
+      }}</v-alert>
       <v-table density="compact" class="border rounded-lg mb-4">
         <thead>
           <tr>
-            <th>Data</th>
-            <th>Current</th>
-            <th>Backup</th>
+            <th>{{ translate('Data') }}</th>
+            <th>{{ translate('Current') }}</th>
+            <th>{{ translate('Backup') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="[key, label] in summaries" :key="key">
-            <td>{{ label }}</td>
+            <td>{{ translate(label) }}</td>
             <td>{{ preview.currentCounts[key] }}</td>
             <td>{{ preview.counts[key] }}</td>
           </tr>
@@ -132,23 +146,27 @@
         :loading="busy"
         :disabled="busy || isOffline || !preview"
         @click="confirm = true"
-        >Restore all data</AppButton
+        >{{ translate('Restore all data') }}</AppButton
       >
     </template>
   </AppDialog>
   <AppConfirmDialog
     v-model="confirm"
-    title="Replace all account data?"
-    confirm-label="Restore data"
+    :title="translate('Replace all account data?')"
+    :confirm-label="translate('Restore data')"
     :loading="busy"
     :error="error"
     @confirm="restore"
   >
-    This replaces your current financial history and preferences with the selected backup. Export
-    your current data first if you want to keep it.
+    {{
+      translate(
+        'This replaces your current financial history and preferences with the selected backup. Export your current data first if you want to keep it.'
+      )
+    }}
   </AppConfirmDialog>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { computed, ref, watch } from 'vue'
 import { mdiDownload, mdiRefresh, mdiUpload } from '@mdi/js'
 import AppCard from './ui/AppCard.vue'
@@ -209,7 +227,7 @@ const exportSummaries = [
 ]
 const exportEntries = computed(() =>
   exportSummaries.map(([key, label]) => ({
-    label,
+    label: translate(label),
     value: preparedExport.value?.counts[key] ?? 0
   }))
 )

@@ -1,5 +1,11 @@
 <template>
-  <AppSelect item-title="name" item-value="id" label="Category" :items="ordered" v-bind="$attrs">
+  <AppSelect
+    item-title="name"
+    item-value="id"
+    :label="translate('Category')"
+    :items="ordered"
+    v-bind="$attrs"
+  >
     <template #selection="{ item }">
       <CategoryDot :color="item.color" />{{ item.name ?? item.title }}
     </template>
@@ -14,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import CategoryDot from '@/components/CategoryDot.vue'
 

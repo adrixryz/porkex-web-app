@@ -1,8 +1,8 @@
 <template>
   <AppConfirmDialog
     v-model="open"
-    title="Export Transactions"
-    confirm-label="Export CSV"
+    :title="translate('Export Transactions')"
+    :confirm-label="translate('Export CSV')"
     color="primary"
     :icon="mdiDownload"
     :max-width="520"
@@ -13,24 +13,29 @@
     <p class="mt-0 mb-4">
       {{
         selection?.scope === 'all'
-          ? 'Export all transactions from the beginning to the end of your history?'
-          : 'Export all transactions matching this selection?'
+          ? translate('Export all transactions from the beginning to the end of your history?')
+          : translate('Export all transactions matching this selection?')
       }}
     </p>
     <AppExportSummary :entries="selection?.filters ?? []" class="mb-4" />
     <p class="ma-0 text-caption">
-      Includes all pages, ordered oldest first. Pending local changes are not included.
+      {{
+        translate(
+          'Includes all pages, ordered oldest first. Pending local changes are not included.'
+        )
+      }}
     </p>
     <v-alert v-if="isOffline" type="warning" density="compact" class="mt-4 text-left">
-      Connect to the internet to export your transactions.
+      {{ translate('Connect to the internet to export your transactions.') }}
     </v-alert>
     <v-alert v-if="error" type="error" density="compact" class="mt-4 text-left">{{
-      error
+      translate(error)
     }}</v-alert>
   </AppConfirmDialog>
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { ref, watch } from 'vue'
 import { mdiDownload } from '@mdi/js'
 import AppConfirmDialog from '@/components/ui/AppConfirmDialog.vue'

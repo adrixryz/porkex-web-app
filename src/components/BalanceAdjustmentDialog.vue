@@ -1,16 +1,16 @@
 <template>
   <AppDialog
     :model-value="modelValue"
-    title="Edit balance adjustment"
+    :title="translate('Edit balance adjustment')"
     :close-disabled="busy"
     :dirty="JSON.stringify({ amount, date }) !== clean"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-form @submit.prevent="save">
       <AppFormFields>
-        <AppMoneyField v-model="amount" label="Adjusted balance" :min="0" />
-        <AppTextField v-model="date" label="Date" type="date" :max="todayInput()" />
-        <v-alert v-if="error" type="error">{{ error }}</v-alert>
+        <AppMoneyField v-model="amount" :label="translate('Adjusted balance')" :min="0" />
+        <AppTextField v-model="date" :label="translate('Date')" type="date" :max="todayInput()" />
+        <v-alert v-if="error" type="error">{{ translate(error) }}</v-alert>
         <AppButton
           type="submit"
           color="primary"
@@ -18,13 +18,14 @@
           class="w-100 font-weight-bold"
           :disabled="!valid"
           :loading="busy"
-          >Update</AppButton
+          >{{ translate('Update') }}</AppButton
         >
       </AppFormFields>
     </v-form>
   </AppDialog>
 </template>
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import AppFormFields from '@/components/ui/AppFormFields.vue'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 import { computed, ref, watch } from 'vue'

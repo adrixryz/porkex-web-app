@@ -3,7 +3,12 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './tests/browser',
   testMatch: process.env.PORKEX_TEST_API_ORIGIN
-    ? ['integration.spec.ts', 'fullBackup.integration.ts', 'release110.integration.ts']
+    ? [
+        'integration.spec.ts',
+        'fullBackup.integration.ts',
+        'release110.integration.ts',
+        'spanish.integration.ts'
+      ]
     : ['recovery.spec.ts', 'release.spec.ts'],
   fullyParallel: false,
   workers: 1,

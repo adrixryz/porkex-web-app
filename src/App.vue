@@ -16,7 +16,7 @@
       <!-- APP BAR -->
       <v-app-bar color="background" elevation="0" border="b">
         <v-app-bar-nav-icon
-          aria-label="Toggle navigation"
+          :aria-label="translate('Toggle navigation')"
           @click="handleNavIconClick"
         ></v-app-bar-nav-icon>
         <div class="app-bar-brand d-flex align-center justify-center">
@@ -37,7 +37,7 @@
             class="mr-4"
             ><AppIconButton
               :icon="mdiSync"
-              label="Pending Changes"
+              :label="translate('Pending Changes')"
               @click="syncCenterOpen = true" /></v-badge
         ></template>
       </v-app-bar>
@@ -57,7 +57,7 @@
             v-for="item in navItems"
             :key="item.route"
             :prepend-icon="item.icon"
-            :title="item.title"
+            :title="translate(item.title)"
             :to="item.route"
             :active="route.path === item.route"
             color="primary"
@@ -92,14 +92,14 @@
           closable
         >
           <template v-if="isOffline">
-            {{ isOfflineHint }}
+            {{ translate(isOfflineHint) }}
           </template>
           <template v-else-if="staleSavedAt">
             {{ wakingHint }}
           </template>
-          <template v-else
-            >Some data is unavailable. Check the error below or reconnect to try again.</template
-          >
+          <template v-else>{{
+            translate('Some data is unavailable. Check the error below or reconnect to try again.')
+          }}</template>
         </v-alert>
 
         <v-alert
@@ -122,10 +122,14 @@
         >
           {{
             recurringState === 'blocked'
-              ? 'A recurring expense is waiting for sufficient funds. Add funds or skip its next occurrence.'
+              ? translate(
+                  'A recurring expense is waiting for sufficient funds. Add funds or skip its next occurrence.'
+                )
               : recurringState === 'pending'
-                ? 'Recurring transactions are still updating. Totals may be incomplete.'
-                : 'Recurring transactions could not be updated. Totals may be incomplete; we will retry.'
+                ? translate('Recurring transactions are still updating. Totals may be incomplete.')
+                : translate(
+                    'Recurring transactions could not be updated. Totals may be incomplete; we will retry.'
+                  )
           }}
         </v-alert>
 
@@ -138,23 +142,28 @@
           closable
           @click:close="lastFlushError = ''"
         >
-          {{ lastFlushError }}
+          {{ translate(lastFlushError) }}
           <div v-if="firstBlockedMutation" class="d-flex ga-2 mt-2">
-            <AppButton size="small" variant="outlined" @click="retryBlocked">Retry</AppButton>
+            <AppButton size="small" variant="outlined" @click="retryBlocked">{{
+              translate('Retry')
+            }}</AppButton>
             <AppButton size="small" variant="text" @click="discardDialog = true">
-              Discard change
+              {{ translate('Discard change') }}
             </AppButton>
           </div>
         </v-alert>
 
         <AppConfirmDialog
           v-model="discardDialog"
-          title="Discard pending change?"
-          confirm-label="Discard"
+          :title="translate('Discard pending change?')"
+          :confirm-label="translate('Discard')"
           @confirm="discardBlocked"
         >
-          This change has not been confirmed by the server. Discarding removes it from this device's
-          queue.
+          {{
+            translate(
+              "This change has not been confirmed by the server. Discarding removes it from this device's queue."
+            )
+          }}
         </AppConfirmDialog>
 
         <router-view v-slot="{ Component }">
@@ -172,6 +181,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAccounts } from '@/composables/useAccounts'
 import UpdateNotice from '@/components/UpdateNotice.vue'
@@ -239,16 +249,19 @@ const { hasStaleData, staleSavedAt, isOffline } = useConnection()
 // server that is simply asleep and about to answer on its own.
 const isOfflineHint = 'No connection. Showing the last saved copy.'
 const wakingHint = computed(() => {
-  const when = staleSavedAt.value ? formatAge(staleSavedAt.value) : 'a moment ago'
-  return `Showing data from ${when} while the connection or server recovers.`
+  const when = staleSavedAt.value ? formatAge(staleSavedAt.value) : translate('a moment ago')
+  return translate('Showing data from {0} while the connection or server recovers.', { 0: when })
 })
 
 const pendingHint = (n: number) =>
   firstBlockedMutation.value
-    ? `${n} pending change${n === 1 ? '' : 's'}. Resolve the rejected change below to continue syncing.`
+    ? translate('{0} pending change{1}. Resolve the rejected change below to continue syncing.', {
+        0: n,
+        1: n === 1 ? '' : 's'
+      })
     : n === 1
-      ? '1 change waiting to sync. It will be sent automatically.'
-      : `${n} changes waiting to sync. They will be sent automatically.`
+      ? translate('1 change waiting to sync. It will be sent automatically.')
+      : translate('{0} changes waiting to sync. They will be sent automatically.', { 0: n })
 
 const handleNavIconClick = () => {
   if (mobile.value) {
@@ -295,7 +308,7 @@ watch(
   () => refreshUser()
 )
 
-const userName = computed(() => currentUser.value?.name || 'User')
+const userName = computed(() => currentUser.value?.name || translate('User'))
 
 const navItems = [
   { title: 'Dashboard', icon: mdiViewDashboardOutline, route: '/' },

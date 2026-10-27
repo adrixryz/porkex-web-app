@@ -1,8 +1,8 @@
 <template>
-  <div class="app-period-navigation" role="group" aria-label="Period navigation">
+  <div class="app-period-navigation" role="group" :aria-label="translate('Period navigation')">
     <AppIconButton
       :icon="mdiChevronLeft"
-      label="Previous period"
+      :label="translate('Previous period')"
       :size="32"
       :icon-size="20"
       :disabled="!canGoBack"
@@ -11,7 +11,7 @@
     <span class="app-period-label" aria-live="polite">{{ label }}</span>
     <AppIconButton
       :icon="mdiChevronRight"
-      label="Next period"
+      :label="translate('Next period')"
       :size="32"
       :icon-size="20"
       :disabled="!canGoForward"
@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { mdiChevronLeft, mdiChevronRight } from '@mdi/js'
 import AppIconButton from './AppIconButton.vue'
 withDefaults(defineProps<{ label: string; canGoForward: boolean; canGoBack?: boolean }>(), {

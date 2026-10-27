@@ -4,27 +4,32 @@
     <AppPageSkeleton v-if="loading && !hasLoaded" page="analytics" />
 
     <template v-else>
-      <AppPageHeader title="Analytics" subtitle="Track your financial trends and patterns">
+      <AppPageHeader
+        :title="translate('Analytics')"
+        :subtitle="translate('Track your financial trends and patterns')"
+      >
         <template #actions>
           <AccountFilter v-model="accountFilter" :accounts="accounts" />
         </template>
       </AppPageHeader>
-      <v-alert v-if="accountsError" type="error" class="mb-4">{{ accountsError }}</v-alert>
+      <v-alert v-if="accountsError" type="error" class="mb-4">{{
+        translate(accountsError)
+      }}</v-alert>
 
       <!-- INSIGHT CARDS -->
       <v-row class="mb-6 analytics-insights">
         <v-col cols="6" md="3">
           <AppStatCard
-            label="Avg Daily Expense"
+            :label="translate('Avg Daily Expense')"
             :value="`${cs}${formatMoney(insights.avgDailyExpense)}`"
-            caption="so far this month"
+            :caption="translate('so far this month')"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
         </v-col>
         <v-col cols="6" md="3">
           <AppStatCard
-            label="Month-over-Month"
+            :label="translate('Month-over-Month')"
             value=""
             :value-class="expenseIncreased ? 'text-error' : 'text-success'"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
@@ -39,23 +44,24 @@
               {{ expenseChangeLabel }}
             </template>
             <template #caption>
-              was {{ cs }}{{ formatMoney(insights.lastMonthExpense) }} last month
+              {{ translate('was') }} {{ cs }}{{ formatMoney(insights.lastMonthExpense) }}
+              {{ translate('last month') }}
             </template>
           </AppStatCard>
         </v-col>
         <v-col cols="6" md="3">
           <AppStatCard
-            label="Savings Rate"
+            :label="translate('Savings Rate')"
             :value="`${insights.savingsRate > 0 ? '+' : ''}${insights.savingsRate}%`"
             :value-class="insights.savingsRate >= 0 ? 'text-success' : 'text-error'"
-            caption="of this month's income kept"
+            :caption="translate('of this month\'s income kept')"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
         </v-col>
         <v-col cols="6" md="3">
           <AppStatCard
-            label="Top Category"
+            :label="translate('Top Category')"
             value=""
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
@@ -65,12 +71,12 @@
                 {{ topCategories[0].name }}
               </div>
               <div v-else class="text-body-2 font-weight-regular text-on-surface-variant">
-                No expenses this month
+                {{ translate('No expenses this month') }}
               </div>
             </template>
             <template v-if="topCategories.length" #caption>
-              {{ cs }}{{ formatMoney(topCategories[0].value) }} · {{ topCategories[0].percent }}% of
-              spending
+              {{ cs }}{{ formatMoney(topCategories[0].value) }} · {{ topCategories[0].percent
+              }}{{ translate('% of spending') }}
             </template>
           </AppStatCard>
         </v-col>
@@ -80,12 +86,16 @@
       <v-row class="mb-6">
         <!-- BAR CHART: Income / Expenses / Profit-Loss per month -->
         <v-col cols="12" md="7">
-          <AppCard title="Income vs Expenses" title-class="font-weight-bold" class="fill-height">
+          <AppCard
+            :title="translate('Income vs Expenses')"
+            title-class="font-weight-bold"
+            class="fill-height"
+          >
             <template #header-actions>
               <AppTextField
                 v-model="monthsInput"
                 type="number"
-                label="Months"
+                :label="translate('Months')"
                 inputmode="numeric"
                 step="1"
                 density="compact"
@@ -98,7 +108,7 @@
                 @keydown.enter="applyMonths"
               >
                 <template #append-inner>
-                  <AmountStepper label="months" @step="stepMonths"></AmountStepper>
+                  <AmountStepper :label="translate('months')" @step="stepMonths"></AmountStepper>
                 </template>
               </AppTextField>
             </template>
@@ -106,7 +116,7 @@
               <div
                 style="height: 320px"
                 role="img"
-                :aria-label="`Income vs expenses for the last ${months} months`"
+                :aria-label="translate('Income vs expenses for the last {0} months', { 0: months })"
               >
                 <Chart type="bar" v-if="barReady" :data="barChartData" :options="barOptions" />
               </div>
@@ -116,12 +126,16 @@
 
         <!-- LINE CHART: Balance Trend -->
         <v-col cols="12" md="5">
-          <AppCard title="Balance Trend" title-class="font-weight-bold" class="fill-height">
+          <AppCard
+            :title="translate('Balance Trend')"
+            title-class="font-weight-bold"
+            class="fill-height"
+          >
             <template #header-actions>
               <AppTextField
                 v-model="daysInput"
                 type="number"
-                label="Days"
+                :label="translate('Days')"
                 inputmode="numeric"
                 step="1"
                 density="compact"
@@ -134,7 +148,7 @@
                 @keydown.enter="applyDays"
               >
                 <template #append-inner>
-                  <AmountStepper label="days" @step="stepDays"></AmountStepper>
+                  <AmountStepper :label="translate('days')" @step="stepDays"></AmountStepper>
                 </template>
               </AppTextField>
             </template>
@@ -142,7 +156,7 @@
               <div
                 style="height: 320px"
                 role="img"
-                :aria-label="`Balance trend for the last ${trendDays} days`"
+                :aria-label="translate('Balance trend for the last {0} days', { 0: trendDays })"
               >
                 <Line v-if="lineReady" :data="lineChartData" :options="lineOptions" />
               </div>
@@ -161,6 +175,7 @@
 </template>
 
 <script setup lang="ts">
+import { t as translate } from '@/i18n'
 import { useAccountQuery } from '@/composables/useAccountQuery'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import AccountFilter from '@/components/AccountFilter.vue'
@@ -198,7 +213,8 @@ import { themeColors } from '@/utils/color'
 import { BAR_CORNER_RADIUS } from '@/utils/chartStyle'
 import { useTheme } from 'vuetify'
 import { mdiTrendingDown, mdiTrendingUp } from '@mdi/js'
-import { todayInput } from '@/utils/date'
+import { formatDateOnly, todayInput } from '@/utils/date'
+import { getLanguage } from '@/i18n'
 import type { ChartData, TooltipItem, LegendItem } from 'chart.js'
 
 ChartJS.register(
@@ -292,7 +308,7 @@ const expenseIncreased = computed(
 )
 const expenseChangeLabel = computed(() => {
   const value = insights.value.expenseChangePercent
-  return value === null ? 'New' : `${value > 0 ? '+' : ''}${value}%`
+  return value === null ? translate('New') : `${value > 0 ? '+' : ''}${value}%`
 })
 
 // Chart tooltips show the raw numbers unless a formatter is provided. The
@@ -314,6 +330,33 @@ const lineReady = computed(() => trendData.value.length > 0)
 // warning orange already marks a loss bar, so a literal keeps them apart.
 const AVG_LINE_COLOR = '#ffeb3b'
 
+// Cached responses from older versions only contain English chart labels.
+function legacyChartDate(label: string, isMonth: boolean): string {
+  if (getLanguage() !== 'es') return label
+  const match = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})$/.exec(label)
+  if (!match) return label
+  const month = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ].indexOf(match[1]!)
+  const value = Number(match[2])
+  const date = new Date(Date.UTC(isMonth ? 2000 + value : 2000, month, isMonth ? 1 : value))
+  return formatDateOnly(
+    date,
+    isMonth ? { month: 'short', year: '2-digit' } : { month: 'short', day: 'numeric' }
+  )
+}
+
 // Mixed chart (bar + line): a dataset's own type wins over the chart's, which
 // is why this uses the generic <Chart> component and a two-type ChartData
 // instead of <Bar>, whose data prop is pinned to bar datasets only.
@@ -321,10 +364,14 @@ const AVG_LINE_COLOR = '#ffeb3b'
 // negative months included). Profit reads blue, an overspent month reads
 // orange; the yellow line is the 3-month moving average of expenses.
 const barChartData = computed<ChartData<'bar' | 'line', (number | null)[]>>(() => ({
-  labels: monthlyData.value.map(d => d.month),
+  labels: monthlyData.value.map(d =>
+    d.monthStart
+      ? formatDateOnly(d.monthStart, { month: 'short', year: '2-digit' })
+      : legacyChartDate(d.month, true)
+  ),
   datasets: [
     {
-      label: 'Income',
+      label: translate('Income'),
       type: 'bar' as const,
       order: 1,
       skipNull: true,
@@ -333,7 +380,7 @@ const barChartData = computed<ChartData<'bar' | 'line', (number | null)[]>>(() =
       data: monthlyData.value.map(d => d.income)
     },
     {
-      label: 'Expenses',
+      label: translate('Expenses'),
       type: 'bar' as const,
       order: 1,
       skipNull: true,
@@ -343,7 +390,7 @@ const barChartData = computed<ChartData<'bar' | 'line', (number | null)[]>>(() =
       data: monthlyData.value.map(d => d.expense)
     },
     {
-      label: 'Profit',
+      label: translate('Profit'),
       type: 'bar' as const,
       order: 1,
       skipNull: true,
@@ -352,7 +399,7 @@ const barChartData = computed<ChartData<'bar' | 'line', (number | null)[]>>(() =
       data: monthlyData.value.map(d => (d.net >= 0 ? d.net : null))
     },
     {
-      label: 'Loss',
+      label: translate('Loss'),
       type: 'bar' as const,
       order: 1,
       skipNull: true,
@@ -361,7 +408,7 @@ const barChartData = computed<ChartData<'bar' | 'line', (number | null)[]>>(() =
       data: monthlyData.value.map(d => (d.net < 0 ? d.net : null))
     },
     {
-      label: '3-month avg expense',
+      label: translate('3-month avg expense'),
       type: 'line' as const,
       order: 0,
       borderColor: AVG_LINE_COLOR,
@@ -410,10 +457,14 @@ const barOptions = {
 }
 
 const lineChartData = computed(() => ({
-  labels: trendData.value.map(d => d.date),
+  labels: trendData.value.map(d =>
+    d.dateKey
+      ? formatDateOnly(d.dateKey, { month: 'short', day: 'numeric' })
+      : legacyChartDate(d.date, false)
+  ),
   datasets: [
     {
-      label: 'Balance',
+      label: translate('Balance'),
       data: trendData.value.map(d => d.balance),
       borderColor: colors.value.primary,
       backgroundColor: 'rgba(0, 112, 243, 0.12)',

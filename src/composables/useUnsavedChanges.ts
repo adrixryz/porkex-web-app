@@ -1,4 +1,5 @@
 import { onUnmounted, ref, watch } from 'vue'
+import { t } from '@/i18n'
 
 const dirtyOwners = new Set<symbol>()
 const busyOwners = new Set<symbol>()
@@ -6,7 +7,7 @@ export const hasUnsavedChanges = ref(false)
 export const hasBusyForms = ref(false)
 
 export function confirmDiscard(): boolean {
-  return window.confirm('Discard your unsaved changes and leave? Cancel to keep editing.')
+  return window.confirm(t('Discard your unsaved changes and leave? Cancel to keep editing.'))
 }
 
 export function canLeaveForms(): boolean {

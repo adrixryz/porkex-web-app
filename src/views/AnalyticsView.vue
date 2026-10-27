@@ -153,7 +153,7 @@
 
       <v-row>
         <v-col cols="12">
-          <CategoryComparison />
+          <CategoryComparison :account-id="accountFilter" />
         </v-col>
       </v-row>
     </template>
@@ -161,6 +161,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAccountQuery } from '@/composables/useAccountQuery'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import AccountFilter from '@/components/AccountFilter.vue'
 import { useAccounts } from '@/composables/useAccounts'
@@ -216,15 +217,7 @@ ChartJS.register(
 const route = useRoute()
 const router = useRouter()
 const { accounts, run: fetchAccounts, error: accountsError } = useAccounts()
-const accountFilter = computed({
-  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : null),
-  set: (value: string | null) => {
-    const query = { ...route.query }
-    if (value) query.accountId = value
-    else delete query.accountId
-    void router.push({ query })
-  }
-})
+const accountFilter = useAccountQuery(accounts)
 const accountQuery = () =>
   accountFilter.value ? `&accountId=${encodeURIComponent(accountFilter.value)}` : ''
 const theme = useTheme()
@@ -533,8 +526,19 @@ async function restoreRange() {
   hydrating = false
   await loadAnalytics()
 }
-watch([() => route.query.months, () => route.query.days, () => route.query.accountId], () => {
-  if (!hydrating) void restoreRange()
+watch(
+  [
+    () => route.query.months,
+    () => route.query.days,
+    () => route.query.account,
+    () => route.query.accountId
+  ],
+  () => {
+    if (!hydrating) void restoreRange()
+  }
+)
+watch(accountFilter, () => {
+  if (!hydrating) void loadAnalytics()
 })
 onMounted(restoreRange)
 onMounted(() => void fetchAccounts())

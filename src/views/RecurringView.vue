@@ -220,6 +220,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAccountQuery } from '@/composables/useAccountQuery'
 import AppCardBody from '@/components/ui/AppCardBody.vue'
 
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
@@ -282,15 +283,7 @@ const cs = useCurrencySymbol()
 const route = useRoute()
 const router = useRouter()
 const { accounts, run: fetchAccounts, error: accountsError } = useAccounts()
-const accountFilter = computed({
-  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : null),
-  set: (value: string | null) => {
-    const query = { ...route.query }
-    if (value) query.accountId = value
-    else delete query.accountId
-    void router.push({ query })
-  }
-})
+const accountFilter = useAccountQuery(accounts)
 const filterType = computed<TxType>({
   get: () => (route.query.type === 'Income' ? 'Income' : 'Expense'),
   set: value => {

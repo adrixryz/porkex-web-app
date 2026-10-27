@@ -113,7 +113,10 @@
                 color="primary"
                 :to="{
                   path: '/transactions',
-                  query: selectedAccountId === 'global' ? {} : { accountId: selectedAccountId }
+                  query:
+                    selectedAccountId === 'global'
+                      ? {}
+                      : { account: catalogSlug(selectedAccountId, accounts) }
                 }"
               >
                 View All
@@ -237,7 +240,9 @@
                   path: '/budgets',
                   query: {
                     period: budgetPeriod,
-                    ...(selectedAccountId === 'global' ? {} : { accountId: selectedAccountId })
+                    ...(selectedAccountId === 'global'
+                      ? {}
+                      : { account: catalogSlug(selectedAccountId, accounts) })
                   }
                 }"
               >
@@ -316,6 +321,7 @@
 </template>
 
 <script setup lang="ts">
+import { catalogSlug } from '@/utils/catalogSlugs'
 import { dashboardBudgetPeriod, budgetPeriodName } from '@/utils/budgetPeriods'
 import { useCategorySortedRecords } from '@/composables/useCategoryOrder'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
@@ -394,11 +400,12 @@ const {
 const balanceOptions = computed(() => [{ id: 'global', name: 'Total' }, ...activeAccounts.value])
 const selectedAccountId = useDashboardAccount()
 watch(
-  () => route.query.accountId,
+  () => route.query.account ?? route.query.accountId,
   value => {
     if (route.name === 'dashboard' && value !== undefined) {
       const query = { ...route.query }
       delete query.accountId
+      delete query.account
       void router.replace({ query })
     }
   },

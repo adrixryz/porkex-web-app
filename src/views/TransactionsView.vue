@@ -473,6 +473,7 @@
 </template>
 
 <script setup lang="ts">
+import { catalogId, catalogSlug } from '@/utils/catalogSlugs'
 import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import AppPageSkeleton from '@/components/AppPageSkeleton.vue'
 import AppMoneyField from '@/components/ui/AppMoneyField.vue'
@@ -600,7 +601,7 @@ const editingTx = ref<Transaction | null>(null)
 const searchQuery = ref('')
 const filterType = ref<'Income' | 'Expense'>('Expense')
 const filterTag = ref<string | null>(null)
-const { tags: tagCatalog } = useTags()
+const { tags: tagCatalog, refreshTags } = useTags()
 const selectedTagName = computed(
   () =>
     tagCatalog.value.find(
@@ -842,15 +843,10 @@ function readRouteQuery() {
   if (typeof type === 'string' && (TYPES as readonly string[]).includes(type)) {
     filterType.value = type as typeof filterType.value
   }
-  if (typeof q.tagId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(q.tagId))
-    filterTag.value = q.tagId
+  filterTag.value = catalogId(q.tag ?? q.tagId, tagCatalog.value, q.tag === undefined)
   if (typeof q.search === 'string') searchQuery.value = q.search
-  if (typeof q.accountId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(q.accountId))
-    filterAccount.value = q.accountId
-  if (typeof q.category === 'string') {
-    const id = Number(q.category)
-    if (Number.isInteger(id) && id > 0) filterCategory.value = id
-  }
+  filterAccount.value = catalogId(q.account ?? q.accountId, accounts.value, q.account === undefined)
+  filterCategory.value = catalogId(q.category, categories.value ?? [])
   if (typeof q.min === 'string') minAmount.value = q.min
   if (typeof q.max === 'string') maxAmount.value = q.max
   if (typeof q.sort === 'string') {
@@ -873,11 +869,12 @@ function readRouteQuery() {
 
 async function syncRouteQuery(mode: 'push' | 'replace' = 'replace') {
   const query: Record<string, string> = { period: periodMode.value }
-  if (filterTag.value) query.tagId = filterTag.value
+  if (filterTag.value) query.tag = catalogSlug(filterTag.value, tagCatalog.value)
   query.type = filterType.value
   if (searchQuery.value.trim()) query.search = searchQuery.value.trim()
-  if (filterCategory.value !== null) query.category = String(filterCategory.value)
-  if (filterAccount.value !== null) query.accountId = filterAccount.value
+  if (filterCategory.value !== null)
+    query.category = catalogSlug(filterCategory.value, categories.value ?? [])
+  if (filterAccount.value !== null) query.account = catalogSlug(filterAccount.value, accounts.value)
   if (minBound.value !== null) query.min = String(minBound.value)
   if (maxBound.value !== null) query.max = String(maxBound.value)
   query.sort = `${sortBy.value}:${order.value}`
@@ -1065,7 +1062,15 @@ watch(
   }
 )
 onMounted(async () => {
-  await Promise.all([restoreRoute(), fetchCategories(), fetchAccounts()])
+  const catalogues = Promise.all([fetchCategories(), fetchAccounts(), refreshTags()])
+  const q = route.query
+  const needsCatalogue =
+    ((q.account ?? q.accountId) &&
+      !catalogId(q.account ?? q.accountId, accounts.value, q.account === undefined)) ||
+    ((q.tag ?? q.tagId) && !catalogId(q.tag ?? q.tagId, tagCatalog.value, q.tag === undefined)) ||
+    (q.category && !catalogId(q.category, categories.value ?? []))
+  if (needsCatalogue) await catalogues
+  await restoreRoute()
 })
 </script>
 

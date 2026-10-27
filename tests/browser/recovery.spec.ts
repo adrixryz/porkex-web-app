@@ -2308,7 +2308,7 @@ test('transaction category options follow Expense and Income and clear incompati
   await expect(page.getByRole('option', { name: 'Food', exact: true })).toBeVisible()
   await expect(page.getByRole('option', { name: 'Salary', exact: true })).toHaveCount(0)
   await page.getByRole('option', { name: 'Food', exact: true }).click()
-  await expect(page).toHaveURL(/category=1/)
+  await expect(page).toHaveURL(/category=food/)
   await page
     .getByRole('group', { name: 'Transaction type', exact: true })
     .getByRole('button', { name: 'Income', exact: true })
@@ -2319,7 +2319,7 @@ test('transaction category options follow Expense and Income and clear incompati
   await expect(page.getByRole('option', { name: 'Salary', exact: true })).toBeVisible()
   await expect(page.getByRole('option', { name: 'Food', exact: true })).toHaveCount(0)
   await page.getByRole('option', { name: 'Salary', exact: true }).click()
-  await expect(page).toHaveURL(/category=2/)
+  await expect(page).toHaveURL(/category=salary/)
   await page.reload()
   await expect(select).toContainText('Salary')
 })

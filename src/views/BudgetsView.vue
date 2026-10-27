@@ -271,6 +271,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAccountQuery } from '@/composables/useAccountQuery'
 import {
   budgetPeriods,
   budgetPeriodName,
@@ -291,7 +292,7 @@ import AppMoneyField from '@/components/ui/AppMoneyField.vue'
 
 import { validAmount } from '@/utils/validation'
 
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import { useAccounts } from '@/composables/useAccounts'
 
@@ -352,21 +353,9 @@ const { showSnack } = useSnackbar()
 
 const { accounts, activeAccounts, run: fetchAccounts, error: accountsError } = useAccounts()
 
-const route = useRoute(),
-  router = useRouter()
+const route = useRoute()
 
-const accountFilter = computed({
-  get: () => (typeof route.query.accountId === 'string' ? route.query.accountId : null),
-
-  set: (value: string | null) => {
-    const query = { ...route.query }
-
-    if (!value) delete query.accountId
-    else query.accountId = value
-
-    void router.push({ query })
-  }
-})
+const accountFilter = useAccountQuery(accounts)
 
 const selectedAccountArchived = computed(() =>
   accounts.value.some(account => account.id === accountFilter.value && account.archived)

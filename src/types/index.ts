@@ -247,6 +247,7 @@ export interface BudgetsResponse {
 export type RecurringFrequency = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'
 
 export interface RecurringRule {
+  tags?: Tag[]
   accountId?: string | null
   nextException?: {
     date: string

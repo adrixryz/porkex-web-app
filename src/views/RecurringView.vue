@@ -380,7 +380,7 @@ function editNext(rule: RecurringRule) {
 
     description: exception?.comment ?? rule.description,
 
-    tags: exception?.tags ?? [],
+    tags: exception?.tags ?? rule.tags ?? [],
 
     recurringId: rule.id
   }

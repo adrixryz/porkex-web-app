@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi, afterEach } from 'vite-plus/test'
 import { flushPromises, mount, enableAutoUnmount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import RecurringDialog from './RecurringDialog.vue'
+import AppSegmentedControl from './ui/AppSegmentedControl.vue'
 import { writeCache } from '@/utils/cache'
 import type { Category, RecurringRule } from '@/types'
 
@@ -76,7 +77,8 @@ const stubs = {
   'v-btn-toggle': { template: '<div><slot /></div>' },
   'v-row': { template: '<div><slot /></div>' },
   'v-col': { template: '<div><slot /></div>' },
-  'v-icon': { template: '<i />' }
+  'v-icon': { template: '<i />' },
+  'v-chip': { template: '<button type="button"><slot /></button>' }
 }
 
 // A fetch that fails the way a dead network does: fetch() itself rejects.
@@ -142,7 +144,12 @@ describe('RecurringDialog form', () => {
   const fetchMock = () =>
     vi.fn(async (_url: string, init?: RequestInit) =>
       (init?.method ?? 'GET') === 'GET'
-        ? new Response(JSON.stringify(CATEGORIES), { status: 200 })
+        ? new Response(
+            JSON.stringify(
+              _url.includes('/tags') ? [{ id: 'tag-1', name: 'Home', position: 0 }] : CATEGORIES
+            ),
+            { status: 200 }
+          )
         : new Response(JSON.stringify({ id: 9 }), { status: 201 })
     )
 
@@ -160,9 +167,15 @@ describe('RecurringDialog form', () => {
     expect(unwrap(vm.isValid as boolean)).toBe(false)
     const form = unwrap(vm.form) as Record<string, unknown>
     form.amount = '25'
-    form.description = 'Rent'
     form.categoryId = 1
+    form.description = '   '
+    await nextTick()
+    expect(unwrap(vm.isValid as boolean)).toBe(false)
+    form.description = 'Rent'
     form.interval = '3'
+    const tag = wrapper.findAll('button').find(button => button.text() === 'Home')
+    expect(tag).toBeTruthy()
+    await tag!.trigger('click')
     await nextTick()
     expect(unwrap(vm.isValid as boolean)).toBe(true)
 
@@ -189,6 +202,7 @@ describe('RecurringDialog form', () => {
       type: 'Expense',
       amount: 25,
       description: 'Rent',
+      tagIds: ['tag-1'],
       categoryId: 1,
       frequency: 'MONTH',
       interval: 3,
@@ -263,6 +277,7 @@ describe('RecurringDialog form', () => {
     const vm = wrapper.vm as unknown as { form: { value?: unknown }; submit: () => Promise<void> }
     const form = unwrap(vm.form) as Record<string, unknown>
 
+    expect(wrapper.findComponent(AppSegmentedControl).exists()).toBe(false)
     expect(form.description).toBe('Rent')
     expect(form.frequency).toBe('MONTH')
     expect(form.interval).toBe('2')
@@ -276,6 +291,7 @@ describe('RecurringDialog form', () => {
     expect(put?.[0]).toContain('/recurring/7')
     const body = JSON.parse((put![1] as RequestInit).body as string)
     expect(body.startDate).toBe('2026-01-31')
+    expect(body.type).toBe('Expense')
     expect(wrapper.emitted('saved')).toBeTruthy()
     vi.unstubAllGlobals()
   })
@@ -298,6 +314,17 @@ describe('RecurringDialog form', () => {
     // The type toggle must not mistake the edit prefill for a user switch.
     expect(form.type).toBe('Income')
     expect(form.categoryId).toBe(2)
+    vi.unstubAllGlobals()
+  })
+
+  it('requires a comment before saving an older rule that has none', async () => {
+    vi.stubGlobal('fetch', fetchMock())
+    const wrapper = await openDialog({ ...RULE, description: '' })
+    const vm = wrapper.vm as unknown as { form: Record<string, unknown>; isValid: boolean }
+    expect(unwrap(vm.isValid)).toBe(false)
+    vm.form.description = 'Rent'
+    await nextTick()
+    expect(unwrap(vm.isValid)).toBe(true)
     vi.unstubAllGlobals()
   })
 })

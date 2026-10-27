@@ -110,6 +110,7 @@ withDefaults(
   }
   .stat-card-responsive-text {
     padding: 12px 8px !important;
+    align-items: flex-start !important;
   }
   .stat-card-responsive :deep(.v-avatar) {
     width: 40px !important;
@@ -143,6 +144,8 @@ withDefaults(
   }
   .stat-card-responsive-text .stat-card-label {
     font-size: clamp(10px, 14cqi, 14px) !important;
+    min-height: 3em;
+    white-space: normal;
   }
   .stat-card-responsive-text .stat-card-value {
     font-size: min(24px, calc(100cqi / var(--stat-value-length) / 0.68)) !important;

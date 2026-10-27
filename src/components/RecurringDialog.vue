@@ -9,12 +9,13 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <v-alert v-if="rule?.nextException" type="info" density="compact" class="mb-3"
-      >Changing the schedule or type can cancel the next-only edit. Other rule edits preserve
+      >Changing the schedule can cancel the next-only edit. Other rule edits preserve
       it.</v-alert
     >
     <v-form @submit.prevent="submit">
       <AppFormFields>
         <AppSegmentedControl
+          v-if="!isEditing"
           v-model="form.type"
           label="Rule type"
           block
@@ -32,8 +33,10 @@
 
         <AppTextField
           v-model="form.description"
-          label="Comment (optional)"
+          label="Comment"
           maxlength="200"
+          :rules="[(value: string) => !!value?.trim() || 'Comment is required.']"
+          hide-details="auto"
           :placeholder="isIncome ? 'e.g. Monthly salary' : 'e.g. Rent'"
         ></AppTextField>
 
@@ -45,6 +48,7 @@
           label="Account"
         />
         <CategorySelect v-model="form.categoryId" :items="categoryOptions" />
+        <TagPicker v-model="form.tagIds" />
 
         <v-row dense>
           <v-col cols="7">
@@ -141,6 +145,7 @@ import { ref, computed, watch } from 'vue'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import AmountStepper from '@/components/AmountStepper.vue'
 import CategorySelect from '@/components/CategorySelect.vue'
+import TagPicker from '@/components/TagPicker.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppDialog from '@/components/ui/AppDialog.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -176,6 +181,7 @@ const form = ref({
   type: 'Expense' as TxType,
   amount: '',
   description: '',
+  tagIds: [] as string[],
   categoryId: null as number | null,
   frequency: 'MONTH' as RecurringFrequency,
   interval: '1',
@@ -223,6 +229,7 @@ const isValid = computed(() => {
   const endOk = !form.value.endDate || form.value.endDate >= form.value.startDate
   return (
     validAmount(form.value.amount) &&
+    !!form.value.description.trim() &&
     Number.isInteger(interval) &&
     interval >= 1 &&
     interval <= MAX_INTERVAL &&
@@ -258,6 +265,7 @@ const reset = () => {
     type: rule?.type ?? props.defaultType,
     amount: rule ? String(rule.amount) : '',
     description: rule?.description ?? '',
+    tagIds: rule?.tags?.map(tag => tag.id) ?? [],
     categoryId: rule?.categoryId ?? null,
     frequency: rule?.frequency ?? 'MONTH',
     interval: String(rule?.interval ?? 1),
@@ -304,6 +312,7 @@ const submit = async () => {
         type: form.value.type,
         amount: Number(form.value.amount),
         description: form.value.description.trim(),
+        tagIds: form.value.tagIds,
         accountId: form.value.accountId,
         categoryId: form.value.categoryId,
         frequency: form.value.frequency,

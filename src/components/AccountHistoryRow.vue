@@ -31,7 +31,7 @@ defineProps<{ date: string; comment?: string; icon: string; color: string; insta
 <style scoped>
 .account-history-row {
   display: grid;
-  grid-template-columns: 36px minmax(96px, 1fr) minmax(0, 1fr) max-content;
+  grid-template-columns: 36px clamp(96px, 25%, 260px) minmax(0, 1fr) max-content;
   align-items: center;
   gap: 12px;
   width: 100%;
@@ -63,6 +63,7 @@ defineProps<{ date: string; comment?: string; icon: string; color: string; insta
 .history-comment {
   min-width: 0;
   overflow-wrap: anywhere;
+  text-align: left;
   white-space: normal;
 }
 @media (max-width: 599px) {
@@ -73,7 +74,7 @@ defineProps<{ date: string; comment?: string; icon: string; color: string; insta
   }
   .account-history-row {
     min-height: 80px;
-    grid-template-columns: 36px minmax(96px, 1fr) minmax(0, 1fr) max-content;
+    grid-template-columns: 36px clamp(72px, 25%, 150px) minmax(0, 1fr) max-content;
     gap: 8px;
   }
 }

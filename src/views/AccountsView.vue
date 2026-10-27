@@ -139,7 +139,6 @@
               <AccountHistoryRow
                 v-else
                 :date="transfer.date"
-                instant
                 :comment="
                   transfer.kind === 'opening-balance' ? 'Opening balance' : 'Balance adjustment'
                 "

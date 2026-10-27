@@ -7,7 +7,7 @@
     <template v-else>
       <!-- HEADER -->
 
-      <AppPageHeader title="Budgets" subtitle="Set limits per account and category.">
+      <AppPageHeader title="Budgets" subtitle="Set budgets per account and category.">
         <template #actions>
           <AppButton
             color="primary"
@@ -29,7 +29,7 @@
         type="warning"
         class="mb-4"
       >
-        Some older budgets use income categories. Remove them and create spending limits for expense
+        Some older budgets use income categories. Remove them and create budgets for expense
         categories.
       </v-alert>
 
@@ -60,7 +60,7 @@
       <v-row v-if="totals" class="mb-4 budget-stats">
         <v-col cols="4">
           <AppStatCard
-            label="Total limit"
+            label="Total Budgeted"
             responsive-text
             :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(totals.amount)}`"
@@ -76,7 +76,8 @@
             responsive-text
             :value-sizing-length="summaryValueLength"
             :value="`${cs}${formatMoney(totals.spent)}`"
-            :caption="`${overallPercent}% used`"
+            value-class="text-error"
+            :caption="`${overallPercent}% used across budgets`"
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           />
@@ -92,13 +93,7 @@
             label-class="text-caption text-on-surface-variant font-weight-medium mb-1"
             class="fill-height"
           >
-            <template #caption>
-              <template v-if="overBudgetCount > 0">
-                <span class="text-error">{{ overBudgetCount }} over budget</span>
-              </template>
-
-              <template v-else>Within limits</template>
-            </template>
+            <template #caption>Across all budgets</template>
           </AppStatCard>
         </v-col>
       </v-row>
@@ -110,7 +105,7 @@
           <AppEmptyState
             :icon="mdiPiggyBankOutline"
             :title="`No budgets for ${budgetRangeName(period)}`"
-            description="Set a limit on a category to know when you are getting close to the limit."
+            description="Set a budget for a category to track your spending."
             padding="12"
           />
         </v-col>
@@ -128,8 +123,7 @@
                 :color="b.category.color ?? undefined"
                 class="mb-3"
                 ><template #subtitle
-                  >{{ b.account?.name || 'Main' }} ·
-                  {{ budgetPeriodName(b.period) }} limit</template
+                  >{{ b.account?.name || 'Main' }} · {{ budgetPeriodName(b.period) }}</template
                 ><template #actions
                   ><AppIconButton
                     :icon="mdiPencilOutline"
@@ -145,10 +139,7 @@
               ></AppEntityHeader>
 
               <div class="d-flex align-baseline justify-space-between mb-2">
-                <span
-                  class="text-h6 font-weight-bold"
-                  :class="b.overBudget ? 'text-error' : 'text-on-surface'"
-                >
+                <span class="text-h6 font-weight-bold text-error">
                   {{ cs }}{{ formatMoney(b.spent) }}
                 </span>
 
@@ -163,7 +154,7 @@
                 bg-color="surface-bright"
                 height="8"
                 rounded
-                :aria-label="`${b.category.name}: ${b.usagePercent}% of the limit used`"
+                :aria-label="`${b.category.name}: ${b.usagePercent}% of the budget used`"
               ></v-progress-linear>
 
               <div class="d-flex align-center justify-space-between mt-2">
@@ -208,14 +199,6 @@
             label="Account"
           />
 
-          <CategorySelect
-            v-model="form.categoryId"
-            :items="availableCategories"
-            :disabled="isEditing"
-          />
-
-          <AppMoneyField v-model="form.amount" label="Limit" step-label="budget limit" />
-
           <AppSelect
             v-model="form.period"
             :items="budgetPeriods"
@@ -223,6 +206,14 @@
             item-value="value"
             label="Repeats"
           ></AppSelect>
+
+          <CategorySelect
+            v-model="form.categoryId"
+            :items="availableCategories"
+            :disabled="isEditing"
+          />
+
+          <AppMoneyField v-model="form.amount" label="Budget amount" step-label="budget amount" />
 
           <v-alert
             v-if="error"
@@ -264,7 +255,7 @@
         </v-avatar>
       </template>
 
-      The limit for {{ deletingBudget?.category.name }} will be deleted. Your transactions are not
+      The budget for {{ deletingBudget?.category.name }} will be deleted. Your transactions are not
       affected.
     </AppConfirmDialog>
   </AppPage>
@@ -433,8 +424,6 @@ const summaryValueLength = computed(() =>
     `${cs.value}${formatMoney(remainingTotal.value)}`.length
   )
 )
-
-const overBudgetCount = computed(() => budgets.value.filter(b => b.overBudget).length)
 
 const overallPercent = computed(() => {
   const t = totals.value

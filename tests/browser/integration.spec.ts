@@ -1034,7 +1034,7 @@ test('lost catalog responses replay through the real API without blocking the qu
   await page.goto('/budgets')
   await page.getByRole('button', { name: 'New Budget', exact: true }).click()
   dialog = page.getByRole('dialog')
-  await dialog.getByLabel('Limit', { exact: true }).fill('50')
+  await dialog.getByLabel('Budget amount', { exact: true }).fill('50')
   await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name, exact: true }).click()
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
@@ -1559,6 +1559,16 @@ test('accounts, savings, favorites, tag filters and balance privacy work togethe
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
   await quickAction(page, 'Favorites')
+  const favoriteButton = page.getByRole('button', { name: 'Usual lunch', exact: true })
+  await expect(favoriteButton).toHaveClass(/rounded-xl/)
+  expect(
+    await favoriteButton.evaluate(node => {
+      const card = node.closest('.favorite-card')!
+      return (
+        getComputedStyle(node).borderTopLeftRadius === getComputedStyle(card).borderTopLeftRadius
+      )
+    })
+  ).toBe(true)
   await page.getByRole('button', { name: 'Usual lunch', exact: true }).click()
   dialog = page.getByRole('dialog', { name: 'New Expense', exact: true })
   await expect(dialog.getByLabel('Amount', { exact: true })).toHaveValue('12')
@@ -1875,10 +1885,10 @@ test('yearly budgets can be created and dashboard cycles follow Day Week Month Y
   )
   await dialog.locator('.v-select').filter({ hasText: 'Category' }).click()
   await page.getByRole('option', { name: category.name, exact: true }).click()
-  await dialog.getByLabel('Limit', { exact: true }).fill('300')
+  await dialog.getByLabel('Budget amount', { exact: true }).fill('300')
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(dialog).not.toBeVisible()
-  await expect(page.getByText('Main · Yearly limit', { exact: false })).toBeVisible()
+  await expect(page.getByText('Main · Yearly', { exact: false })).toBeVisible()
   await page.goto('/')
   const summary = page
     .locator('.v-card')

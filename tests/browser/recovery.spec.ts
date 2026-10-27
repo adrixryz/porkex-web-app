@@ -1572,11 +1572,16 @@ test('recurring category colors match in new and edit dialogs for expenses and i
         'background-color',
         'rgb(234, 67, 53)'
       )
-    for (const [type, name, color] of [
+    const choices = [
       ['Expense', 'Food', 'rgb(234, 67, 53)'],
       ['Income', 'Salary', 'rgb(52, 168, 83)']
-    ]) {
-      await dialog.getByRole('button', { name: type, exact: true }).click()
+    ] as const
+    if (mode === 'Edit') {
+      await expect(dialog.getByRole('button', { name: 'Expense', exact: true })).toHaveCount(0)
+      await expect(dialog.getByRole('button', { name: 'Income', exact: true })).toHaveCount(0)
+    }
+    for (const [type, name, color] of mode === 'New' ? choices : choices.slice(0, 1)) {
+      if (mode === 'New') await dialog.getByRole('button', { name: type, exact: true }).click()
       await category.locator('.v-field').click()
       const option = page.getByRole('option', { name, exact: true })
       await expect(option.locator('.category-dot')).toHaveCSS('background-color', color)
@@ -1589,6 +1594,33 @@ test('recurring category colors match in new and edit dialogs for expenses and i
     await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click()
     await expect(dialog).not.toBeVisible()
   }
+  const { rules } = await state(page)
+  await state(page, {
+    rules: [
+      ...rules,
+      {
+        ...rules[0],
+        id: 2,
+        type: 'Income',
+        description: 'Salary rule',
+        categoryId: 2,
+        category: { id: 2, name: 'Salary', color: '#34A853', type: 'Income' }
+      }
+    ]
+  })
+  await page.reload()
+  await page
+    .getByRole('group', { name: 'Recurring type' })
+    .getByRole('button', { name: 'Income' })
+    .click()
+  await page.getByRole('button', { name: 'Edit Salary rule', exact: true }).click()
+  const incomeDialog = page.getByRole('dialog', { name: 'Edit Recurring Rule', exact: true })
+  await expect(incomeDialog.getByRole('button', { name: 'Expense', exact: true })).toHaveCount(0)
+  await expect(incomeDialog.getByRole('button', { name: 'Income', exact: true })).toHaveCount(0)
+  await expect(incomeDialog.locator('.v-select__selection .category-dot')).toHaveCSS(
+    'background-color',
+    'rgb(52, 168, 83)'
+  )
 })
 
 test('recent transaction comments wrap completely and amounts remain right aligned', async ({
@@ -2218,7 +2250,7 @@ test('shared form spacing stays stable and validation expands only the affected 
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   for (const config of [
-    { path: '/budgets', button: 'New Budget', title: 'New Budget', amount: 'Limit' },
+    { path: '/budgets', button: 'New Budget', title: 'New Budget', amount: 'Budget amount' },
     { path: '/recurring', button: 'New Rule', title: 'New Recurring Rule', amount: 'Amount' }
   ]) {
     await page.goto(config.path)

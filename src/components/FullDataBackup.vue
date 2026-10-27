@@ -195,6 +195,7 @@ const summaries = [
   ['Tag', 'Tags'],
   ['Budget', 'Budgets'],
   ['RecurringRule', 'Recurring rules'],
+  ['RecurringTag', 'Recurring rule tags'],
   ['OccurrenceOverride', 'Recurring exceptions'],
   ['Favorite', 'Favorites']
 ]

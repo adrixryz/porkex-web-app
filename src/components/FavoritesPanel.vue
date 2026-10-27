@@ -23,6 +23,7 @@
         <AppCardBody padding="pa-3" class="d-flex align-center ga-2">
           <AppButton
             variant="text"
+            rounded="xl"
             :framed="false"
             class="favorite-open"
             :aria-label="favorite.name"

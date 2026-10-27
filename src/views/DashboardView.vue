@@ -103,6 +103,7 @@
           <AppCard
             title="Recent Transactions"
             title-class="font-weight-bold"
+            keep-actions-inline
             class="overflow-hidden fill-height"
           >
             <template #header-actions>
@@ -537,7 +538,11 @@ const summaryBudgets = useCategorySortedRecords(
 )
 const breakdownType = ref('Expense')
 const breakdownItems = computed(() =>
-  breakdownType.value === 'Income' ? (db.value.incomePieChartData ?? []) : db.value.pieChartData
+  [
+    ...(breakdownType.value === 'Income'
+      ? (db.value.incomePieChartData ?? [])
+      : db.value.pieChartData)
+  ].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
 )
 const breakdownTotal = computed(
   () =>
@@ -551,7 +556,7 @@ const chartData = computed(() => ({
     {
       backgroundColor: breakdownItems.value.map(c => c.color),
       data: breakdownItems.value.map(c => c.value),
-      borderWidth: 2,
+      borderWidth: breakdownItems.value.length > 1 ? 2 : 0,
       borderColor: colors.value.surface
     }
   ]

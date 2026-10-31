@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
-import { readCache, writeCache, invalidateCache, clearCache, formatAge } from './cache'
+import {
+  readCache,
+  readFallbackCache,
+  writeCache,
+  invalidateCache,
+  clearCache,
+  formatAge
+} from './cache'
 
 beforeEach(() => {
   localStorage.clear()
@@ -71,12 +78,12 @@ describe('readCache / writeCache', () => {
 })
 
 describe('eviction', () => {
-  it('keeps at most 12 entries, dropping the least recent', () => {
+  it('keeps at most 24 entries, dropping the least recent', () => {
     // Real time has millisecond resolution, so the writes are spaced with fake
     // timers to make the LRU order deterministic.
     vi.useFakeTimers()
     try {
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 30; i++) {
         vi.setSystemTime(new Date(1_700_000_000_000 + i * 1000))
         writeCache(`/k${i}`, i)
       }
@@ -87,14 +94,31 @@ describe('eviction', () => {
     const stored = JSON.parse(localStorage.getItem('porkex_cache')!)
     const keys = Object.keys(stored)
 
-    expect(keys.length).toBeLessThanOrEqual(12)
-    // The most recent writes survive, the first three are gone.
-    expect(keys).toContain('/k14')
-    expect(keys).toContain('/k13')
-    expect(keys).toContain('/k3')
+    expect(keys.length).toBeLessThanOrEqual(24)
+    // The most recent writes survive, the first six are gone.
+    expect(keys).toContain('/k29')
+    expect(keys).toContain('/k28')
+    expect(keys).toContain('/k6')
     expect(keys).not.toContain('/k0')
     expect(keys).not.toContain('/k1')
     expect(keys).not.toContain('/k2')
+    expect(keys).not.toContain('/k5')
+  })
+
+  it('reserves the latest Transactions response ahead of other large-view history', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(1_700_000_000_000))
+      writeCache('/transactions?period=week&page=1', { items: ['saved'] })
+      for (let i = 0; i < 30; i++) {
+        vi.setSystemTime(new Date(1_700_000_000_001 + i * 1000))
+        writeCache(`/analytics?view=${i}`, { items: [i] })
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect(readCache('/transactions?period=week&page=1')?.data).toEqual({ items: ['saved'] })
   })
 })
 
@@ -109,6 +133,14 @@ describe('invalidateCache', () => {
     expect(readCache('/transactions?page=1')).toBeNull()
     expect(readCache('/transactions?page=2')).toBeNull()
     expect(readCache<number>('/dashboard')?.data).toBe(3)
+  })
+
+  it('keeps the invalidated response available as an offline fallback', () => {
+    writeCache('/transactions?page=1', { items: ['saved'] })
+    invalidateCache('/transactions')
+
+    expect(readCache('/transactions?page=1')).toBeNull()
+    expect(readFallbackCache('/transactions?page=1')?.data).toEqual({ items: ['saved'] })
   })
 
   it('accepts several fragments at once', () => {
@@ -176,6 +208,6 @@ it('pins bounded catalogs and keeps their offline snapshot during revalidation',
   expect(readCache('/accounts')?.data).toEqual([{ id: 'main-1' }])
   expect(readCache('/categories')?.data).toEqual([{ id: 1 }])
   expect(Object.keys(JSON.parse(localStorage.getItem('porkex_cache')!)).length).toBeLessThanOrEqual(
-    12
+    24
   )
 })

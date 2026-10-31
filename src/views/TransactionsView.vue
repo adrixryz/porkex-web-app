@@ -235,7 +235,11 @@
       <!-- TABLE -->
       <v-row>
         <v-col cols="12">
-          <AppCard class="overflow-hidden" :aria-busy="loading">
+          <AppCard
+            class="overflow-hidden"
+            :aria-busy="loading"
+            :title="`${translate('Total')}: ${totalAmount === null ? '—' : cs + formatMoney(totalAmount)}`"
+          >
             <AppCardBody padding="pa-0">
               <div v-if="loading" role="status" :aria-label="translate('Loading transactions')">
                 <AppSkeleton type="rows" :rows="4" />
@@ -417,7 +421,7 @@
                 </v-table>
               </div>
               <AppEmptyState
-                v-else
+                v-else-if="listHasLoaded || listIsStale"
                 :icon="mdiReceiptTextClockOutline"
                 :title="translate('No transactions found')"
                 :description="
@@ -438,6 +442,13 @@
                   </AppButton>
                 </template>
               </AppEmptyState>
+              <div v-else class="pa-6 text-center text-medium-emphasis">
+                {{
+                  translate(
+                    'Some data is unavailable. Check the error below or reconnect to try again.'
+                  )
+                }}
+              </div>
             </AppCardBody>
 
             <!-- PAGINATION -->
@@ -518,7 +529,8 @@ import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useAccounts } from '@/composables/useAccounts'
-import { scheduleDelete, hiddenTransactionIds } from '@/utils/undoDelete'
+import { scheduleDelete, hiddenTransactionIds, scheduledDeletes } from '@/utils/undoDelete'
+import { outboxRevision, ownedPending } from '@/utils/outbox'
 import TransactionSummary from '@/components/TransactionSummary.vue'
 import { useTags } from '@/composables/useTags'
 import TagChips from '@/components/TagChips.vue'
@@ -539,7 +551,7 @@ import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
 import { normalizeTransactionType } from '@/utils/transactionTypes'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextField from '@/components/ui/AppTextField.vue'
-import { fetchJson } from '@/utils/api'
+import { fetchJson, getUser } from '@/utils/api'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
 import {
   formatPeriodLabel,
@@ -716,6 +728,8 @@ const transactionsUrl = () => {
 const {
   data: list,
   loading,
+  hasLoaded: listHasLoaded,
+  isStale: listIsStale,
   error: listError,
   run: fetchTransactions
 } = useAsyncData<TransactionsResponse>(
@@ -737,6 +751,56 @@ const { data: categories, run: fetchCategories } = useAsyncData<Category[]>(
 const transactions = computed(() =>
   (list.value?.items ?? []).filter(tx => !hiddenTransactionIds.value.has(tx.id))
 )
+const awaitingDeletionRefresh = ref(false)
+const pendingTransactionDelete = computed(() => {
+  void outboxRevision.value
+  if (scheduledDeletes.value.some(item => !!item.transaction)) return true
+  const userId = getUser()?.id
+  if (!userId) return false
+  try {
+    return ownedPending(userId).some(
+      item => item.method === 'DELETE' && /^\/transactions\/\d+$/.test(item.path)
+    )
+  } catch {
+    // A damaged queue cannot establish whether a deletion is pending.
+    return true
+  }
+})
+function onTransactionDeleteConfirmed(event: Event) {
+  const detail = (event as CustomEvent<{ userId: number; path: string }>).detail
+  if (detail?.userId !== getUser()?.id || !/^\/transactions\/\d+$/.test(detail.path)) return
+  awaitingDeletionRefresh.value = true
+  // Discard any read started before this confirmation and request a new total.
+  void fetchTransactions()
+}
+window.addEventListener('porkex-delete-confirmed', onTransactionDeleteConfirmed)
+watch(
+  [list, listHasLoaded, listIsStale],
+  () => {
+    if (listHasLoaded.value && !listIsStale.value) awaitingDeletionRefresh.value = false
+  },
+  { flush: 'post' }
+)
+const totalAmount = computed(() => {
+  const response = list.value
+  // The initial empty value is not a successful zero-total response. Show a
+  // total only after a successful request or when a saved copy is on screen.
+  if (!listHasLoaded.value && !listIsStale.value) return null
+  if (
+    (loading.value && !listHasLoaded.value) ||
+    pendingTransactionDelete.value ||
+    awaitingDeletionRefresh.value ||
+    response.items.some(tx => hiddenTransactionIds.value.has(tx.id))
+  )
+    return null
+  // Older cached responses have no aggregate. Only calculate a fallback when
+  // the cached page contains every matching movement.
+  if (typeof response.totalAmount !== 'number') {
+    if (response.total > response.items.length) return null
+    return transactions.value.reduce((sum, tx) => sum + Math.round(tx.amount * 100), 0) / 100
+  }
+  return response.totalAmount
+})
 const totalPages = computed(() => list.value?.totalPages ?? 1)
 
 function changeTransactionType(value: unknown) {
@@ -1008,6 +1072,7 @@ watch(page, () => {
 onUnmounted(() => {
   window.clearTimeout(searchTimer)
   window.clearTimeout(navigationTimer)
+  window.removeEventListener('porkex-delete-confirmed', onTransactionDeleteConfirmed)
 })
 
 const draft = ref<MovementDraft | null>(null)

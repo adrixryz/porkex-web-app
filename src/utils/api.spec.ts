@@ -15,6 +15,7 @@ import {
 } from './api'
 import { enqueue, flushOutbox, pendingCount, setOutboxUser, type QueuedMutation } from './outbox'
 import { writeCache } from './cache'
+import { resetConnection } from './connection'
 import { DATA_REVALIDATE_EVENT } from './revalidation'
 import { deferred, installTestLocks } from './locks.test-helper'
 
@@ -153,6 +154,7 @@ beforeEach(() => {
   setToken(TOKEN)
   setUser({ id: 1, name: 'Test', email: 'test@example.com' })
   recurringState.value = 'ready'
+  resetConnection()
 })
 
 describe('reads are never queued', () => {
@@ -509,18 +511,23 @@ describe('ordered writes and session boundaries', () => {
         return new Response('{}', { status: 200 })
       })
     )
-    await api('/transactions/7', { method: 'PUT', body: '{"amount":20}' })
+    const queued = await api('/transactions/7', { method: 'PUT', body: '{"amount":20}' })
+    expect(isQueuedResponse(queued)).toBe(true)
+    expect(amounts).toEqual([])
+    await syncPendingWrites()
     expect(amounts).toEqual([10, 20])
     expect(pendingCount.value).toBe(0)
     vi.unstubAllGlobals()
   })
 
-  it('queues newer changes after the blocked first item without sending them', async () => {
+  it('queues newer changes behind a rejected first item and preserves FIFO during replay', async () => {
     await enqueue(pending())
     const send = vi.fn(async () => new Response('{"error":"Missing"}', { status: 404 }))
     vi.stubGlobal('fetch', send)
     const response = await api('/transactions/7', { method: 'PUT', body: '{"amount":20}' })
     expect(isQueuedResponse(response)).toBe(true)
+    expect(send).not.toHaveBeenCalled()
+    await syncPendingWrites()
     expect(send).toHaveBeenCalledOnce()
     expect(pendingCount.value).toBe(2)
     vi.unstubAllGlobals()
@@ -795,6 +802,23 @@ describe('legacy migration across app upgrades', () => {
 })
 
 describe('cold or temporarily unavailable API gateways', () => {
+  it('queues the next write without another cold-start request', async () => {
+    const send = vi.fn(async () => new Response('{}', { status: 503 }))
+    vi.stubGlobal('fetch', send)
+    try {
+      expect((await api('/transactions', { method: 'POST', body: '{"amount":5}' })).status).toBe(
+        202
+      )
+      expect((await api('/transactions', { method: 'POST', body: '{"amount":7}' })).status).toBe(
+        202
+      )
+      expect(send).toHaveBeenCalledOnce()
+      expect(pendingCount.value).toBe(2)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it.each([408, 502, 503, 504])(
     'durably queues a write after HTTP %s with its original client ID',
     async status => {

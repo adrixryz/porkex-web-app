@@ -1,7 +1,7 @@
 import { ref, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
-import { readCache, writeCache } from '@/utils/cache'
-import { markFresh, markStale } from '@/utils/connection'
+import { readCache, readFallbackCache, writeCache } from '@/utils/cache'
+import { markFresh, markServerUnavailable, markStale } from '@/utils/connection'
 import { DATA_REVALIDATE_EVENT } from '@/utils/revalidation'
 import { getSessionIdentity } from '@/utils/api'
 
@@ -115,6 +115,10 @@ export function useAsyncData<T>(
     if (staleToken !== null || staleTimer !== undefined) return
     staleTimer = setTimeout(() => {
       staleTimer = undefined
+      // The cached result remains usable while this request is slow. Mark the
+      // API as unavailable so a new movement can be queued immediately instead
+      // of opening another request that waits for a cold backend.
+      markServerUnavailable()
       raiseStale(savedAt)
     }, STALE_BANNER_DELAY_MS)
   }
@@ -144,7 +148,7 @@ export function useAsyncData<T>(
       savedAt = 0
     }
     if (cacheKey && !hasLoaded.value) {
-      const cached = readCache<T>(cacheKey)
+      const cached = readCache<T>(cacheKey) ?? readFallbackCache<T>(cacheKey)
       if (cached) {
         data.value = cached.data
         isStale.value = true

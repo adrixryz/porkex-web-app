@@ -1,6 +1,6 @@
 # Porkex — Frontend
 
-Porkex v1.1.0 is a personal finance tracker for accounts, savings goals, income, expenses, categories, weekly/monthly/yearly budgets and recurring payments, with charts to follow your spending. It works in a PC browser and as an installable Android PWA, with offline recovery and synchronization. Settings supports English and Spanish, transaction CSV imports/exports and full account-data JSON backups/restores. Language is saved with the account and changes made offline synchronize when connectivity returns.
+Porkex v1.1.1 is a personal finance tracker for accounts, savings goals, income, expenses, categories, weekly/monthly/yearly budgets and recurring payments, with charts to follow your spending. It works in a PC browser and as an installable Android PWA, with offline recovery and synchronization. Settings supports English and Spanish, transaction CSV imports/exports and full account-data JSON backups/restores. Language is saved with the account and changes made offline synchronize when connectivity returns.
 
 Built with Vue 3, TypeScript and Vuetify. The API is maintained in [porkex-backend](https://github.com/adrixryz/porkex-backend).
 

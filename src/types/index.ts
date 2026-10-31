@@ -209,6 +209,7 @@ export interface TransactionsResponse {
   earliestDate?: string | null
   items: Transaction[]
   total: number
+  totalAmount?: number
   page: number
   perPage: number
   totalPages: number

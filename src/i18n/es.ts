@@ -1,4 +1,6 @@
 const messages: Record<string, string> = {
+  'Dashboard totals and lists are unavailable until the account inclusion change is resolved and data refreshes.':
+    'Los totales y las listas del panel estarán disponibles cuando se resuelva el cambio de inclusión de la cuenta y se actualicen los datos.',
   'Balance adjustment': 'Ajuste de saldo',
   ' The outcome could not be confirmed. Retry this same selection to safely confirm it.':
     ' No se pudo confirmar el resultado. Reintenta esta misma selección para confirmarlo de forma segura.',

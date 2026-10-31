@@ -6,6 +6,7 @@ import {
   claimLegacyOutbox,
   discardFirstBlocked,
   enqueue,
+  drainOutbox,
   firstBlockedMutation,
   flushOutbox,
   hasLegacyOutbox,
@@ -140,6 +141,24 @@ describe('durable account-owned queue', () => {
 })
 
 describe('serial replay without lost updates', () => {
+  it('can release the send lock after one acknowledged operation', async () => {
+    await enqueue(item({ id: 'first' }))
+    await enqueue(item({ id: 'second' }))
+    const send = vi.fn(async () => response())
+
+    await expect(drainOutbox(1, send, () => true, 1)).resolves.toEqual({
+      sent: 1,
+      stopped: 'more'
+    })
+    expect(pendingCount.value).toBe(1)
+    await expect(drainOutbox(1, send, () => true, 1)).resolves.toEqual({
+      sent: 1,
+      stopped: 'empty'
+    })
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(pendingCount.value).toBe(0)
+  })
+
   it('retains entries enqueued while an older request is in flight', async () => {
     await enqueue(item({ id: 'first' }))
     const started = deferred<void>()

@@ -84,7 +84,7 @@
         <!-- Two independent notices: the reads on screen may be a cached copy,
              and there may be writes still waiting to reach the server. -->
         <v-alert
-          v-if="hasStaleData"
+          v-if="showStaleNotice"
           type="warning"
           variant="tonal"
           density="compact"
@@ -244,6 +244,27 @@ const discardBlocked = async () => {
 }
 
 const { hasStaleData, staleSavedAt, isOffline } = useConnection()
+const showAgedStale = ref(false)
+let staleAgeTimer: ReturnType<typeof setTimeout> | undefined
+watch(
+  [hasStaleData, staleSavedAt, isOffline],
+  ([stale, savedAt, offline]) => {
+    clearTimeout(staleAgeTimer)
+    showAgedStale.value = false
+    if (!stale || offline || savedAt === null) return
+    const remaining = savedAt + 3 * 60_000 + 1 - Date.now()
+    if (remaining <= 0) showAgedStale.value = true
+    else
+      staleAgeTimer = setTimeout(() => {
+        showAgedStale.value = true
+      }, remaining)
+  },
+  { immediate: true }
+)
+const showStaleNotice = computed(
+  () =>
+    hasStaleData.value && (isOffline.value || staleSavedAt.value === null || showAgedStale.value)
+)
 
 // The two cases need different wording: one is the device, the other is a
 // server that is simply asleep and about to answer on its own.
@@ -298,6 +319,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearTimeout(staleAgeTimer)
   window.removeEventListener(USER_CHANGE_EVENT, onUserChange)
   window.removeEventListener('storage', onUserChange)
   stopRecovery?.()

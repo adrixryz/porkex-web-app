@@ -26,7 +26,7 @@ type StoredMutation = Omit<QueuedMutation, 'userId' | 'status'> & {
 type NewMutation = Omit<QueuedMutation, 'createdAt' | 'attempts' | 'status'>
 export interface FlushResult {
   sent: number
-  stopped: 'empty' | 'network' | 'server' | 'auth' | 'blocked' | 'session'
+  stopped: 'empty' | 'network' | 'server' | 'auth' | 'blocked' | 'session' | 'more'
 }
 
 export const outboxRevision = ref(0)
@@ -257,7 +257,8 @@ export async function clearOutbox() {
 export async function drainOutbox(
   userId: number,
   send: (mutation: QueuedMutation) => Promise<Response>,
-  canSend: () => boolean = () => true
+  canSend: () => boolean = () => true,
+  maxSent = Infinity
 ): Promise<FlushResult> {
   let sent = 0
   while (canSend()) {
@@ -268,6 +269,7 @@ export async function drainOutbox(
       lastFlushError.value = ''
       return { sent, stopped: 'empty' }
     }
+    if (sent >= maxSent) return { sent, stopped: 'more' }
     if (item.status === 'blocked') {
       refreshPendingCount()
       return { sent, stopped: 'blocked' }

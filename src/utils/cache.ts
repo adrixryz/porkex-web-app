@@ -12,11 +12,12 @@ import { transactionTypeReviver } from './transactionTypes'
 import { t } from '@/i18n'
 
 const KEY = 'porkex_cache'
+const FALLBACK_KEY = 'porkex_stale_cache'
 
-// Enough for the views a user moves between, including a few filter
-// combinations of the transaction list. Bounded so browsing many filters cannot
-// grow localStorage without limit.
-const MAX_ENTRIES = 12
+// Keep enough recent responses to move among the main financial views. A total
+// character cap keeps localStorage bounded even when a response is large.
+const MAX_ENTRIES = 24
+const MAX_TOTAL_CHARS = 1_500_000
 const PINNED = new Set([
   '/categories',
   '/accounts',
@@ -24,6 +25,16 @@ const PINNED = new Set([
   '/tags',
   '/goals',
   '/favorites'
+])
+const CORE_ROUTES = new Set([
+  '/dashboard',
+  '/transactions',
+  '/analytics',
+  '/analytics/category-comparison',
+  '/budgets',
+  '/recurring',
+  '/accounts/movements',
+  '/profile'
 ])
 
 // A single response larger than this is not worth keeping: it would eat the
@@ -37,9 +48,9 @@ export interface CacheEntry<T = unknown> {
 
 type CacheMap = Record<string, CacheEntry>
 
-function readAll(): CacheMap {
+function readAll(key = KEY): CacheMap {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return {}
     const parsed = JSON.parse(raw, transactionTypeReviver)
     return parsed && typeof parsed === 'object' ? (parsed as CacheMap) : {}
@@ -48,34 +59,82 @@ function readAll(): CacheMap {
   }
 }
 
-function writeAll(map: CacheMap) {
+function writeAll(map: CacheMap, key = KEY): boolean {
   try {
-    localStorage.setItem(KEY, JSON.stringify(map))
+    localStorage.setItem(key, JSON.stringify(map))
+    return true
   } catch {
     // Quota exceeded or storage disabled: the cache is an optimisation, so
     // failing to store it must never break the app.
+    return false
   }
 }
 
-// Drops malformed entries and the ones that aged out, then trims to MAX_ENTRIES
-// keeping the most recently written.
-function normalize(map: CacheMap): CacheMap {
-  const valid: [string, CacheEntry][] = []
-  for (const [url, entry] of Object.entries(map)) {
-    if (entry && typeof entry.savedAt === 'number' && entry.data !== undefined) {
-      valid.push([url, entry])
-    }
+// Keep fresh and fallback responses within one shared bound. An invalidated
+// response is still useful offline, but must not crowd the cache independently.
+function normalizeStores(primary: CacheMap, fallback: CacheMap): [CacheMap, CacheMap] {
+  const valid: { url: string; entry: CacheEntry; fallback: boolean }[] = []
+  for (const [url, entry] of Object.entries(primary)) {
+    if (entry && typeof entry.savedAt === 'number' && entry.data !== undefined)
+      valid.push({ url, entry, fallback: false })
   }
-  valid.sort(
-    (a, b) => Number(PINNED.has(b[0])) - Number(PINNED.has(a[0])) || b[1].savedAt - a[1].savedAt
-  )
-  return Object.fromEntries(valid.slice(0, MAX_ENTRIES))
+  for (const [url, entry] of Object.entries(fallback)) {
+    if (!primary[url] && entry && typeof entry.savedAt === 'number' && entry.data !== undefined)
+      valid.push({ url, entry, fallback: true })
+  }
+  const route = (url: string) => url.replace(/^full-previous:/, '').split('?')[0]!
+  const latestCore = new Map<string, (typeof valid)[number]>()
+  for (const item of valid) {
+    const path = route(item.url)
+    if (!CORE_ROUTES.has(path)) continue
+    const current = latestCore.get(path)
+    if (
+      !current ||
+      item.entry.savedAt > current.entry.savedAt ||
+      (item.entry.savedAt === current.entry.savedAt && current.fallback && !item.fallback)
+    )
+      latestCore.set(path, item)
+  }
+  const priority = (item: (typeof valid)[number]) => {
+    const path = route(item.url)
+    const isLatestCore = latestCore.get(path)?.url === item.url
+    // Transactions is the main offline workflow: reserve room for its latest
+    // successful filtered response even when other views have large snapshots.
+    if (path === '/transactions' && isLatestCore) return 4
+    if (PINNED.has(item.url)) return 3
+    if (isLatestCore) return 2
+    if (CORE_ROUTES.has(path)) return 1
+    return 0
+  }
+  valid.sort((a, b) => priority(b) - priority(a) || b.entry.savedAt - a.entry.savedAt)
+  const kept: typeof valid = []
+  let totalChars = 2
+  for (const item of valid) {
+    if (kept.length >= MAX_ENTRIES) break
+    const chars = item.url.length + JSON.stringify(item.entry).length + 4
+    if (totalChars + chars > MAX_TOTAL_CHARS) continue
+    kept.push(item)
+    totalChars += chars
+  }
+  return [
+    Object.fromEntries(
+      kept.filter(value => !value.fallback).map(value => [value.url, value.entry])
+    ),
+    Object.fromEntries(kept.filter(value => value.fallback).map(value => [value.url, value.entry]))
+  ]
 }
 
 export function readCache<T>(url: string): CacheEntry<T> | null {
   const entry = readAll()[url]
   // Validated on read as well as on write: localStorage is shared with whatever
   // else this origin has stored, and a malformed entry must not reach a view.
+  if (!entry || typeof entry.savedAt !== 'number' || entry.data === undefined) return null
+  return entry as CacheEntry<T>
+}
+
+/** Last successful response retained when a write invalidates the live cache. */
+export function readFallbackCache<T>(url: string): CacheEntry<T> | null {
+  const entry = readAll(FALLBACK_KEY)[url]
   if (!entry || typeof entry.savedAt !== 'number' || entry.data === undefined) return null
   return entry as CacheEntry<T>
 }
@@ -89,33 +148,41 @@ export function writeCache<T>(url: string, data: T) {
   }
   if (serialized.length > MAX_BYTES) return
 
-  const map = normalize(readAll())
-  map[url] = { data, savedAt: Date.now() }
-  writeAll(normalize(map))
+  const primary = readAll()
+  const fallback = readAll(FALLBACK_KEY)
+  primary[url] = { data, savedAt: Date.now() }
+  delete fallback[url]
+  const [nextPrimary, nextFallback] = normalizeStores(primary, fallback)
+  if (writeAll(nextPrimary)) writeAll(nextFallback, FALLBACK_KEY)
 }
 
 /**
- * Forgets entries whose url contains any of the given fragments.
- * Called after a write so the next read does not replay a value the user has
- * already superseded.
+ * Removes matching entries from the live cache but retains their last good
+ * response as an offline fallback until a successful read replaces it.
  */
 export function invalidateCache(...fragments: string[]) {
   if (!fragments.length) return
   const map = readAll()
+  const fallback = readAll(FALLBACK_KEY)
   let changed = false
   for (const url of Object.keys(map)) {
-    // Catalog snapshots remain available offline while active consumers revalidate.
     if (!PINNED.has(url) && fragments.some(f => url.includes(f))) {
+      fallback[url] = map[url]!
       delete map[url]
       changed = true
     }
   }
-  if (changed) writeAll(map)
+  if (!changed) return
+  const [nextPrimary, nextFallback] = normalizeStores(map, fallback)
+  // Save the fallback first. If storage is full, keep the existing primary copy
+  // rather than deleting the only usable response.
+  if (writeAll(nextFallback, FALLBACK_KEY)) writeAll(nextPrimary)
 }
 
 export function clearCache() {
   try {
     localStorage.removeItem(KEY)
+    localStorage.removeItem(FALLBACK_KEY)
   } catch {
     // Nothing to do: see writeAll.
   }

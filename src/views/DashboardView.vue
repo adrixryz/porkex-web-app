@@ -27,9 +27,19 @@
           </div>
           <h1
             class="dashboard-total text-h3 font-weight-bold"
-            :class="!hideBalances && summary.globalBalance < 0 ? 'text-error' : 'text-on-surface'"
+            :class="
+              !hideBalances && !totalScopeUncertain && summary.globalBalance < 0
+                ? 'text-error'
+                : 'text-on-surface'
+            "
           >
-            {{ hideBalances ? '****' : cs + formatMoney(summary.globalBalance) }}
+            {{
+              hideBalances
+                ? '****'
+                : totalScopeUncertain
+                  ? '—'
+                  : cs + formatMoney(summary.globalBalance)
+            }}
           </h1>
         </template>
         <template #period>
@@ -61,7 +71,13 @@
               :value-sizing-length="kpiValueLength"
               responsive
               compact
-              :value="hideBalances ? '****' : `+${cs}${formatMoney(summary.totalIncome)}`"
+              :value="
+                hideBalances
+                  ? '****'
+                  : totalScopeUncertain
+                    ? '—'
+                    : `+${cs}${formatMoney(summary.totalIncome)}`
+              "
               :icon="mdiArrowUpCircleOutline"
               color="success"
               value-class="text-success"
@@ -73,7 +89,13 @@
               :value-sizing-length="kpiValueLength"
               responsive
               compact
-              :value="hideBalances ? '****' : `-${cs}${formatMoney(summary.totalExpense)}`"
+              :value="
+                hideBalances
+                  ? '****'
+                  : totalScopeUncertain
+                    ? '—'
+                    : `-${cs}${formatMoney(summary.totalExpense)}`
+              "
               :icon="mdiArrowDownCircleOutline"
               color="error"
               value-class="text-error"
@@ -85,7 +107,7 @@
               :value-sizing-length="kpiValueLength"
               responsive
               compact
-              :value="hideBalances ? '****' : summary.transactionCount"
+              :value="hideBalances ? '****' : totalScopeUncertain ? '—' : summary.transactionCount"
               :icon="mdiReceiptTextOutline"
               color="primary"
               value-class="text-on-surface"
@@ -96,9 +118,16 @@
       <v-alert v-if="dbError || budgetsError" type="warning" class="mb-4">
         {{ translate(dbError || budgetsError) }}
       </v-alert>
+      <v-alert v-if="totalScopeUncertain" type="info" class="mb-4">
+        {{
+          translate(
+            'Dashboard totals and lists are unavailable until the account inclusion change is resolved and data refreshes.'
+          )
+        }}
+      </v-alert>
 
       <!-- MAIN TWO COLUMNS -->
-      <v-row>
+      <v-row v-if="!totalScopeUncertain">
         <v-col cols="12" md="8" order="2" order-md="1">
           <AppCard
             :title="translate('Recent Transactions')"
@@ -359,7 +388,10 @@ import AppSegmentedControl from '@/components/ui/AppSegmentedControl.vue'
 import { Chart as ChartJS, ArcElement, Tooltip } from 'chart.js'
 import type { TooltipItem } from 'chart.js'
 import { Pie } from 'vue-chartjs'
-import { fetchJson } from '@/utils/api'
+import { fetchJson, getUser } from '@/utils/api'
+import { warmDefaultAnalyticsCache } from '@/utils/offlineWarmup'
+import { outboxRevision, ownedPending } from '@/utils/outbox'
+import { pendingAccountWrites } from '@/utils/pendingAccountWrites'
 import { useAsyncData } from '@/composables/useAsyncData'
 import type { BudgetsResponse, DashboardResponse } from '@/types'
 import { formatMoney, useCurrencySymbol } from '@/utils/currency'
@@ -401,6 +433,7 @@ const route = useRoute(),
   router = useRouter()
 const {
   accounts,
+  data: confirmedAccounts,
   activeAccounts,
   hasLoaded: accountsLoaded,
   loading: accountsLoading,
@@ -409,6 +442,39 @@ const {
 } = useAccounts()
 const balanceOptions = computed(() => [{ id: 'global', name: 'Total' }, ...activeAccounts.value])
 const selectedAccountId = useDashboardAccount()
+const pendingScopeChange = computed(() => {
+  void outboxRevision.value
+  const userId = getUser()?.id
+  if (!userId) return false
+  let operations
+  try {
+    operations = [...ownedPending(userId), ...pendingAccountWrites.values()]
+  } catch {
+    return true
+  }
+  return operations.some(operation => {
+    if (operation.userId !== userId) return false
+    if (operation.method !== 'PUT' || !/^\/accounts\/[^/]+$/.test(operation.path)) return false
+    try {
+      const body = JSON.parse(operation.body || '{}') as Record<string, unknown>
+      if (typeof body.excludeFromTotalBalance !== 'boolean') return false
+      const id = decodeURIComponent(operation.path.split('/')[2]!)
+      const confirmed = confirmedAccounts.value.find(account => account.id === id)
+      return (
+        ('outcome' in operation && operation.outcome === 'unknown') ||
+        !confirmed ||
+        body.excludeFromTotalBalance !== (confirmed.excludeFromTotalBalance ?? false)
+      )
+    } catch {
+      return true
+    }
+  })
+})
+const awaitingScopeRefresh = ref(false)
+const totalScopeUncertain = computed(
+  () =>
+    selectedAccountId.value === 'global' && (pendingScopeChange.value || awaitingScopeRefresh.value)
+)
 watch(
   () => route.query.account ?? route.query.accountId,
   value => {
@@ -475,11 +541,12 @@ const periodLabel = computed(() =>
   formatPeriodLabel(dashboardPeriod.value, periodRange.value.from, periodRange.value.to)
 )
 const dashboardUrl = () =>
-  `/dashboard?from=${periodRange.value.from}&to=${periodRange.value.to}${accountQuery()}`
+  `/dashboard?from=${periodRange.value.from}&to=${periodRange.value.to}&scope=dashboard${accountQuery()}`
 const {
   data: db,
   loading,
   hasLoaded,
+  isStale: dashboardStale,
   error: dbError,
   run: fetchDashboard
 } = useAsyncData<DashboardResponse>(
@@ -488,7 +555,11 @@ const {
   { cacheKey: dashboardUrl }
 )
 const canGoBack = computed(
-  () => !loading.value && !!db.value.earliestDate && periodRange.value.from > db.value.earliestDate
+  () =>
+    !totalScopeUncertain.value &&
+    !loading.value &&
+    !!db.value.earliestDate &&
+    periodRange.value.from > db.value.earliestDate
 )
 
 let hidden = false
@@ -523,9 +594,11 @@ onMounted(() => void fetchAccounts())
 // The client's calendar day and preferred week start anchor it.
 const budgetPeriod = computed(() => dashboardBudgetPeriod(dashboardPeriod.value))
 const budgetsCacheKey = () =>
-  `/budgets?period=${budgetPeriod.value}&weekStart=${getFirstDayOfWeek()}&today=${toDateOnly(periodAnchor.value)}${accountQuery()}`
+  `/budgets?period=${budgetPeriod.value}&weekStart=${getFirstDayOfWeek()}&today=${toDateOnly(periodAnchor.value)}${selectedAccountId.value === 'global' ? '&scope=dashboard' : accountQuery()}`
 const {
   data: budgets,
+  hasLoaded: budgetsLoaded,
+  isStale: budgetsStale,
   run: fetchBudgets,
   error: budgetsError
 } = useAsyncData<BudgetsResponse>(
@@ -536,6 +609,17 @@ const {
   { budgets: [], totals: [] },
   { cacheKey: budgetsCacheKey }
 )
+
+// Dashboard is the first screen most sessions open. Warm Analytics' default
+// charts in the background so that screen can still render offline even if the
+// user has not navigated to Analytics yet in this browser session.
+let analyticsCacheWarmed = false
+watch([hasLoaded, dashboardStale], ([loaded, stale]) => {
+  if (loaded && !stale && !analyticsCacheWarmed) {
+    analyticsCacheWarmed = true
+    void warmDefaultAnalyticsCache()
+  }
+})
 
 const visibleRecent = computed(() =>
   db.value.recentTransactions.filter(tx => !hiddenTransactionIds.value.has(tx.id)).slice(0, 8)
@@ -604,6 +688,43 @@ const loadDashboard = async () => {
   await Promise.all([fetchDashboard(), fetchBudgets()])
   if (dbError.value) showSnack(dbError.value, 'error')
 }
+
+let dashboardBeforeScopeRefresh: DashboardResponse | null = null
+let budgetsBeforeScopeRefresh: BudgetsResponse | null = null
+watch(
+  pendingScopeChange,
+  (pending, previouslyPending) => {
+    if (pending) {
+      awaitingScopeRefresh.value = true
+      dashboardBeforeScopeRefresh = null
+      budgetsBeforeScopeRefresh = null
+    } else if (previouslyPending) {
+      dashboardBeforeScopeRefresh = db.value
+      budgetsBeforeScopeRefresh = budgets.value
+      if (selectedAccountId.value === 'global') void loadDashboard()
+    }
+  },
+  { immediate: true }
+)
+watch([db, budgets, hasLoaded, budgetsLoaded, dashboardStale, budgetsStale], () => {
+  if (
+    awaitingScopeRefresh.value &&
+    !pendingScopeChange.value &&
+    selectedAccountId.value === 'global' &&
+    dashboardBeforeScopeRefresh &&
+    budgetsBeforeScopeRefresh &&
+    db.value !== dashboardBeforeScopeRefresh &&
+    budgets.value !== budgetsBeforeScopeRefresh &&
+    hasLoaded.value &&
+    budgetsLoaded.value &&
+    !dashboardStale.value &&
+    !budgetsStale.value
+  ) {
+    awaitingScopeRefresh.value = false
+    dashboardBeforeScopeRefresh = null
+    budgetsBeforeScopeRefresh = null
+  }
+})
 
 watch([dashboardUrl, budgetsCacheKey, todayInput], () => {
   db.value = { ...EMPTY_DASHBOARD }

@@ -13,6 +13,19 @@ export const hasStaleData = ref(false)
 // When the cached copy currently on screen was stored, for the banner text.
 export const staleSavedAt = ref<number | null>(null)
 
+// Distinguish a reachable network from a reachable API. Render (or another
+// gateway) can return 502 while navigator.onLine is still true; writes should
+// use the durable outbox instead of waiting for that backend to wake.
+export const isServerUnavailable = ref(false)
+
+export function markServerUnavailable() {
+  isServerUnavailable.value = true
+}
+
+export function markServerAvailable() {
+  isServerUnavailable.value = false
+}
+
 // Distinguishes "no signal at all" from "the server is waking up": the first is
 // the device, the second is a cold start nobody can do anything about.
 export const isOffline = ref(typeof navigator !== 'undefined' && navigator.onLine === false)
@@ -71,8 +84,9 @@ export function resetConnection() {
   staleOwners.clear()
   hasStaleData.value = false
   staleSavedAt.value = null
+  isServerUnavailable.value = false
 }
 
 export function useConnection() {
-  return { hasStaleData, staleSavedAt, isOffline }
+  return { hasStaleData, staleSavedAt, isOffline, isServerUnavailable }
 }

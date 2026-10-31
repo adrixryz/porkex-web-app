@@ -4,13 +4,19 @@ import { mutationError } from './validation'
 import { showSnack } from '@/composables/useSnackbar'
 import type { User } from '@/types'
 import { clearCache, invalidateCache } from './cache'
-import { resetConnection } from './connection'
+import {
+  isServerUnavailable,
+  markServerAvailable,
+  markServerUnavailable,
+  resetConnection
+} from './connection'
 import {
   claimLegacyOutbox,
   drainOutbox,
   enqueue,
   hasLegacyOutbox,
   lastFlushError,
+  ownedPending,
   pendingCount,
   setOutboxUser,
   withSendLock,
@@ -18,6 +24,7 @@ import {
 } from './outbox'
 import { requestRevalidation } from './revalidation'
 import { sharedRead } from './sharedReads'
+import { pendingAccountWrites } from './pendingAccountWrites'
 
 const API_ORIGIN = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 const API_BASE = `${API_ORIGIN}/api`
@@ -127,6 +134,7 @@ function recordRecurringState(response: Response, session: Session) {
 
 function handleResponse(response: Response, session: Session): Response {
   assertCurrent(session)
+  noteServerResponse(response)
   if (response.status === 401) {
     let rotating = false
     try {
@@ -149,6 +157,11 @@ function handleResponse(response: Response, session: Session): Response {
   return response
 }
 
+function noteServerResponse(response: Response) {
+  if ([408, 502, 503, 504].includes(response.status)) markServerUnavailable()
+  else markServerAvailable()
+}
+
 const WRITE_INVALIDATES = [
   '/accounts',
   '/transfers',
@@ -164,6 +177,10 @@ const WRITE_INVALIDATES = [
 ]
 const READ_TIMEOUT_MS = 45_000
 const WRITE_TIMEOUT_MS = 45_000
+// A cold gateway must not keep a normal form open while the server wakes.
+// An aborted request may have reached the server, so it is queued as unknown
+// with its original create/edit identifiers and retried through the outbox.
+const QUEUEABLE_WRITE_TIMEOUT_MS = 4_000
 const AUTH_TIMEOUT_MS = 30_000
 
 function browserTimeZone(): string {
@@ -219,7 +236,16 @@ export function isQueuedResponse(response: Response): boolean {
 
 function confirmedWrite(path: string, notify = true) {
   readGeneration++
-  invalidateCache(...WRITE_INVALIDATES, ...(path === '/profile' ? ['/profile'] : []))
+  // Profile preferences and favorite templates do not change recorded
+  // balances or movements. Keep their unrelated snapshots available when the
+  // server is cold; active views still revalidate after every confirmed write.
+  const affected =
+    path === '/profile'
+      ? ['/profile']
+      : /^\/favorites(?:\/|$)/.test(path)
+        ? ['/favorites']
+        : WRITE_INVALIDATES
+  invalidateCache(...affected)
   if (notify) requestRevalidation()
 }
 
@@ -246,12 +272,19 @@ async function sendQueued(mutation: QueuedMutation, session: Session): Promise<R
   }
   activeWrites.value += 1
   try {
-    const response = await fetch(`${API_BASE}${mutation.path}`, {
-      method: mutation.method,
-      headers: requestHeaders(session),
-      signal: withTimeout(undefined, WRITE_TIMEOUT_MS),
-      ...(body !== null ? { body } : {})
-    })
+    let response: Response
+    try {
+      response = await fetch(`${API_BASE}${mutation.path}`, {
+        method: mutation.method,
+        headers: requestHeaders(session),
+        signal: withTimeout(undefined, QUEUEABLE_WRITE_TIMEOUT_MS),
+        ...(body !== null ? { body } : {})
+      })
+    } catch (error) {
+      if (isNetworkFailure(error)) markServerUnavailable()
+      throw error
+    }
+    noteServerResponse(response)
     if (response.status === 401) expireSession(session)
     else if (isCurrent(session)) {
       recordRecurringState(response, session)
@@ -353,14 +386,18 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
   }
 
   if (isRead) {
-    const response = handleResponse(
-      await fetch(`${API_BASE}${path}`, {
+    let rawResponse: Response
+    try {
+      rawResponse = await fetch(`${API_BASE}${path}`, {
         ...options,
         signal: withTimeout(options.signal, READ_TIMEOUT_MS),
         headers: requestHeaders(session, options.headers)
-      }),
-      session
-    )
+      })
+    } catch (error) {
+      if (isNetworkFailure(error)) markServerUnavailable()
+      throw error
+    }
+    const response = handleResponse(rawResponse, session)
     if (response.ok && pendingCount.value > 0) {
       void syncPendingWrites().catch(error => {
         lastFlushError.value =
@@ -381,6 +418,12 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
     path === '/profile' && method === 'PUT' && typeof body === 'string' ? crypto.randomUUID() : null
   if (profileWrite)
     activeProfileChanges.set(profileWrite, { userId, patch: JSON.parse(body as string) })
+  const accountWrite =
+    method === 'PUT' && /^\/accounts\/[^/?]+$/.test(path) && typeof body === 'string'
+      ? crypto.randomUUID()
+      : null
+  if (accountWrite)
+    pendingAccountWrites.set(accountWrite, { userId, path, method, body: body as string })
   const savePending = async (alreadyAttempted = false) => {
     if (!alreadyAttempted) assertCurrent(session)
     await enqueue({
@@ -407,15 +450,16 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
   try {
     return await withSendLock(userId, async () => {
       assertCurrent(session)
+      // No request can reach the server while the device is offline. Save the
+      // new operation behind the existing queue without attempting a replay.
+      // Legacy unowned entries still require their normal ownership check.
+      if ((navigator.onLine === false || isServerUnavailable.value) && !hasLegacyOutbox())
+        return savePending()
       await verifyLegacyOwner(session)
-      const flushed = await drainOutbox(
-        userId,
-        m => sendQueued(m, session),
-        () => isCurrent(session)
-      )
-      if (flushed.sent > 0 && isCurrent(session)) requestRevalidation()
       assertCurrent(session)
-      if (flushed.stopped !== 'empty') {
+      // Preserve FIFO without making a new form wait for every older request.
+      // Recovery will replay the queue, including this operation, in order.
+      if (ownedPending(userId).length > 0) {
         if (!queueable) throw new Error('Sync your pending changes before changing the password.')
         return savePending()
       }
@@ -425,20 +469,25 @@ export async function api(path: string, options: RequestInit = {}): Promise<Resp
           ...options,
           method,
           body: body ?? undefined,
-          signal: withTimeout(options.signal, WRITE_TIMEOUT_MS),
+          signal: withTimeout(options.signal, QUEUEABLE_WRITE_TIMEOUT_MS),
           headers: requestHeaders(session, options.headers, timeZone)
         })
       } catch (error) {
         if (!queueable || !isNetworkFailure(error)) throw error
+        markServerUnavailable()
         return await savePending(true)
       }
-      if ([408, 502, 503, 504].includes(response.status)) return await savePending(true)
+      if ([408, 502, 503, 504].includes(response.status)) {
+        noteServerResponse(response)
+        return await savePending(true)
+      }
       const handled = handleResponse(response, session)
       if (response.ok) confirmedWrite(path)
       return handled
     })
   } finally {
     if (profileWrite) activeProfileChanges.delete(profileWrite)
+    if (accountWrite) pendingAccountWrites.delete(accountWrite)
     activeWrites.value -= 1
   }
 }
@@ -557,16 +606,30 @@ export function syncPendingWrites(): Promise<void> {
   const session = captureSession()
   if (!session.token || session.userId === null) return Promise.resolve()
   const userId = session.userId
-  synchronizing = withSendLock(userId, async () => {
-    if (!isCurrent(session)) return
-    await verifyLegacyOwner(session)
-    const flushed = await drainOutbox(
-      userId,
-      m => sendQueued(m, session),
-      () => isCurrent(session)
-    )
-    if (flushed.sent > 0 && isCurrent(session)) requestRevalidation()
-  }).finally(() => {
+  synchronizing = (async () => {
+    // Release the account lock between queued writes. A new form can then
+    // append its operation without waiting for an entire backlog to replay.
+    let sent = 0
+    try {
+      while (isCurrent(session)) {
+        const flushed = await withSendLock(userId, async () => {
+          if (!isCurrent(session)) return null
+          await verifyLegacyOwner(session)
+          return drainOutbox(
+            userId,
+            m => sendQueued(m, session),
+            () => isCurrent(session),
+            1
+          )
+        })
+        if (!flushed) return
+        sent += flushed.sent
+        if (flushed.stopped !== 'more') return
+      }
+    } finally {
+      if (sent > 0 && isCurrent(session)) requestRevalidation()
+    }
+  })().finally(() => {
     synchronizing = null
   })
   return synchronizing
